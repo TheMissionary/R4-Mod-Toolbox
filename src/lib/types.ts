@@ -1,0 +1,64 @@
+export type ActiveView = 'home' | 'archive' | 'cet' | 'red4ext' | 'redscript';
+
+export interface ArchiveItem {
+  name: string;
+  file_name: string;
+  path: string;
+  size_bytes: number;
+  file_count: number;
+  enabled: boolean;
+  has_conflicts: boolean;
+  conflicts_with: string[];
+  wins: string[];
+  loses: string[];
+}
+
+export interface CategoryItem {
+  id: string;
+  name: string;
+  enabled: boolean;
+  collapsed: boolean;
+  isEditing: boolean;
+}
+
+export type LoadOrderItem =
+  | { type: 'category'; category: CategoryItem }
+  | { type: 'archive'; archive: ArchiveItem };
+
+export interface ArchiveScanReport {
+  archives: ArchiveItem[];
+  total_conflicts: number;
+  affected_archives_count: number;
+}
+
+export interface CetPluginItem {
+  name: string;
+  path: string;
+  has_init: boolean;
+  size_bytes: number;
+  enabled: boolean;
+}
+
+export interface Red4extPluginItem {
+  name: string;
+  path: string;
+  size_bytes: number;
+  enabled: boolean;
+}
+
+export interface RedScriptItem {
+  name: string;
+  path: string;
+  reds_count: number;
+  size_bytes: number;
+  enabled: boolean;
+}
+
+export interface ScanResult {
+  is_valid_game_path: boolean;
+  game_version: string;
+  archive_count: number;
+  cet_count: number;
+  red4ext_count: number;
+  redscript_count: number;
+}

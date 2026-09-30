@@ -1,0 +1,7 @@
+node_modules/
+src-tauri/target/
+dist/
+.svelte-kit/
+scripts/
+*.log
+_Terminal_Output.txt

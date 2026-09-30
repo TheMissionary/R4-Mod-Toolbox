@@ -1,0 +1,25 @@
+﻿@import "../node_modules/tailwindcss/index.css";
+
+@theme {
+  --color-nvidia-bg: #121517;
+  --color-nvidia-surface: #181c20;
+  --color-nvidia-card: #1e2328;
+  --color-nvidia-border: #2a323d;
+  --color-nvidia-accent: #76b900;
+  --color-nvidia-accent-hover: #88d600;
+  --color-nvidia-text-muted: #94a3b8;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-nvidia-bg);
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}

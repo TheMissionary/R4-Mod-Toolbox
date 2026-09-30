@@ -1,0 +1,22 @@
+[package]
+name = "red4-mod-toolbox"
+version = "0.1.0"
+description = "Cyberpunk 2077 Mod and Conflict Management Tool"
+authors = ["Jason"]
+edition = "2021"
+
+[lib]
+name = "red4_desktop_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+notify = "6.1.1"
+red4lib = { git = "https://github.com/rfuzzo/red4lib", rev = "cfa6713570e9bf859c29c05052035d38daa08d55" }
