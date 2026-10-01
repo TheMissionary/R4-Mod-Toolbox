@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { CetPluginItem } from '$lib/types';
-  import { Search, Eye, EyeOff } from 'lucide-svelte';
+  import { Search, X, Eye, EyeOff } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
 
   let {
@@ -55,8 +55,18 @@
         type="text"
         bind:value={searchQuery}
         placeholder="Filter CET plugins..."
-        class="w-full pl-9 pr-3 py-1.5 rounded border border-nvidia-border bg-nvidia-surface/80 text-xs text-white placeholder:text-nvidia-text-muted/60 focus:outline-hidden focus:border-nvidia-accent font-sans"
+        class="w-full pl-9 pr-8 py-1.5 rounded border border-nvidia-border bg-nvidia-surface/80 text-xs text-white placeholder:text-nvidia-text-muted/60 focus:outline-hidden focus:border-nvidia-accent font-sans"
       />
+      {#if searchQuery !== ''}
+        <button
+          type="button"
+          onclick={() => searchQuery = ''}
+          class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-nvidia-text-muted hover:text-white transition cursor-pointer"
+          title="Clear search"
+        >
+          <X class="h-3.5 w-3.5" />
+        </button>
+      {/if}
     </div>
     <div class="text-xs font-mono text-nvidia-text-muted">
       Active: <span class="text-nvidia-accent font-semibold">{activeCount}</span> / {plugins.length}

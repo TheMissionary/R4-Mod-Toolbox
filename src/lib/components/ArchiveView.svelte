@@ -7,6 +7,7 @@
     ChevronRight,
     CheckCircle2,
     Search,
+    X,
     Crown,
     ShieldAlert,
     FolderPlus,
@@ -157,15 +158,39 @@
   async function toggleMod(archive: ArchiveItem) {
     const next = !archive.enabled;
     archive.enabled = next;
+    
     try {
+      // 1. Toggle the target item (whether it's a mod or a category delimiter)
       await invoke('toggle_mod_state', {
         gamePath,
         modName: archive.file_name,
         enable: next
       });
+
+      // 2. If it IS a delimiter, batch toggle everything below it until the next delimiter
+      if (archive.is_delimiter) {
+        const startIndex = localArchives.findIndex(a => a.file_name === archive.file_name);
+        if (startIndex !== -1) {
+          for (let i = startIndex + 1; i < localArchives.length; i++) {
+            const child = localArchives[i];
+            if (child.is_delimiter) break; // Stop at the next category
+            
+            if (child.enabled !== next) {
+              child.enabled = next;
+              await invoke('toggle_mod_state', {
+                gamePath,
+                modName: child.file_name,
+                enable: next
+              });
+            }
+          }
+        }
+      }
+
+      // 3. Save the final state
       persistState();
     } catch (err) {
-      console.error('Failed to toggle mod:', err);
+      console.error('Failed to toggle mod/category:', err);
     }
   }
 
@@ -488,8 +513,18 @@
         type="text"
         bind:value={searchQuery}
         placeholder="Filter mods or categories..."
-        class="w-full pl-9 pr-4 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-white placeholder-nvidia-text-muted focus:outline-none focus:border-nvidia-accent"
+        class="w-full pl-9 pr-8 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-white placeholder-nvidia-text-muted focus:outline-none focus:border-nvidia-accent"
       />
+      {#if searchQuery !== ''}
+        <button
+          type="button"
+          onclick={() => searchQuery = ''}
+          class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-nvidia-text-muted hover:text-white transition cursor-pointer"
+          title="Clear search"
+        >
+          <X class="h-3.5 w-3.5" />
+        </button>
+      {/if}
     </div>
 
     <div class="flex items-center gap-2.5">
