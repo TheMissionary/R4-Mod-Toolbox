@@ -1,12 +1,14 @@
 <script lang="ts">
   import type { ArchiveItem } from '$lib/types';
-  import { GripVertical, Folder } from 'lucide-svelte';
+  import { GripVertical, Folder, FolderOpen } from 'lucide-svelte';
 
   let {
     archive,
     originalIndex,
     isSource,
     isHighlighted,
+    collapsed = false,
+    onToggleCollapse,
     onDragStart,
     onPointerMove,
     onToggle,
@@ -17,6 +19,8 @@
     originalIndex: number;
     isSource: boolean;
     isHighlighted: boolean;
+    collapsed?: boolean;
+    onToggleCollapse?: (categoryFileName: string) => void;
     onDragStart: (e: PointerEvent, index: number) => void;
     onPointerMove: (e: PointerEvent, index: number) => void;
     onToggle: (archive: ArchiveItem) => void;
@@ -58,7 +62,19 @@
         <div class="h-3 w-3 rounded-full bg-black transition transform {archive.enabled ? 'translate-x-3': 'translate-x-0'}"></div>
       </button>
 
-      <Folder class="h-4 w-4 text-nvidia-accent shrink-0" />
+      <!-- Collapse / Expand Toggle Button -->
+      <button
+        type="button"
+        onclick={() => onToggleCollapse && onToggleCollapse(archive.file_name)}
+        class="text-nvidia-accent hover:text-nvidia-accent-hover transition shrink-0 p-1 rounded hover:bg-nvidia-surface/60 cursor-pointer"
+        title={collapsed ? "Expand category" : "Collapse category"}
+      >
+        {#if collapsed}
+          <Folder class="h-4 w-4" />
+        {:else}
+          <FolderOpen class="h-4 w-4" />
+        {/if}
+      </button>
 
       <span class="text-sm font-bold text-white uppercase tracking-wider truncate">
         {archive.category_name || archive.file_name.replace('[CAT] ', '').replace('.archive', '')}
@@ -67,7 +83,7 @@
 
     <div class="flex items-center gap-2 shrink-0">
       <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-nvidia-accent/10 border border-nvidia-accent/30 text-nvidia-accent uppercase tracking-widest">
-        Physical Category
+        Category Marker
       </span>
     </div>
   </div>

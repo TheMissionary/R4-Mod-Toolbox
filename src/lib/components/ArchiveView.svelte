@@ -49,6 +49,14 @@
   let scrollContainer = $state<HTMLElement | null>(null);
   let showXlHelp = $state(false);
 
+  // Category Collapsing State
+  let collapsedCategories = $state<Record<string, boolean>>({});
+  let preDragCollapseState = $state<Record<string, boolean> | null>(null);
+
+  function toggleCategoryCollapse(categoryFileName: string) {
+    collapsedCategories[categoryFileName] = !collapsedCategories[categoryFileName];
+  }
+
   // Context Menu State
   let contextMenu = $state<{
     visible: boolean;
@@ -90,7 +98,9 @@
   let highlightedModName = $state<string | null>(null);
   let highlightTimeoutId: number | null = null;
 
+  // Drag and Drop State
   let activeDragIndex = $state<number | null>(null);
+  let dragBlockSize = $state<number>(1);
   let dropTargetIndex = $state<number | null>(null);
   let dropPlacement = $state<'before' | 'after' | null>(null);
   let cursorX = $state(0);
@@ -100,7 +110,7 @@
   let animationFrameId: number | null = null;
 
   function formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 B';
+    if (!bytes || bytes === 0) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -112,7 +122,6 @@
     localStorage.setItem('cp2077_show_conflict_summary', showConflictSummary.toString());
   }
 
-  // Hardened sync: deeply track the archives array so external scans trigger UI updates
   $effect(() => {
     if (archives && archives.length >= 0) {
       localArchives = [...archives];
@@ -146,7 +155,6 @@
       if (report && Array.isArray(report.archives)) {
         archives = report.archives;
         if (onStateChanged) onStateChanged();
-        // Scroll to TOP to see the newly prepended category
         setTimeout(() => {
           if (scrollContainer) {
             scrollContainer.scrollTop = 0;
@@ -163,20 +171,18 @@
     archive.enabled = next;
     
     try {
-      // 1. Toggle the target item (whether it's a mod or a category delimiter)
       await invoke('toggle_mod_state', {
         gamePath,
         modName: archive.file_name,
         enable: next
       });
 
-      // 2. If it IS a delimiter, batch toggle everything below it until the next delimiter
       if (archive.is_delimiter) {
         const startIndex = localArchives.findIndex(a => a.file_name === archive.file_name);
         if (startIndex !== -1) {
           for (let i = startIndex + 1; i < localArchives.length; i++) {
             const child = localArchives[i];
-            if (child.is_delimiter) break; // Stop at the next category
+            if (child.is_delimiter) break;
             
             if (child.enabled !== next) {
               child.enabled = next;
@@ -190,7 +196,6 @@
         }
       }
 
-      // 3. Save the final state and notify parent to update global counts
       persistState();
       if (onStateChanged) onStateChanged();
     } catch (err) {
@@ -243,6 +248,25 @@
     cursorX = event.clientX;
     cursorY = event.clientY;
     scrollSpeed = 0;
+
+    let size = 1;
+    if (localArchives[index].is_delimiter) {
+      for (let i = index + 1; i < localArchives.length; i++) {
+        if (localArchives[i].is_delimiter) break;
+        size++;
+      }
+
+      // Save user's current collapse preferences and force-collapse all categories
+      preDragCollapseState = { ...collapsedCategories };
+      const allCollapsed: Record<string, boolean> = {};
+      for (const item of localArchives) {
+        if (item.is_delimiter) {
+          allCollapsed[item.file_name] = true;
+        }
+      }
+      collapsedCategories = allCollapsed;
+    }
+    dragBlockSize = size;
   }
 
   function onPointerMove(event: PointerEvent) {
@@ -274,6 +298,10 @@
 
   function onRowPointerMove(event: PointerEvent, index: number) {
     if (activeDragIndex === null) return;
+    
+    // Prevent dropping inside the dragged block itself
+    if (index >= activeDragIndex && index < activeDragIndex + dragBlockSize) return;
+
     dropTargetIndex = index;
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const midPoint = rect.top + rect.height / 2;
@@ -289,22 +317,48 @@
 
     if (activeDragIndex !== null && dropTargetIndex !== null && dropPlacement !== null) {
       let targetIndex = dropTargetIndex;
+      
       if (dropPlacement === 'after') {
-        targetIndex += 1;
+        // If dropping after a collapsed category header, drop after all of its hidden mods!
+        if (localArchives[dropTargetIndex].is_delimiter) {
+          let targetBlockEnd = dropTargetIndex;
+          for (let i = dropTargetIndex + 1; i < localArchives.length; i++) {
+            if (localArchives[i].is_delimiter) break;
+            targetBlockEnd++;
+          }
+          targetIndex = targetBlockEnd + 1;
+        } else {
+          targetIndex += 1;
+        }
       }
+      
+      // Adjust target index if we are moving down the list
       if (activeDragIndex < targetIndex) {
-        targetIndex -= 1;
+        if (targetIndex > activeDragIndex + dragBlockSize) {
+          targetIndex -= dragBlockSize;
+        } else {
+          targetIndex = activeDragIndex;
+        }
       }
 
       if (activeDragIndex !== targetIndex) {
         const updated = [...localArchives];
-        const [movedItem] = updated.splice(activeDragIndex, 1);
-        updated.splice(targetIndex, 0, movedItem);
+        const movedItems = updated.splice(activeDragIndex, dragBlockSize);
+        updated.splice(targetIndex, 0, ...movedItems);
+        
         localArchives = updated;
         persistState();
       }
     }
+    
+    // Restore user's previous collapse preferences
+    if (preDragCollapseState !== null) {
+      collapsedCategories = { ...preDragCollapseState };
+      preDragCollapseState = null;
+    }
+
     activeDragIndex = null;
+    dragBlockSize = 1;
     dropTargetIndex = null;
     dropPlacement = null;
   }
@@ -381,22 +435,36 @@
     }
   }
 
+  // Filtered view that honors collapsed category states
   let visibleItems = $derived.by(() => {
     const result: { archive: ArchiveItem; originalIndex: number; archiveRank: number }[] = [];
     let rank = 0;
+    let currentCategoryCollapsed = false;
 
     for (let i = 0; i < localArchives.length; i++) {
       const archive = localArchives[i];
-      if (!archive.is_delimiter) {
+
+      if (archive.is_delimiter) {
+        currentCategoryCollapsed = !!collapsedCategories[archive.file_name];
+        if (searchQuery === '' || archive.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+          result.push({ 
+            archive, 
+            originalIndex: i, 
+            archiveRank: 0 
+          });
+        }
+      } else {
         rank += 1;
-      }
-      
-      if (searchQuery === '' || archive.name.toLowerCase().includes(searchQuery.toLowerCase())) {
-        result.push({ 
-          archive, 
-          originalIndex: i, 
-          archiveRank: archive.is_delimiter ? 0 : rank 
-        });
+        // Hide mod if its parent category is collapsed (unless searching)
+        if (!currentCategoryCollapsed || searchQuery !== '') {
+          if (searchQuery === '' || archive.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+            result.push({ 
+              archive, 
+              originalIndex: i, 
+              archiveRank: rank 
+            });
+          }
+        }
       }
     }
     return result;
@@ -435,7 +503,12 @@
     <GripVertical class="h-3.5 w-3.5 text-[#76b900]" />
     {#if draggedEntry.is_delimiter}
       <Folder class="h-3.5 w-3.5 text-[#76b900]" />
-      <span class="text-xs font-bold text-white uppercase tracking-wider">{draggedEntry.category_name || draggedEntry.file_name.replace('[CAT] ', '').replace('.archive', '')}</span>
+      <span class="text-xs font-bold text-white uppercase tracking-wider">
+        {draggedEntry.category_name || draggedEntry.file_name.replace('[CAT] ', '').replace('.archive', '')}
+        {#if dragBlockSize > 1}
+          <span class="text-[#76b900] ml-1">({dragBlockSize - 1} mods)</span>
+        {/if}
+      </span>
     {:else}
       <span class="text-xs font-mono font-semibold text-white">{draggedEntry.file_name}</span>
     {/if}
@@ -451,7 +524,6 @@
     onclick={(e) => e.stopPropagation()}
     oncontextmenu={(e) => e.preventDefault()}
   >
-    <!-- Header with Monospace Filename -->
     <div class="px-3 py-1.5 border-b border-nvidia-border/60 bg-nvidia-card/40 flex items-center justify-between gap-2">
       <div class="flex items-center gap-1.5 min-w-0 flex-1">
         {#if contextMenu.targetType === 'xl'}
@@ -470,9 +542,7 @@
       </span>
     </div>
 
-    <!-- Actions -->
     <div class="p-1 space-y-0.5">
-      <!-- Show in Explorer -->
       <button
         type="button"
         onclick={handleContextMenuShowInExplorer}
@@ -482,7 +552,6 @@
         <span>Show in Explorer</span>
       </button>
 
-      <!-- Enable / Disable (Mirrors Switch) -->
       <button
         type="button"
         onclick={handleContextMenuToggle}
@@ -492,7 +561,6 @@
         <span>{contextMenu.archive.enabled ? (contextMenu.archive.is_delimiter ? 'Disable Category' : 'Disable Mod') : (contextMenu.archive.is_delimiter ? 'Enable Category' : 'Enable Mod')}</span>
       </button>
 
-      <!-- Copy File Name -->
       <button
         type="button"
         onclick={handleContextMenuCopyName}
@@ -574,9 +642,9 @@
         </div>
       {:else}
         {#each visibleItems as { archive, originalIndex, archiveRank } (archive.file_name)}
-          {@const isSource = activeDragIndex === originalIndex}
-          {@const showLineBefore = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'before' && activeDragIndex !== originalIndex && activeDragIndex !== originalIndex - 1}
-          {@const showLineAfter = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'after' && activeDragIndex !== originalIndex && activeDragIndex !== originalIndex + 1}
+          {@const isSource = activeDragIndex !== null && originalIndex >= activeDragIndex && originalIndex < activeDragIndex + dragBlockSize}
+          {@const showLineBefore = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'before' && !isSource}
+          {@const showLineAfter = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'after' && !isSource}
 
           <div class="relative flex flex-col">
             {#if showLineBefore}
@@ -590,6 +658,8 @@
                 {archive}
                 {originalIndex}
                 {isSource}
+                collapsed={!!collapsedCategories[archive.file_name]}
+                onToggleCollapse={toggleCategoryCollapse}
                 isHighlighted={highlightedModName === archive.file_name}
                 onDragStart={startDrag}
                 onPointerMove={onRowPointerMove}
@@ -639,7 +709,6 @@
                       {archive.file_name}
                     </span>
 
-                    <!-- Flat Inline XL Badge with Isolated Context Menu Trigger -->
                     {#if archive.associated_xl}
                       <span
                         role="button"
@@ -743,7 +812,6 @@
       <!-- Dedicated Bottom Section: Unassociated .xl Files -->
       {#if unassociatedXlFiles.length > 0}
         <div class="mt-6 pt-4 border-t border-nvidia-border/60 space-y-2">
-          <!-- Section Header with Help Trigger -->
           <div class="rounded-lg border border-cyan-900/40 bg-gradient-to-r from-[#0e171f] via-[#101923] to-nvidia-surface px-3 py-2 flex items-center justify-between">
             <div class="flex items-center gap-2 min-w-0">
               <FileCode class="h-4 w-4 text-cyan-400 shrink-0" />
@@ -772,7 +840,6 @@
             </div>
           </div>
 
-          <!-- Explanatory Help Card -->
           {#if showXlHelp}
             <div class="p-3 rounded-lg border border-cyan-800/50 bg-cyan-950/20 text-xs text-gray-300 space-y-1.5">
               <div class="flex items-center gap-2 text-cyan-300 font-semibold">
@@ -791,7 +858,6 @@
             </div>
           {/if}
 
-          <!-- Read-only List of Unassociated Files -->
           <div class="space-y-1">
             {#each unassociatedXlFiles as xl (xl.file_name)}
               <div class="rounded border border-cyan-950/60 bg-nvidia-surface/80 px-3 py-1.5 flex items-center justify-between h-8">
