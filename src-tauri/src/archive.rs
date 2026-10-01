@@ -360,8 +360,11 @@ pub fn save_modlist(base_game_path: &str, ordered_archives: Vec<String>) -> Resu
     for name in ordered_archives {
         let clean_name = clean_name_str(&name);
         if clean_name.ends_with(".archive") {
-            let actual_path = archive_dir.join(&clean_name);
-            if actual_path.exists() {
+            let active_path = archive_dir.join(&clean_name);
+            let disabled_path = archive_dir.join(format!("{}.disabled", clean_name));
+            
+            // If either the active or disabled file exists, preserve its position in modlist.txt
+            if active_path.exists() || disabled_path.exists() {
                 let line = format!("{}\r\n", clean_name);
                 file.write_all(line.as_bytes()).map_err(|e| e.to_string())?;
             }
