@@ -31,7 +31,6 @@
 
   type TabType = 'home' | 'archive' | 'cet' | 'red4ext' | 'redscript';
 
-  // Synchronously read the saved tab before the component even renders
   function getInitialTab(): TabType {
     if (typeof sessionStorage !== 'undefined') {
       const saved = sessionStorage.getItem('cp2077_active_tab');
@@ -44,7 +43,6 @@
 
   let currentTab = $state<TabType>(getInitialTab());
 
-  // Explicitly save the tab the exact moment it is clicked
   function setTab(tab: TabType) {
     currentTab = tab;
     if (typeof sessionStorage !== 'undefined') {
@@ -129,6 +127,16 @@
     }
   }
 
+  // Lightweight function to update global counts without rebuilding UI lists
+  async function refreshCountsOnly() {
+    if (!gamePath) return;
+    try {
+      scanResult = await invoke<ScanResult>('scan_game_directory', { gamePath });
+    } catch (err) {
+      console.error('Failed to refresh counts:', err);
+    }
+  }
+
   onMount(() => {
     refreshAll();
     invoke('start_directory_watcher', { gamePath }).catch(() => {});
@@ -179,7 +187,7 @@
           </div>
           {#if scanResult}
             <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
-              {scanResult.archive_count}
+              {scanResult.archive_active}/{scanResult.archive_total}
             </span>
           {/if}
         </button>
@@ -195,7 +203,7 @@
           </div>
           {#if scanResult}
             <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
-              {scanResult.cet_count}
+              {scanResult.cet_active}/{scanResult.cet_total}
             </span>
           {/if}
         </button>
@@ -211,7 +219,7 @@
           </div>
           {#if scanResult}
             <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
-              {scanResult.red4ext_count}
+              {scanResult.red4ext_active}/{scanResult.red4ext_total}
             </span>
           {/if}
         </button>
@@ -227,7 +235,7 @@
           </div>
           {#if scanResult}
             <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
-              {scanResult.redscript_count}
+              {scanResult.redscript_active}/{scanResult.redscript_total}
             </span>
           {/if}
         </button>
@@ -292,8 +300,11 @@
               </div>
             </div>
             <div>
-              <span class="text-2xl font-bold font-mono text-white group-hover:text-nvidia-accent transition-colors">{scanResult?.archive_count ?? 0}</span>
-              <p class="text-[10px] text-nvidia-text-muted font-mono">archive/pc/mod</p>
+              <div class="flex items-baseline gap-1.5">
+                <span class="text-2xl font-bold font-mono text-white group-hover:text-nvidia-accent transition-colors">{scanResult?.archive_active ?? 0}</span>
+                <span class="text-xs font-mono text-nvidia-text-muted">of {scanResult?.archive_total ?? 0}</span>
+              </div>
+              <p class="text-[10px] text-nvidia-text-muted font-mono mt-0.5">archive/pc/mod</p>
             </div>
           </button>
 
@@ -311,8 +322,11 @@
               </div>
             </div>
             <div>
-              <span class="text-2xl font-bold font-mono text-white group-hover:text-nvidia-accent transition-colors">{scanResult?.cet_count ?? 0}</span>
-              <p class="text-[10px] text-nvidia-text-muted font-mono">bin/x64/plugins/cyber_engine_tweaks</p>
+              <div class="flex items-baseline gap-1.5">
+                <span class="text-2xl font-bold font-mono text-white group-hover:text-nvidia-accent transition-colors">{scanResult?.cet_active ?? 0}</span>
+                <span class="text-xs font-mono text-nvidia-text-muted">of {scanResult?.cet_total ?? 0}</span>
+              </div>
+              <p class="text-[10px] text-nvidia-text-muted font-mono mt-0.5">bin/x64/plugins/cyber_engine_tweaks</p>
             </div>
           </button>
 
@@ -330,8 +344,11 @@
               </div>
             </div>
             <div>
-              <span class="text-2xl font-bold font-mono text-white group-hover:text-nvidia-accent transition-colors">{scanResult?.red4ext_count ?? 0}</span>
-              <p class="text-[10px] text-nvidia-text-muted font-mono">red4ext/plugins</p>
+              <div class="flex items-baseline gap-1.5">
+                <span class="text-2xl font-bold font-mono text-white group-hover:text-nvidia-accent transition-colors">{scanResult?.red4ext_active ?? 0}</span>
+                <span class="text-xs font-mono text-nvidia-text-muted">of {scanResult?.red4ext_total ?? 0}</span>
+              </div>
+              <p class="text-[10px] text-nvidia-text-muted font-mono mt-0.5">red4ext/plugins</p>
             </div>
           </button>
 
@@ -349,8 +366,11 @@
               </div>
             </div>
             <div>
-              <span class="text-2xl font-bold font-mono text-white group-hover:text-nvidia-accent transition-colors">{scanResult?.redscript_count ?? 0}</span>
-              <p class="text-[10px] text-nvidia-text-muted font-mono">r6/scripts</p>
+              <div class="flex items-baseline gap-1.5">
+                <span class="text-2xl font-bold font-mono text-white group-hover:text-nvidia-accent transition-colors">{scanResult?.redscript_active ?? 0}</span>
+                <span class="text-xs font-mono text-nvidia-text-muted">of {scanResult?.redscript_total ?? 0}</span>
+              </div>
+              <p class="text-[10px] text-nvidia-text-muted font-mono mt-0.5">r6/scripts</p>
             </div>
           </button>
         </div>
@@ -358,19 +378,19 @@
 
       <!-- Persistent Tab Views -->
       <div class={currentTab === 'archive' ? 'h-full' : 'hidden'}>
-        <ArchiveView bind:archives {gamePath} scanReport={archiveReport} onScanRequested={refreshAll} />
+        <ArchiveView bind:archives {gamePath} scanReport={archiveReport} onScanRequested={refreshAll} onStateChanged={refreshCountsOnly} />
       </div>
 
       <div class={currentTab === 'cet' ? 'h-full' : 'hidden'}>
-        <CetView bind:plugins={cetPlugins} {gamePath} />
+        <CetView bind:plugins={cetPlugins} {gamePath} onStateChanged={refreshCountsOnly} />
       </div>
 
       <div class={currentTab === 'red4ext' ? 'h-full' : 'hidden'}>
-        <Red4extView bind:plugins={red4extPlugins} {gamePath} />
+        <Red4extView bind:plugins={red4extPlugins} {gamePath} onStateChanged={refreshCountsOnly} />
       </div>
 
       <div class={currentTab === 'redscript' ? 'h-full' : 'hidden'}>
-        <RedscriptView bind:packages={redscriptPackages} {gamePath} />
+        <RedscriptView bind:packages={redscriptPackages} {gamePath} onStateChanged={refreshCountsOnly} />
       </div>
     </main>
   </div>

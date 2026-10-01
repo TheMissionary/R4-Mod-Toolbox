@@ -69,8 +69,12 @@ export interface RedScriptItem {
 export interface ScanResult {
   is_valid_game_path: boolean;
   game_version: string;
-  archive_count: number;
-  cet_count: number;
-  red4ext_count: number;
-  redscript_count: number;
+  archive_active: number;
+  archive_total: number;
+  cet_active: number;
+  cet_total: number;
+  red4ext_active: number;
+  red4ext_total: number;
+  redscript_active: number;
+  redscript_total: number;
 }

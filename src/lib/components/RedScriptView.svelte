@@ -5,10 +5,12 @@
 
   let {
     packages = $bindable([]),
-    gamePath = ''
+    gamePath = '',
+    onStateChanged
   }: {
     packages: RedScriptItem[];
     gamePath: string;
+    onStateChanged?: () => void;
   } = $props();
 
   let searchQuery = $state('');
@@ -33,6 +35,7 @@
       });
       pkg.enabled = nextState;
       packages = [...packages];
+      if (onStateChanged) onStateChanged();
     } catch (err) {
       console.error(`Failed to toggle Redscript package ${pkg.name}:`, err);
     }
@@ -49,27 +52,29 @@
 
 <div class="flex flex-col h-full select-none">
   <div class="flex items-center justify-between gap-3 mb-3 shrink-0">
-    <div class="relative flex-1 max-w-md">
-      <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-nvidia-text-muted" />
-      <input
-        type="text"
-        bind:value={searchQuery}
-        placeholder="Filter Redscript packages..."
-        class="w-full pl-9 pr-8 py-1.5 rounded border border-nvidia-border bg-nvidia-surface/80 text-xs text-white placeholder:text-nvidia-text-muted/60 focus:outline-hidden focus:border-nvidia-accent font-sans"
-      />
-      {#if searchQuery !== ''}
-        <button
-          type="button"
-          onclick={() => searchQuery = ''}
-          class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-nvidia-text-muted hover:text-white transition cursor-pointer"
-          title="Clear search"
-        >
-          <X class="h-3.5 w-3.5" />
-        </button>
-      {/if}
-    </div>
-    <div class="text-xs font-mono text-nvidia-text-muted">
-      Active: <span class="text-nvidia-accent font-semibold">{activeCount}</span> / {packages.length}
+    <div class="flex items-center gap-3 flex-1 max-w-md">
+      <div class="relative flex-1">
+        <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-nvidia-text-muted" />
+        <input
+          type="text"
+          bind:value={searchQuery}
+          placeholder="Filter Redscript packages..."
+          class="w-full pl-9 pr-8 py-1.5 rounded border border-nvidia-border bg-nvidia-surface/80 text-xs text-white placeholder:text-nvidia-text-muted/60 focus:outline-hidden focus:border-nvidia-accent font-sans"
+        />
+        {#if searchQuery !== ''}
+          <button
+            type="button"
+            onclick={() => searchQuery = ''}
+            class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-nvidia-text-muted hover:text-white transition cursor-pointer"
+            title="Clear search"
+          >
+            <X class="h-3.5 w-3.5" />
+          </button>
+        {/if}
+      </div>
+      <div class="text-xs font-mono text-nvidia-text-muted shrink-0">
+        Active: <span class="text-nvidia-accent font-semibold">{activeCount}</span> of {packages.length}
+      </div>
     </div>
   </div>
 

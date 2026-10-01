@@ -31,12 +31,14 @@
     archives = $bindable([]),
     gamePath = '',
     scanReport = null,
-    onScanRequested
+    onScanRequested,
+    onStateChanged
   }: {
     archives: ArchiveItem[];
     gamePath: string;
     scanReport?: ArchiveScanReport | null;
     onScanRequested?: () => void;
+    onStateChanged?: () => void;
   } = $props();
 
   let searchQuery = $state('');
@@ -143,6 +145,7 @@
       });
       if (report && Array.isArray(report.archives)) {
         archives = report.archives;
+        if (onStateChanged) onStateChanged();
         // Scroll to TOP to see the newly prepended category
         setTimeout(() => {
           if (scrollContainer) {
@@ -187,8 +190,9 @@
         }
       }
 
-      // 3. Save the final state
+      // 3. Save the final state and notify parent to update global counts
       persistState();
+      if (onStateChanged) onStateChanged();
     } catch (err) {
       console.error('Failed to toggle mod/category:', err);
     }
@@ -412,6 +416,9 @@
       return item.file_name.toLowerCase().includes(searchQuery.toLowerCase());
     })
   );
+
+  let actualMods = $derived(archives.filter(a => !a.is_delimiter));
+  let activeCount = $derived(actualMods.filter(a => a.enabled).length);
 </script>
 
 <svelte:window
@@ -507,24 +514,29 @@
 
 <div class="space-y-3 select-none flex flex-col h-full">
   <div class="flex items-center justify-between gap-4 shrink-0">
-    <div class="relative flex-1 max-w-md">
-      <Search class="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-nvidia-text-muted" />
-      <input
-        type="text"
-        bind:value={searchQuery}
-        placeholder="Filter mods or categories..."
-        class="w-full pl-9 pr-8 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-white placeholder-nvidia-text-muted focus:outline-none focus:border-nvidia-accent"
-      />
-      {#if searchQuery !== ''}
-        <button
-          type="button"
-          onclick={() => searchQuery = ''}
-          class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-nvidia-text-muted hover:text-white transition cursor-pointer"
-          title="Clear search"
-        >
-          <X class="h-3.5 w-3.5" />
-        </button>
-      {/if}
+    <div class="flex items-center gap-3 flex-1 max-w-md">
+      <div class="relative flex-1">
+        <Search class="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-nvidia-text-muted" />
+        <input
+          type="text"
+          bind:value={searchQuery}
+          placeholder="Filter mods or categories..."
+          class="w-full pl-9 pr-8 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-white placeholder-nvidia-text-muted focus:outline-none focus:border-nvidia-accent"
+        />
+        {#if searchQuery !== ''}
+          <button
+            type="button"
+            onclick={() => searchQuery = ''}
+            class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-nvidia-text-muted hover:text-white transition cursor-pointer"
+            title="Clear search"
+          >
+            <X class="h-3.5 w-3.5" />
+          </button>
+        {/if}
+      </div>
+      <div class="text-xs font-mono text-nvidia-text-muted shrink-0">
+        Active: <span class="text-nvidia-accent font-semibold">{activeCount}</span> of {actualMods.length}
+      </div>
     </div>
 
     <div class="flex items-center gap-2.5">
@@ -548,8 +560,6 @@
         {/if}
         <span>Conflicting Mod Summary</span>
       </button>
-
-      <span class="text-xs font-mono text-gray-400 pl-2">Mods: {archives.filter(a => !a.is_delimiter).length}</span>
     </div>
   </div>
 

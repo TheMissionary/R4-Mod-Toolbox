@@ -8,10 +8,14 @@ use std::path::{Path, PathBuf};
 pub struct ScanResult {
     pub is_valid_game_path: bool,
     pub game_version: String,
-    pub archive_count: usize,
-    pub cet_count: usize,
-    pub red4ext_count: usize,
-    pub redscript_count: usize,
+    pub archive_active: usize,
+    pub archive_total: usize,
+    pub cet_active: usize,
+    pub cet_total: usize,
+    pub red4ext_active: usize,
+    pub red4ext_total: usize,
+    pub redscript_active: usize,
+    pub redscript_total: usize,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -76,54 +80,57 @@ fn scan_game_directory(game_path: String) -> Result<ScanResult, String> {
     let exe_path = root.join("bin").join("x64").join("Cyberpunk2077.exe");
     let is_valid = exe_path.exists();
 
+    // Archive Counts
     let archive_dir = root.join("archive").join("pc").join("mod");
-    let archive_count = if archive_dir.exists() {
-        fs::read_dir(&archive_dir)
-            .map(|entries| {
-                entries
-                    .flatten()
-                    .filter(|e| e.path().extension().map_or(false, |ext| ext == "archive"))
-                    .count()
-            })
-            .unwrap_or(0)
-    } else {
-        0
-    };
+    let mut archive_active = 0;
+    let mut archive_total = 0;
+    if archive_dir.exists() {
+        if let Ok(entries) = fs::read_dir(&archive_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.starts_with("[CAT] ") { continue; } // Skip delimiters
+                if name.ends_with(".archive") {
+                    archive_active += 1;
+                    archive_total += 1;
+                } else if name.ends_with(".archive.disabled") {
+                    archive_total += 1;
+                }
+            }
+        }
+    }
 
+    // CET Counts
     let cet_dir = root.join("bin").join("x64").join("plugins").join("cyber_engine_tweaks").join("mods");
-    let cet_count = if cet_dir.exists() {
-        fs::read_dir(&cet_dir)
-            .map(|entries| entries.flatten().filter(|e| e.path().is_dir()).count())
-            .unwrap_or(0)
-    } else {
-        0
-    };
+    let cet_disabled_dir = root.join("Disabled_Mods").join("cet");
+    let cet_active = if cet_dir.exists() { fs::read_dir(&cet_dir).map(|e| e.flatten().filter(|e| e.path().is_dir()).count()).unwrap_or(0) } else { 0 };
+    let cet_disabled = if cet_disabled_dir.exists() { fs::read_dir(&cet_disabled_dir).map(|e| e.flatten().filter(|e| e.path().is_dir()).count()).unwrap_or(0) } else { 0 };
+    let cet_total = cet_active + cet_disabled;
 
+    // RED4ext Counts
     let red4ext_dir = root.join("red4ext").join("plugins");
-    let red4ext_count = if red4ext_dir.exists() {
-        fs::read_dir(&red4ext_dir)
-            .map(|entries| entries.flatten().count())
-            .unwrap_or(0)
-    } else {
-        0
-    };
+    let red4ext_disabled_dir = root.join("Disabled_Mods").join("red4ext");
+    let red4ext_active = if red4ext_dir.exists() { fs::read_dir(&red4ext_dir).map(|e| e.flatten().count()).unwrap_or(0) } else { 0 };
+    let red4ext_disabled = if red4ext_disabled_dir.exists() { fs::read_dir(&red4ext_disabled_dir).map(|e| e.flatten().count()).unwrap_or(0) } else { 0 };
+    let red4ext_total = red4ext_active + red4ext_disabled;
 
+    // Redscript Counts
     let redscript_dir = root.join("r6").join("scripts");
-    let redscript_count = if redscript_dir.exists() {
-        fs::read_dir(&redscript_dir)
-            .map(|entries| entries.flatten().count())
-            .unwrap_or(0)
-    } else {
-        0
-    };
+    let redscript_disabled_dir = root.join("Disabled_Mods").join("redscript");
+    let redscript_active = if redscript_dir.exists() { fs::read_dir(&redscript_dir).map(|e| e.flatten().count()).unwrap_or(0) } else { 0 };
+    let redscript_disabled = if redscript_disabled_dir.exists() { fs::read_dir(&redscript_disabled_dir).map(|e| e.flatten().count()).unwrap_or(0) } else { 0 };
+    let redscript_total = redscript_active + redscript_disabled;
 
     Ok(ScanResult {
         is_valid_game_path: is_valid,
         game_version: "2.31".to_string(),
-        archive_count,
-        cet_count,
-        red4ext_count,
-        redscript_count,
+        archive_active,
+        archive_total,
+        cet_active,
+        cet_total,
+        red4ext_active,
+        red4ext_total,
+        redscript_active,
+        redscript_total,
     })
 }
 
