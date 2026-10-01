@@ -127,7 +127,6 @@
     }
   }
 
-  // Lightweight function to update global counts without rebuilding UI lists
   async function refreshCountsOnly() {
     if (!gamePath) return;
     try {
@@ -138,7 +137,25 @@
   }
 
   onMount(() => {
-    refreshAll();
+    const splashStartTime = Date.now();
+
+    // Smoothly dismiss the instant title screen after a minimum ~800ms threshold
+    const dismissSplash = () => {
+      const elapsed = Date.now() - splashStartTime;
+      const remaining = Math.max(0, 800 - elapsed);
+      setTimeout(() => {
+        const splash = document.getElementById('app-splash');
+        if (splash) {
+          splash.classList.add('fade-out');
+          setTimeout(() => splash.remove(), 350);
+        }
+      }, remaining);
+    };
+
+    refreshAll().finally(() => {
+      dismissSplash();
+    });
+
     invoke('start_directory_watcher', { gamePath }).catch(() => {});
     const unlisten = listen('directory-changed', () => {
       refreshAll();
