@@ -4,12 +4,12 @@
 
   let { 
     gamePath = $bindable(''), 
-    isScanning = false,
-    onScanRequested 
+    isLoading = false,
+    onRefresh 
   }: { 
     gamePath: string; 
-    isScanning: boolean;
-    onScanRequested: (path: string) => void;
+    isLoading: boolean;
+    onRefresh: () => void;
   } = $props();
 
   async function chooseDirectory() {
@@ -22,11 +22,15 @@
       
       if (typeof selected === 'string') {
         gamePath = selected;
-        onScanRequested(selected);
+        if (onRefresh) onRefresh();
       }
     } catch (err) {
       console.error('Directory picker failed:', err);
     }
+  }
+
+  function handleHardRefresh() {
+    window.location.reload();
   }
 </script>
 
@@ -41,19 +45,19 @@
   <div class="flex items-center gap-3">
     <button 
       onclick={chooseDirectory}
-      class="flex items-center gap-2 px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-card/80 border border-nvidia-border text-xs text-gray-200 transition"
+      class="flex items-center gap-2 px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-card/80 border border-nvidia-border text-xs text-gray-200 transition cursor-pointer"
     >
       <FolderSearch class="h-3.5 w-3.5 text-nvidia-text-muted" />
       <span>Verify Game Path</span>
     </button>
 
     <button 
-      onclick={() => onScanRequested(gamePath)}
-      disabled={!gamePath || isScanning}
-      class="flex items-center gap-2 px-3.5 py-1.5 rounded bg-nvidia-accent hover:bg-nvidia-accent-hover text-black font-semibold text-xs transition disabled:opacity-50 disabled:cursor-not-allowed"
+      onclick={handleHardRefresh}
+      disabled={!gamePath || isLoading}
+      class="flex items-center gap-2 px-3.5 py-1.5 rounded bg-nvidia-accent hover:bg-nvidia-accent-hover text-black font-semibold text-xs transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
     >
-      <RefreshCw class="h-3.5 w-3.5 {isScanning ? 'animate-spin' : ''}" />
-      <span>{isScanning ? 'Analyzing...' : 'Run Conflict Scan'}</span>
+      <RefreshCw class="h-3.5 w-3.5 {isLoading ? 'animate-spin' : ''}" />
+      <span>{isLoading ? 'Analyzing...' : 'Sync & Rescan'}</span>
     </button>
   </div>
 </header>

@@ -29,7 +29,29 @@
     ArrowUpRight
   } from 'lucide-svelte';
 
-  let currentTab = $state<'home' | 'archive' | 'cet' | 'red4ext' | 'redscript'>('home');
+  type TabType = 'home' | 'archive' | 'cet' | 'red4ext' | 'redscript';
+
+  // Synchronously read the saved tab before the component even renders
+  function getInitialTab(): TabType {
+    if (typeof sessionStorage !== 'undefined') {
+      const saved = sessionStorage.getItem('cp2077_active_tab');
+      if (saved === 'home' || saved === 'archive' || saved === 'cet' || saved === 'red4ext' || saved === 'redscript') {
+        return saved as TabType;
+      }
+    }
+    return 'home';
+  }
+
+  let currentTab = $state<TabType>(getInitialTab());
+
+  // Explicitly save the tab the exact moment it is clicked
+  function setTab(tab: TabType) {
+    currentTab = tab;
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem('cp2077_active_tab', tab);
+    }
+  }
+
   let gamePath = $state('G:\\SteamLibrary\\steamapps\\common\\Cyberpunk 2077');
   let isLoading = $state(false);
   let isLaunching = $state(false);
@@ -139,7 +161,7 @@
       <nav class="p-3 space-y-1">
         <button
           type="button"
-          onclick={() => currentTab = 'home'}
+          onclick={() => setTab('home')}
           class="w-full flex items-center gap-3 px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'home' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-gray-300 hover:bg-nvidia-surface hover:text-white'}"
         >
           <Home class="h-4 w-4" />
@@ -148,7 +170,7 @@
 
         <button
           type="button"
-          onclick={() => currentTab = 'archive'}
+          onclick={() => setTab('archive')}
           class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'archive' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-gray-300 hover:bg-nvidia-surface hover:text-white'}"
         >
           <div class="flex items-center gap-3">
@@ -164,7 +186,7 @@
 
         <button
           type="button"
-          onclick={() => currentTab = 'cet'}
+          onclick={() => setTab('cet')}
           class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'cet' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-gray-300 hover:bg-nvidia-surface hover:text-white'}"
         >
           <div class="flex items-center gap-3">
@@ -180,7 +202,7 @@
 
         <button
           type="button"
-          onclick={() => currentTab = 'red4ext'}
+          onclick={() => setTab('red4ext')}
           class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'red4ext' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-gray-300 hover:bg-nvidia-surface hover:text-white'}"
         >
           <div class="flex items-center gap-3">
@@ -196,7 +218,7 @@
 
         <button
           type="button"
-          onclick={() => currentTab = 'redscript'}
+          onclick={() => setTab('redscript')}
           class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'redscript' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-gray-300 hover:bg-nvidia-surface hover:text-white'}"
         >
           <div class="flex items-center gap-3">
@@ -259,7 +281,7 @@
           <!-- Card 1: Archive Mods -->
           <button
             type="button"
-            onclick={() => currentTab = 'archive'}
+            onclick={() => setTab('archive')}
             class="p-4 rounded border border-nvidia-border bg-nvidia-surface/60 hover:bg-nvidia-surface/90 hover:border-nvidia-accent/70 transition-all duration-150 flex flex-col justify-between h-28 text-left cursor-pointer group shadow-xs"
           >
             <div class="flex justify-between items-start w-full">
@@ -278,7 +300,7 @@
           <!-- Card 2: CET Plugins -->
           <button
             type="button"
-            onclick={() => currentTab = 'cet'}
+            onclick={() => setTab('cet')}
             class="p-4 rounded border border-nvidia-border bg-nvidia-surface/60 hover:bg-nvidia-surface/90 hover:border-nvidia-accent/70 transition-all duration-150 flex flex-col justify-between h-28 text-left cursor-pointer group shadow-xs"
           >
             <div class="flex justify-between items-start w-full">
@@ -297,7 +319,7 @@
           <!-- Card 3: RED4ext Plugins -->
           <button
             type="button"
-            onclick={() => currentTab = 'red4ext'}
+            onclick={() => setTab('red4ext')}
             class="p-4 rounded border border-nvidia-border bg-nvidia-surface/60 hover:bg-nvidia-surface/90 hover:border-nvidia-accent/70 transition-all duration-150 flex flex-col justify-between h-28 text-left cursor-pointer group shadow-xs"
           >
             <div class="flex justify-between items-start w-full">
@@ -313,10 +335,10 @@
             </div>
           </button>
 
-          <!-- Card 4: Redscript Packages (Restored) -->
+          <!-- Card 4: Redscript Packages -->
           <button
             type="button"
-            onclick={() => currentTab = 'redscript'}
+            onclick={() => setTab('redscript')}
             class="p-4 rounded border border-nvidia-border bg-nvidia-surface/60 hover:bg-nvidia-surface/90 hover:border-nvidia-accent/70 transition-all duration-150 flex flex-col justify-between h-28 text-left cursor-pointer group shadow-xs"
           >
             <div class="flex justify-between items-start w-full">

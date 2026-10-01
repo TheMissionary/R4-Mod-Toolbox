@@ -1,0 +1,94 @@
+# Cyberpunk 2077 RED4 Mod Toolbox: Project Summary & Technical Reference (PTSR)
+
+## 1. Environment & Technical Stack Specifications
+
+### Core Directories & Target Artifacts
+* Host Operating System: Windows 11 Pro, running PowerShell 7.6.6.
+* Active Working Project: G:\R4-Mod-TBX
+* Pristine Source Baseline Backup: G:\Cyberpunk Mod Tool\Backup\Baseline-20260926-ContextMenuComplete
+* Rust Backend Directory: G:\R4-Mod-TBX\src-tauri
+* Svelte Frontend Directory: G:\R4-Mod-TBX\src
+* Primary Standalone Binary: G:\R4-Mod-TBX\src-tauri\target\release\red4-mod-toolbox.exe
+* Operational Log Target: C:\Users\eidsv\Desktop\_Terminal_Output.txt
+* Local Automation Scripts Directory: G:\R4-Mod-TBX\scripts\
+* Cyberpunk 2077 Target Path: G:\SteamLibrary\steamapps\common\Cyberpunk 2077
+  * Mod Archive Root: G:\SteamLibrary\steamapps\common\Cyberpunk 2077\archive\pc\mod
+  * REDengine Load Order File: G:\SteamLibrary\steamapps\common\Cyberpunk 2077\archive\pc\mod\modlist.txt
+
+### Validated Dependency Versions
+* Desktop Runtime: Tauri v2 (@tauri-apps/api: ^2, @tauri-apps/cli: ^2, tauri: 2, tauri-build: 2)
+* Tauri Plugins:
+  * Opener: tauri-plugin-opener: 2 (@tauri-apps/plugin-opener: ^2)
+  * Dialog: tauri-plugin-dialog: 2 (@tauri-apps/plugin-dialog: ^2.7.3)
+* Frontend Framework: Svelte v5.56.3 (leveraging runes: $state, $derived, $props, $effect)
+* Application Framework: SvelteKit v2.65.1 with @sveltejs/adapter-static: ^3.0.10
+* Bundler & Tooling: Vite v8.0.16, @sveltejs/vite-plugin-svelte: ^7.1.2, TypeScript ~6.0.3
+* Styling Engine: Tailwind CSS v4.3.3 (@tailwindcss/vite, @tailwindcss/postcss, autoprefixer: ^10.6.1)
+* Icon Library: lucide-svelte: ^1.0.1
+* Rust Backend Libraries:
+  * red4lib: Git rev cfa6713570e9bf859c29c05052035d38daa08d55 (RFUZZO WolvenKit core parser)
+  * notify: 6.1.1 (Filesystem change monitoring)
+  * serde: 1.0 and serde_json: 1.0 (Serialization and deserialization)
+
+---
+
+## 2. Project History, Milestones & Validated Architecture
+
+### Core Functionality in Baseline-20260926-ContextMenuComplete
+1. Red4lib In-Memory Hash Scanner:
+   * Non-destructive parsing of .archive file resource headers.
+   * Compares 64-bit resource hashes across archives to calculate a real-time conflict matrix identifying exact overlapping hashes.
+   * Differentiates winning archives from overridden archives according to active load order position.
+2. Interactive Conflict Drawer:
+   * Summarizes all contested archives.
+   * Clicking a contested mod smoothly scrolls to the item in the main load list and triggers a green pulse highlight (registerModNode).
+3. Four-Tier Native Context Menu:
+   * Right-click trigger on both archive rows and companion .XL badges.
+   * Actions: Reveal in Windows Explorer, Enable or Disable mod (toggling .disabled extension), and Copy File Name to clipboard with visual feedback.
+4. Drag-and-Drop Reordering Engine:
+   * Full drag-and-drop support with real-time insertion line indicators (dropPlacement: 'before' | 'after').
+   * Commits the active sequence directly into REDengine's native modlist.txt.
+5. Companion .XL Pairing:
+   * Automatically pairs companion .xl files with their parent archives (via explicit map or pattern matching .archive.xl / <stem>.xl).
+   * Toggles .xl active state synchronously whenever the parent .archive is enabled or disabled.
+
+### Operational Infrastructure & Handoff Protocols
+1. AI Studio Full-File Delivery Paradigm:
+   * All code generation in Google AI Studio provides complete, pristine file payloads or whole new sub-component files.
+   * Terminal-based regex and Node.js string-replacement scripts (scripts/update-*.mjs) are abandoned to eliminate AST anchor slicing failures.
+2. Git-First Version Control:
+   * The active repository G:\R4-Mod-TBX is initialized to track every validated milestone.
+   * Instant rollback via git reset --hard or git restore . maintains workspace stability without recursive folder duplication.
+   * Working tree must be confirmed clean before and after each variable change.
+3. Component Modularization Strategy:
+   * In Baseline-20260926-ContextMenuComplete, standard mod rows remain inline within ArchiveView.svelte.
+   * New UI features must be developed as dedicated sub-components in src/lib/components/ (specifically CategoryDelimiterRow.svelte), keeping ArchiveView.svelte changes restricted to clean template branching.
+
+---
+
+## 3. Starting State & Next Objective
+
+* Active Starting Baseline:
+  * Pristine Baseline-20260926-ContextMenuComplete checked out at Git commit 19577fd in G:\R4-Mod-TBX.
+  * Clean working tree with no partial or experimental delimiter code present on disk.
+
+* Implementation Objective: Physical Category Delimiters
+  1. Filesystem Specification:
+     * Physical 0-byte .archive marker files on disk adhering to [CAT] CATEGORY_NAME.archive.
+     * Toggling disabled state renames the file to [CAT] CATEGORY_NAME.archive.disabled.
+     * Must be written to and preserved in native modlist.txt load order sequence.
+  2. Rust Backend Contract (src-tauri/src/archive.rs):
+     * Extend ArchiveItem struct:
+       pub is_delimiter: bool,
+       pub category_name: Option<String>,
+     * Add delimiter detection helper function identifying prefix [CAT].
+     * Explicitly bypass WolvenKit red4lib::archive::open_read(path) on delimiter files to prevent zero-byte read panics while preserving items in ordered_paths.
+  3. Frontend TypeScript Contract (src/lib/types.ts):
+     * Extend ArchiveItem interface:
+       is_delimiter?: boolean;
+       category_name?: string | null;
+  4. Frontend UI Implementation (src/lib/components/):
+     * Create isolated sub-component src/lib/components/CategoryDelimiterRow.svelte.
+     * Render as a stylized category header banner featuring a green folder icon, uppercase category title, category pill, drag-and-drop grip handle, and enable/disable toggle.
+     * Completely suppress byte size, asset count (0 assets), conflict state badges (Winning, Overridden, Clean), and .XL companion tags.
+     * Mount into ArchiveView.svelte using a clean conditional check inside the main #each loop.

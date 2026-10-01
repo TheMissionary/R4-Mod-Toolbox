@@ -21,13 +21,13 @@ pub struct ArchiveItem {
     pub size_bytes: u64,
     pub file_count: usize,
     pub enabled: bool,
-    pub is_delimiter: bool,
-    pub category_name: Option<String>,
     pub has_conflicts: bool,
     pub conflicts_with: Vec<String>,
     pub wins: Vec<String>,
     pub loses: Vec<String>,
     pub associated_xl: Option<XlItem>,
+    pub is_delimiter: bool,
+    pub category_name: Option<String>,
 }
 
 #[allow(dead_code)]
@@ -91,21 +91,6 @@ fn get_archive_stem(clean_name: &str) -> String {
         clean_name.to_string()
     }
 }
-
-fn detect_category_delimiter(clean_name: &str) -> Option<String> {
-    let stem = get_archive_stem(clean_name);
-    let trimmed = stem.trim();
-    if trimmed.starts_with("[CAT]") {
-        let cat_part = trimmed["[CAT]".len()..].trim();
-        let cleaned = cat_part.trim_start_matches(|c: char| c == '_' || c == '-' || c == ' ');
-        if !cleaned.is_empty() {
-            return Some(cleaned.to_string());
-        }
-        return Some(cat_part.to_string());
-    }
-    None
-}
-
 
 pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> {
     let archive_dir = PathBuf::from(base_game_path).join("archive").join("pc").join("mod");
@@ -197,10 +182,16 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
         let metadata = path.metadata().ok();
         let size_bytes = metadata.map(|m| m.len()).unwrap_or(0);
 
-        let delimiter_cat = detect_category_delimiter(&display_name);
-        let is_delimiter = delimiter_cat.is_some();
+        // Delimiter Detection
+        let is_delimiter = display_name.starts_with("[CAT] ");
+        let category_name = if is_delimiter {
+            Some(display_name.trim_start_matches("[CAT] ").trim_end_matches(".archive").trim().to_string())
+        } else {
+            None
+        };
 
         let mut hashes = Vec::new();
+        // Bypass red4lib parsing for 0-byte delimiter files to prevent panics
         if is_enabled && !is_delimiter {
             if let Ok(archive) = red4lib::archive::open_read(path) {
                 hashes = archive.get_entries().clone().into_keys().collect::<Vec<u64>>();
@@ -251,13 +242,13 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
             size_bytes,
             file_count: hashes.len(),
             enabled: is_enabled,
-            is_delimiter,
-            category_name: delimiter_cat,
             has_conflicts: false,
             conflicts_with: Vec::new(),
             wins: Vec::new(),
             loses: Vec::new(),
             associated_xl: matched_xl,
+            is_delimiter,
+            category_name,
         });
     }
 
@@ -396,4 +387,37 @@ pub fn load_categories(base_game_path: &str) -> Result<String, String> {
     } else {
         Ok("[]".to_string())
     }
+}
+
+pub fn create_physical_category(base_game_path: &str, category_name: &str) -> Result<ArchiveScanReport, String> {
+    let archive_dir = PathBuf::from(base_game_path).join("archive").join("pc").join("mod");
+    fs::create_dir_all(&archive_dir).map_err(|e| e.to_string())?;
+    
+    // Sanitize category name to prevent path traversal or invalid characters
+    let safe_name = category_name.replace(|c: char| !c.is_ascii_alphanumeric() && c != ' ' && c != '-' && c != '_', "");
+    let file_name = format!("[CAT] {}.archive", safe_name.trim());
+    let file_path = archive_dir.join(&file_name);
+    
+    if !file_path.exists() {
+        File::create(&file_path).map_err(|e| e.to_string())?;
+        
+        // Prepend to modlist.txt so it appears at the top of the load order
+        let modlist_path = archive_dir.join("modlist.txt");
+        let mut existing_content = String::new();
+        
+        if modlist_path.exists() {
+            if let Ok(content) = fs::read_to_string(&modlist_path) {
+                existing_content = content;
+            }
+        }
+        
+        let mut new_content = format!("{}\r\n", file_name);
+        if !existing_content.is_empty() {
+            new_content.push_str(&existing_content);
+        }
+        
+        fs::write(&modlist_path, new_content).map_err(|e| e.to_string())?;
+    }
+    
+    scan_archives(base_game_path)
 }

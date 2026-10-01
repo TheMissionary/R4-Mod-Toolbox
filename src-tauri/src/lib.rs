@@ -153,6 +153,11 @@ fn load_categories_config(game_path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn create_physical_category(game_path: String, category_name: String) -> Result<archive::ArchiveScanReport, String> {
+    archive::create_physical_category(&game_path, &category_name)
+}
+
+#[tauri::command]
 fn start_directory_watcher(_game_path: String) -> Result<(), String> {
     // Directory watcher integration stub
     Ok(())
@@ -381,6 +386,7 @@ pub fn run() {
             save_load_order,
             save_categories_config,
             load_categories_config,
+            create_physical_category,
             start_directory_watcher,
             get_cet_details,
             get_red4ext_details,

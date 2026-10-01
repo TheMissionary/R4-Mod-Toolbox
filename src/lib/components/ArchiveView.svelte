@@ -1,8 +1,6 @@
 <script lang="ts">
-  function focusOnMount(node: HTMLElement) {
-    node.focus();
-  }
-  import type { ArchiveItem, ArchiveScanReport, CategoryItem, LoadOrderItem, XlItem } from '$lib/types';
+  import type { ArchiveItem, ArchiveScanReport, XlItem } from '$lib/types';
+  import CategoryDelimiterRow from '$lib/components/CategoryDelimiterRow.svelte';
   import {
     GripVertical,
     ChevronDown,
@@ -13,8 +11,6 @@
     ShieldAlert,
     FolderPlus,
     Folder,
-    FolderOpen,
-    Trash2,
     Eye,
     EyeOff,
     AlertTriangle,
@@ -28,22 +24,25 @@
   } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
-  import { tick, untrack } from 'svelte';
+  import { tick } from 'svelte';
 
   let {
     archives = $bindable([]),
     gamePath = '',
-    scanReport = null
+    scanReport = null,
+    onScanRequested
   }: {
     archives: ArchiveItem[];
     gamePath: string;
     scanReport?: ArchiveScanReport | null;
+    onScanRequested?: () => void;
   } = $props();
 
   let searchQuery = $state('');
   let expandedRows = $state<Record<string, boolean>>({});
-  let loadOrderList = $state<LoadOrderItem[]>([]);
-  let initialized = $state(false);
+  
+  // Flat array representing the exact physical load order
+  let localArchives = $state<ArchiveItem[]>([]);
   let scrollContainer = $state<HTMLElement | null>(null);
   let showXlHelp = $state(false);
 
@@ -110,118 +109,19 @@
     localStorage.setItem('cp2077_show_conflict_summary', showConflictSummary.toString());
   }
 
+  // Hardened sync: deeply track the archives array so external scans trigger UI updates
   $effect(() => {
-    const currentArchives = archives;
-    const currentGamePath = gamePath;
-
-    if (currentArchives && currentGamePath) {
-      untrack(() => {
-        if (!initialized) {
-          syncLoadOrderWithCategories(currentArchives, currentGamePath);
-        } else {
-          reconcileLoadOrderWithArchives(currentArchives);
-        }
-      });
+    if (archives && archives.length >= 0) {
+      localArchives = [...archives];
     }
   });
 
-  async function syncLoadOrderWithCategories(sourceArchives: ArchiveItem[], targetGamePath: string) {
-    try {
-      const raw = await invoke<string>('load_categories_config', { gamePath: targetGamePath });
-      const savedCategories: { id: string; name: string; enabled: boolean; collapsed: boolean; archiveNames: string[] }[] = JSON.parse(raw);
-
-      const unassignedArchives = [...sourceArchives];
-      const items: LoadOrderItem[] = [];
-
-      for (const cat of savedCategories) {
-        items.push({
-          type: 'category',
-          category: {
-            id: cat.id,
-            name: cat.name,
-            enabled: cat.enabled,
-            collapsed: cat.collapsed,
-            isEditing: false
-          }
-        });
-
-        for (const modName of cat.archiveNames) {
-          const idx = unassignedArchives.findIndex(a => a.file_name === modName);
-          if (idx !== -1) {
-            items.push({ type: 'archive', archive: unassignedArchives.splice(idx, 1)[0] });
-          }
-        }
-      }
-
-      for (const rem of unassignedArchives) {
-        items.push({ type: 'archive', archive: rem });
-      }
-
-      loadOrderList = items;
-      initialized = true;
-    } catch {
-      loadOrderList = sourceArchives.map(a => ({ type: 'archive', archive: a }));
-      initialized = true;
-    }
-  }
-
-  function reconcileLoadOrderWithArchives(sourceArchives: ArchiveItem[]) {
-    const freshMap = new Map(sourceArchives.map(a => [a.file_name, a]));
-    const updated: LoadOrderItem[] = [];
-    const seen = new Set<string>();
-
-    for (const item of loadOrderList) {
-      if (item.type === 'category') {
-        updated.push(item);
-      } else {
-        const fresh = freshMap.get(item.archive.file_name);
-        if (fresh) {
-          updated.push({ type: 'archive', archive: fresh });
-          seen.add(item.archive.file_name);
-        }
-      }
-    }
-
-    for (const archive of sourceArchives) {
-      if (!seen.has(archive.file_name)) {
-        updated.push({ type: 'archive', archive });
-      }
-    }
-
-    loadOrderList = updated;
-  }
-
   async function persistState() {
-    const archiveNames: string[] = [];
-    const categoryLayout: { id: string; name: string; enabled: boolean; collapsed: boolean; archiveNames: string[] }[] = [];
-    let currentCat: typeof categoryLayout[0] | null = null;
-
-    for (const item of loadOrderList) {
-      if (item.type === 'category') {
-        currentCat = {
-          id: item.category.id,
-          name: item.category.name,
-          enabled: item.category.enabled,
-          collapsed: item.category.collapsed,
-          archiveNames: []
-        };
-        categoryLayout.push(currentCat);
-      } else {
-        archiveNames.push(item.archive.file_name);
-        if (currentCat) {
-          currentCat.archiveNames.push(item.archive.file_name);
-        }
-      }
-    }
-
+    const archiveNames = localArchives.map(a => a.file_name);
     try {
       const report = await invoke<ArchiveScanReport>('save_load_order', {
         gamePath,
         loadOrder: archiveNames
-      });
-      await invoke('save_categories_config', {
-        gamePath,
-        configJson: JSON.stringify(categoryLayout)
       });
       if (report && Array.isArray(report.archives)) {
         archives = report.archives;
@@ -231,43 +131,27 @@
     }
   }
 
-  function addCategory() {
-    const newCat: CategoryItem = {
-      id: 'cat_' + Date.now(),
-      name: 'New Category',
-      enabled: true,
-      collapsed: false,
-      isEditing: true
-    };
-    loadOrderList = [{ type: 'category', category: newCat }, ...loadOrderList];
-    persistState();
-  }
-
-  function removeCategory(catId: string) {
-    loadOrderList = loadOrderList.filter(item => !(item.type === 'category' && item.category.id === catId));
-    persistState();
-  }
-
-  async function toggleCategory(cat: CategoryItem) {
-    const next = !cat.enabled;
-    cat.enabled = next;
-
-    const catIndex = loadOrderList.findIndex(i => i.type === 'category' && i.category.id === cat.id);
-    if (catIndex === -1) return;
-
-    for (let i = catIndex + 1; i < loadOrderList.length; i++) {
-      const item = loadOrderList[i];
-      if (item.type === 'category') break;
-      if (item.archive.enabled !== next) {
-        item.archive.enabled = next;
-        await invoke('toggle_mod_state', {
-          gamePath,
-          modName: item.archive.file_name,
-          enable: next
-        });
+  async function addCategory() {
+    const name = prompt("Enter new category name:", "New Category");
+    if (!name || name.trim() === '') return;
+    
+    try {
+      const report = await invoke<ArchiveScanReport>('create_physical_category', {
+        gamePath,
+        categoryName: name.trim()
+      });
+      if (report && Array.isArray(report.archives)) {
+        archives = report.archives;
+        // Scroll to TOP to see the newly prepended category
+        setTimeout(() => {
+          if (scrollContainer) {
+            scrollContainer.scrollTop = 0;
+          }
+        }, 100);
       }
+    } catch (err) {
+      console.error("Failed to create physical category:", err);
     }
-    persistState();
   }
 
   async function toggleMod(archive: ArchiveItem) {
@@ -286,25 +170,6 @@
   }
 
   async function focusModInMainList(modName: string) {
-    let uncollapsed = false;
-    let parentCat: CategoryItem | null = null;
-
-    for (const entry of loadOrderList) {
-      if (entry.type === 'category') {
-        parentCat = entry.category;
-      } else if (entry.archive.file_name === modName) {
-        if (parentCat && parentCat.collapsed) {
-          parentCat.collapsed = false;
-          uncollapsed = true;
-        }
-        break;
-      }
-    }
-
-    if (uncollapsed) {
-      persistState();
-    }
-
     if (searchQuery !== '') {
       searchQuery = '';
     }
@@ -403,10 +268,10 @@
       }
 
       if (activeDragIndex !== targetIndex) {
-        const updated = [...loadOrderList];
+        const updated = [...localArchives];
         const [movedItem] = updated.splice(activeDragIndex, 1);
         updated.splice(targetIndex, 0, movedItem);
-        loadOrderList = updated;
+        localArchives = updated;
         persistState();
       }
     }
@@ -415,25 +280,12 @@
     dropPlacement = null;
   }
 
-  function getCategoryStats(catIndex: number) {
-    let total = 0;
-    let active = 0;
-    for (let i = catIndex + 1; i < loadOrderList.length; i++) {
-      const entry = loadOrderList[i];
-      if (entry.type === 'category') break;
-      total += 1;
-      if (entry.archive.enabled) active += 1;
-    }
-    return { total, active };
-  }
-
   // --- Context Menu Handlers ---
   function openContextMenu(event: MouseEvent, archive: ArchiveItem, targetType: 'archive' | 'xl' = 'archive') {
     event.preventDefault();
     event.stopPropagation();
     copiedFeedback = false;
 
-    // Viewport boundary guard (prevent menu overflowing outside screen)
     const menuWidth = 230;
     const menuHeight = 145;
     const posX = (event.clientX + menuWidth > window.innerWidth) ? (window.innerWidth - menuWidth - 10) : event.clientX;
@@ -501,25 +353,21 @@
   }
 
   let visibleItems = $derived.by(() => {
-    let currentCategoryCollapsed = false;
-    const result: { item: LoadOrderItem; originalIndex: number; archiveRank: number }[] = [];
+    const result: { archive: ArchiveItem; originalIndex: number; archiveRank: number }[] = [];
     let rank = 0;
 
-    for (let i = 0; i < loadOrderList.length; i++) {
-      const entry = loadOrderList[i];
-
-      if (entry.type === 'category') {
-        currentCategoryCollapsed = entry.category.collapsed;
-        if (searchQuery === '' || entry.category.name.toLowerCase().includes(searchQuery.toLowerCase())) {
-          result.push({ item: entry, originalIndex: i, archiveRank: 0 });
-        }
-      } else {
+    for (let i = 0; i < localArchives.length; i++) {
+      const archive = localArchives[i];
+      if (!archive.is_delimiter) {
         rank += 1;
-        if (!currentCategoryCollapsed || searchQuery !== '') {
-          if (searchQuery === '' || entry.archive.name.toLowerCase().includes(searchQuery.toLowerCase())) {
-            result.push({ item: entry, originalIndex: i, archiveRank: rank });
-          }
-        }
+      }
+      
+      if (searchQuery === '' || archive.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+        result.push({ 
+          archive, 
+          originalIndex: i, 
+          archiveRank: archive.is_delimiter ? 0 : rank 
+        });
       }
     }
     return result;
@@ -530,7 +378,7 @@
   );
 
   let draggedEntry = $derived(
-    activeDragIndex !== null ? loadOrderList[activeDragIndex] : null
+    activeDragIndex !== null ? localArchives[activeDragIndex] : null
   );
 
   let unassociatedXlFiles = $derived(
@@ -553,11 +401,11 @@
     style="left: {cursorX}px; top: {cursorY}px;"
   >
     <GripVertical class="h-3.5 w-3.5 text-[#76b900]" />
-    {#if draggedEntry.type === 'category'}
+    {#if draggedEntry.is_delimiter}
       <Folder class="h-3.5 w-3.5 text-[#76b900]" />
-      <span class="text-xs font-bold text-white uppercase tracking-wider">{draggedEntry.category.name}</span>
+      <span class="text-xs font-bold text-white uppercase tracking-wider">{draggedEntry.category_name || draggedEntry.file_name.replace('[CAT] ', '').replace('.archive', '')}</span>
     {:else}
-      <span class="text-xs font-mono font-semibold text-white">{draggedEntry.archive.file_name}</span>
+      <span class="text-xs font-mono font-semibold text-white">{draggedEntry.file_name}</span>
     {/if}
   </div>
 {/if}
@@ -576,6 +424,8 @@
       <div class="flex items-center gap-1.5 min-w-0 flex-1">
         {#if contextMenu.targetType === 'xl'}
           <FileCode class="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+        {:else if contextMenu.archive.is_delimiter}
+          <Folder class="h-3.5 w-3.5 text-nvidia-accent shrink-0" />
         {:else}
           <div class="h-2 w-2 rounded-full shrink-0 {contextMenu.archive.enabled ? 'bg-nvidia-accent' : 'bg-red-500'}"></div>
         {/if}
@@ -607,7 +457,7 @@
         class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-gray-200 hover:text-white transition text-left cursor-pointer group"
       >
         <Power class="h-3.5 w-3.5 {contextMenu.archive.enabled ? 'text-amber-400' : 'text-nvidia-accent'}" />
-        <span>{contextMenu.archive.enabled ? 'Disable Mod' : 'Enable Mod'}</span>
+        <span>{contextMenu.archive.enabled ? (contextMenu.archive.is_delimiter ? 'Disable Category' : 'Disable Mod') : (contextMenu.archive.is_delimiter ? 'Enable Category' : 'Enable Mod')}</span>
       </button>
 
       <!-- Copy File Name -->
@@ -664,7 +514,7 @@
         <span>Conflicting Mod Summary</span>
       </button>
 
-      <span class="text-xs font-mono text-gray-400 pl-2">Mods: {archives.length}</span>
+      <span class="text-xs font-mono text-gray-400 pl-2">Mods: {archives.filter(a => !a.is_delimiter).length}</span>
     </div>
   </div>
 
@@ -678,7 +528,7 @@
           No matches found.
         </div>
       {:else}
-        {#each visibleItems as { item, originalIndex, archiveRank } (item.type === 'category' ? item.category.id : item.archive.file_name)}
+        {#each visibleItems as { archive, originalIndex, archiveRank } (archive.file_name)}
           {@const isSource = activeDragIndex === originalIndex}
           {@const showLineBefore = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'before' && activeDragIndex !== originalIndex && activeDragIndex !== originalIndex - 1}
           {@const showLineAfter = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'after' && activeDragIndex !== originalIndex && activeDragIndex !== originalIndex + 1}
@@ -690,85 +540,19 @@
               </div>
             {/if}
 
-            {#if item.type === 'category'}
-              {@const stats = getCategoryStats(originalIndex)}
-              <div
-                role="group"
-                aria-label="Mod Category: {item.category.name}"
-                onpointermove={(e) => onRowPointerMove(e, originalIndex)}
-                class="rounded-lg border border-nvidia-border bg-gradient-to-r from-nvidia-card via-[#161a1e] to-nvidia-surface transition-colors px-3 py-1.5 flex items-center justify-between h-10 mt-3 relative overflow-hidden shadow-sm {isSource ? 'opacity-20 border-dashed border-nvidia-accent' : ''}"
-              >
-                <div class="absolute left-0 top-0 bottom-0 w-1 bg-nvidia-accent"></div>
-
-                <div class="flex items-center gap-2.5 flex-1 min-w-0 pl-1">
-                  <div
-                    role="button"
-                    tabindex="0"
-                    aria-label="Drag entire category"
-                    onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
-                    onpointerdown={(e) => { e.stopPropagation(); startDrag(e, originalIndex); }}
-                    class="cursor-grab active:cursor-grabbing text-nvidia-text-muted hover:text-white shrink-0 p-1"
-                    title="Drag entire category"
-                  >
-                    <GripVertical class="h-3.5 w-3.5" />
-                  </div>
-
-                  <button
-                    onclick={() => { item.category.collapsed = !item.category.collapsed; persistState(); }}
-                    class="text-nvidia-accent hover:text-nvidia-accent-hover transition shrink-0 p-1 rounded hover:bg-nvidia-surface/60"
-                    title={item.category.collapsed ? "Expand category" : "Collapse category"}
-                  >
-                    {#if item.category.collapsed}
-                      <Folder class="h-4 w-4" />
-                    {:else}
-                      <FolderOpen class="h-4 w-4" />
-                    {/if}
-                  </button>
-
-                  <button
-                    onclick={() => toggleCategory(item.category)}
-                    class="w-7 h-4 rounded-full transition relative p-0.5 shrink-0 {item.category.enabled ? 'bg-nvidia-accent' : 'bg-nvidia-border'}"
-                    title="Batch toggle all mods in category"
-                  >
-                    <div class="h-3 w-3 rounded-full bg-black transition transform {item.category.enabled ? 'translate-x-3' : 'translate-x-0'}"></div>
-                  </button>
-
-                  {#if item.category.isEditing}
-                    <input
-                      type="text"
-                      bind:value={item.category.name}
-                      onblur={() => { item.category.isEditing = false; persistState(); }}
-                      onkeydown={(e) => { if (e.key === 'Enter') { item.category.isEditing = false; persistState(); }}}
-                      class="bg-nvidia-bg border border-nvidia-accent rounded px-2 py-0.5 text-xs text-white font-bold uppercase tracking-wider focus:outline-none"
-                      use:focusOnMount
-                    />
-                  {:else}
-                    <button
-                      onclick={() => item.category.isEditing = true}
-                      class="text-xs font-bold text-gray-100 uppercase tracking-wider hover:text-nvidia-accent transition truncate flex items-center gap-2"
-                    >
-                      <span>{item.category.name}</span>
-                    </button>
-                  {/if}
-
-                  <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-nvidia-surface border border-nvidia-border text-nvidia-text-muted shrink-0">
-                    {stats.active}/{stats.total} Active
-                  </span>
-                </div>
-
-                <div class="flex items-center gap-2 shrink-0">
-                  <button
-                    onclick={() => removeCategory(item.category.id)}
-                    class="p-1 rounded hover:bg-nvidia-surface text-nvidia-text-muted hover:text-red-400 transition"
-                    title="Delete category container"
-                  >
-                    <Trash2 class="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-
+            {#if archive.is_delimiter}
+              <CategoryDelimiterRow
+                {archive}
+                {originalIndex}
+                {isSource}
+                isHighlighted={highlightedModName === archive.file_name}
+                onDragStart={startDrag}
+                onPointerMove={onRowPointerMove}
+                onToggle={toggleMod}
+                onContextMenu={openContextMenu}
+                registerNode={registerModNode}
+              />
             {:else}
-              {@const archive = item.archive}
               {@const isExpanded = !!expandedRows[archive.file_name]}
               {@const isHighlighted = highlightedModName === archive.file_name}
 

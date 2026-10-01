@@ -1,5 +1,13 @@
 export type ActiveView = 'home' | 'archive' | 'cet' | 'red4ext' | 'redscript';
 
+export interface XlItem {
+  file_name: string;
+  path: string;
+  size_bytes: number;
+  enabled: boolean;
+  associated_archive?: string | null;
+}
+
 export interface ArchiveItem {
   name: string;
   file_name: string;
@@ -11,6 +19,9 @@ export interface ArchiveItem {
   conflicts_with: string[];
   wins: string[];
   loses: string[];
+  associated_xl?: XlItem | null;
+  is_delimiter?: boolean;
+  category_name?: string | null;
 }
 
 export interface CategoryItem {
@@ -29,6 +40,7 @@ export interface ArchiveScanReport {
   archives: ArchiveItem[];
   total_conflicts: number;
   affected_archives_count: number;
+  unassociated_xl: XlItem[];
 }
 
 export interface CetPluginItem {
