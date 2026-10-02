@@ -39,7 +39,7 @@
   use:registerNode={archive.file_name}
   onpointermove={(e) => onPointerMove(e, originalIndex)}
   oncontextmenu={(e) => onContextMenu(e, archive, 'archive')}
-  class="rounded-lg border transition-all duration-300 {isHighlighted ? 'border-[#76b900] ring-2 ring-[#76b900] bg-[#76b900]/20 shadow-[0_0_15px_rgba(118,185,0,0.35)] scale-[1.008]' : 'border-nvidia-accent/40 bg-gradient-to-r from-nvidia-card to-nvidia-surface hover:border-nvidia-accent/70'} {archive.enabled ? 'opacity-100' : 'opacity-50'} {isSource ? 'opacity-20 border-dashed border-nvidia-accent/50' : ''} mt-2 mb-1"
+  class="rounded-lg border transition-all duration-300 {isHighlighted ? 'border-[#76b900] ring-2 ring-[#76b900] bg-[#76b900]/20 shadow-[0_0_15px_rgba(118,185,0,0.35)] scale-[1.008]' : 'border-nvidia-accent/35 bg-nvidia-accent/8 hover:bg-nvidia-accent/12 hover:border-nvidia-accent/65'} {archive.enabled ? 'opacity-100' : 'opacity-50'} {isSource ? 'opacity-20 border-dashed border-nvidia-accent/50' : ''} mt-2 mb-1"
 >
   <div class="flex items-center justify-between px-3 gap-2 density-row relative overflow-hidden">
     <!-- Left accent line -->
@@ -87,7 +87,7 @@
 
     <!-- Right Controls: Badge + In-line Rename and Delete -->
     <div class="flex items-center gap-2 shrink-0">
-      <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-nvidia-accent/10 border border-nvidia-accent/30 text-nvidia-accent uppercase tracking-widest">
+      <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-nvidia-accent/15 border border-nvidia-accent/35 text-nvidia-accent uppercase tracking-widest">
         Category Marker
       </span>
 

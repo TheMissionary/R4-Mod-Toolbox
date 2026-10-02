@@ -352,18 +352,13 @@
 
     let size = 1;
     if (localArchives[index].is_delimiter) {
-      // Calculate child block size
       for (let i = index + 1; i < localArchives.length; i++) {
         if (localArchives[i].is_delimiter) break;
         size++;
       }
 
-      // Preserve the user's active viewport collapse preferences
       preDragCollapseState = { ...collapsedCategories };
 
-      // Targeted Encapsulation: If the dragged category has child mods (size > 1),
-      // collapse ONLY this active category during transit so its mods travel packed together.
-      // Other categories remain in their exact current open/closed state!
       if (size > 1) {
         collapsedCategories = {
           ...collapsedCategories,
@@ -404,7 +399,6 @@
   function onRowPointerMove(event: PointerEvent, index: number) {
     if (activeDragIndex === null) return;
     
-    // Ignore hovering over items within the actively moving block
     if (index >= activeDragIndex && index < activeDragIndex + dragBlockSize) return;
 
     dropTargetIndex = index;
@@ -425,7 +419,6 @@
       
       if (dropPlacement === 'after') {
         const targetItem = localArchives[dropTargetIndex];
-        // If dropping after a collapsed category header, insert after its hidden block
         if (targetItem.is_delimiter && collapsedCategories[targetItem.file_name]) {
           let targetBlockEnd = dropTargetIndex;
           for (let i = dropTargetIndex + 1; i < localArchives.length; i++) {
@@ -434,12 +427,10 @@
           }
           targetIndex = targetBlockEnd + 1;
         } else {
-          // Dropping after an individual mod or after an open category header
           targetIndex += 1;
         }
       }
       
-      // Adjust target index if moving downward past the original block
       if (activeDragIndex < targetIndex) {
         if (targetIndex > activeDragIndex + dragBlockSize) {
           targetIndex -= dragBlockSize;
@@ -458,7 +449,6 @@
       }
     }
     
-    // Restore the user's active collapse state
     if (preDragCollapseState !== null) {
       collapsedCategories = { ...preDragCollapseState };
       preDragCollapseState = null;
@@ -856,23 +846,24 @@
                     </div>
                   </div>
 
+                  <!-- High-Contrast Status Badges (Items d & e) -->
                   <div class="flex items-center gap-2 shrink-0">
                     {#if archive.wins.length > 0}
-                      <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-nvidia-accent/10 border border-nvidia-accent/30 text-nvidia-accent text-[11px] font-medium">
+                      <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-nvidia-accent/15 border border-nvidia-accent/40 text-nvidia-accent text-[11px] font-semibold shadow-xs">
                         <Crown class="h-3 w-3" />
                         <span>Winning ({archive.wins.length})</span>
                       </div>
                     {/if}
 
                     {#if archive.loses.length > 0}
-                      <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-medium">
+                      <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-red-500/15 border border-red-500/40 text-red-400 text-[11px] font-semibold shadow-xs">
                         <ShieldAlert class="h-3 w-3" />
-                        <span>Overridden ({archive.loses.length})</span>
+                        <span>Overwritten ({archive.loses.length})</span>
                       </div>
                     {/if}
 
                     {#if archive.wins.length === 0 && archive.loses.length === 0}
-                      <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-nvidia-card border border-nvidia-border text-nvidia-text-muted text-[11px]">
+                      <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-nvidia-surface border border-nvidia-border text-nvidia-text-muted text-[11px]">
                         <CheckCircle2 class="h-3 w-3 text-nvidia-accent" />
                         <span>Clean</span>
                       </div>
@@ -912,10 +903,10 @@
 
                     {#if archive.loses.length > 0}
                       <div>
-                        <span class="text-[10px] font-semibold text-amber-400 uppercase tracking-wider">Loses To Higher Mods:</span>
+                        <span class="text-[10px] font-semibold text-red-400 uppercase tracking-wider">Loses To Higher Mods:</span>
                         <div class="mt-1 flex flex-wrap gap-1">
                           {#each archive.loses as target}
-                            <span class="px-1.5 py-0.2 rounded bg-amber-500/10 border border-amber-500/30 text-[10px] font-mono text-amber-300">
+                            <span class="px-1.5 py-0.2 rounded bg-red-500/15 border border-red-500/40 text-[10px] font-mono text-red-300 font-semibold">
                               {target}
                             </span>
                           {/each}
@@ -936,16 +927,17 @@
         {/each}
       {/if}
 
-      <!-- Dedicated Bottom Section: Unassociated .xl Files -->
+      <!-- Dedicated Bottom Section: Unassociated .xl Files (Clean Light/Dark Adaptive) -->
       {#if unassociatedXlFiles.length > 0}
         <div class="mt-6 pt-4 border-t border-nvidia-border/60 space-y-2">
-          <div class="rounded-lg border border-cyan-900/40 bg-gradient-to-r from-[#0e171f] via-[#101923] to-nvidia-surface px-3 py-2 flex items-center justify-between">
+          <!-- Adaptive Cyan Wash Header (No Dark Gradient in Light Mode) -->
+          <div class="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 flex items-center justify-between">
             <div class="flex items-center gap-2 min-w-0">
               <FileCode class="h-4 w-4 text-cyan-400 shrink-0" />
-              <span class="text-xs font-bold text-cyan-300 uppercase tracking-wider">
+              <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider">
                 Unassociated .xl Files
               </span>
-              <span class="text-[10px] text-gray-400 hidden sm:inline">
+              <span class="text-[10px] text-nvidia-text-muted hidden sm:inline">
                 (Active in game, without a systemically generated mod association)
               </span>
             </div>
@@ -954,7 +946,7 @@
               <button
                 type="button"
                 onclick={() => showXlHelp = !showXlHelp}
-                class="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border transition-colors {showXlHelp ? 'bg-cyan-950 text-cyan-300 border-cyan-600' : 'bg-nvidia-surface hover:bg-nvidia-card text-cyan-400 border-cyan-900/60'}"
+                class="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border transition-colors {showXlHelp ? 'bg-cyan-950 text-cyan-300 border-cyan-600' : 'bg-nvidia-surface hover:bg-nvidia-card text-cyan-400 border-cyan-500/40'}"
                 title="Click for association instructions"
               >
                 <HelpCircle class="h-3.5 w-3.5" />
@@ -968,15 +960,15 @@
           </div>
 
           {#if showXlHelp}
-            <div class="p-3 rounded-lg border border-cyan-800/50 bg-cyan-950/20 text-xs text-nvidia-text-primary space-y-1.5">
-              <div class="flex items-center gap-2 text-cyan-300 font-semibold">
+            <div class="p-3 rounded-lg border border-cyan-500/30 bg-cyan-500/5 text-xs text-nvidia-text-primary space-y-1.5">
+              <div class="flex items-center gap-2 text-cyan-400 font-semibold">
                 <Info class="h-4 w-4 shrink-0" />
                 <span>How to link an unassociated .xl file to its parent .archive mod:</span>
               </div>
               <p class="text-[11px] text-nvidia-text-muted pl-6 leading-relaxed">
                 1. Open your mod folder in Windows Explorer: <span class="font-mono text-nvidia-text-primary">{gamePath ? gamePath + '\\archive\\pc\\mod' : '\\archive\\pc\\mod'}</span>.
                 <br />
-                2. Rename the <span class="font-mono text-cyan-300">.xl</span> file to match its parent archive name exactly:
+                2. Rename the <span class="font-mono text-cyan-400 font-bold">.xl</span> file to match its parent archive name exactly:
                 <br />
                 &nbsp;&nbsp;&nbsp;• Standard: <span class="font-mono text-nvidia-text-primary">&lt;ModName&gt;.archive.xl</span> or <span class="font-mono text-nvidia-text-primary">&lt;ModName&gt;.xl</span>
                 <br />
@@ -985,19 +977,21 @@
             </div>
           {/if}
 
+          <!-- High-Contrast Loose .XL Rows -->
           <div class="space-y-1">
             {#each unassociatedXlFiles as xl (xl.file_name)}
-              <div class="rounded border border-cyan-950/60 bg-nvidia-surface/80 px-3 flex items-center justify-between density-row">
+              <div class="rounded border border-nvidia-border bg-nvidia-surface/80 hover:bg-nvidia-surface px-3 flex items-center justify-between density-row">
                 <div class="flex items-center gap-2.5 min-w-0">
-                  <FileCode class="h-3.5 w-3.5 text-cyan-500 shrink-0" />
-                  <span class="font-mono text-cyan-200 truncate">{xl.file_name}</span>
+                  <FileCode class="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+                  <!-- High Contrast Legible Title in Light and Dark Mode -->
+                  <span class="font-mono text-nvidia-text-primary font-medium truncate">{xl.file_name}</span>
                   <span class="text-[11px] font-mono text-nvidia-text-muted shrink-0">
                     {formatBytes(xl.size_bytes)}
                   </span>
                 </div>
 
                 <div class="flex items-center gap-2 shrink-0">
-                  <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-800/40 text-cyan-300">
+                  <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 font-semibold">
                     Active / Untethered
                   </span>
                 </div>
@@ -1008,12 +1002,12 @@
       {/if}
     </div>
 
-    <!-- Conflict Summary Drawer (Density-aware) -->
+    <!-- Conflict Summary Drawer (Density-aware, High Saturation) -->
     {#if showConflictSummary}
       <aside class="w-80 rounded-lg border border-nvidia-border bg-nvidia-surface flex flex-col overflow-hidden shrink-0 shadow-xl transition-all duration-200">
         <div class="p-3 border-b border-nvidia-border bg-nvidia-card/50 flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <AlertTriangle class="h-4 w-4 text-amber-400" />
+            <AlertTriangle class="h-4 w-4 text-red-400" />
             <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Conflicting Summary</span>
           </div>
           <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-nvidia-surface border border-nvidia-border text-nvidia-text-primary">
@@ -1032,24 +1026,26 @@
               <button
                 type="button"
                 onclick={() => focusModInMainList(archive.file_name)}
-                class="w-full text-left rounded px-2.5 flex items-center justify-between gap-2 border transition cursor-pointer density-row {isLosing ? 'border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/15' : 'border-nvidia-accent/30 bg-nvidia-accent/5 hover:bg-nvidia-accent/15'} hover:border-nvidia-accent group"
+                class="w-full text-left rounded px-2.5 flex items-center justify-between gap-2 border transition cursor-pointer density-row {isLosing ? 'border-red-500/35 bg-red-500/10 hover:bg-red-500/20 hover:border-red-400' : 'border-nvidia-accent/35 bg-nvidia-accent/10 hover:bg-nvidia-accent/20 hover:border-nvidia-accent'} group"
                 title="Click to locate in main load order"
               >
                 <div class="flex items-center gap-2 min-w-0 flex-1">
-                  <div class="h-2 w-2 rounded-full shrink-0 {isLosing ? 'bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.6)]' : 'bg-nvidia-accent shadow-[0_0_6px_rgba(118,185,0,0.6)]'}"></div>
+                  <!-- Saturated Status Indicator Dot -->
+                  <div class="h-2 w-2 rounded-full shrink-0 {isLosing ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.7)]' : 'bg-nvidia-accent shadow-[0_0_8px_rgba(118,185,0,0.7)]'}"></div>
 
-                  <span class="font-mono text-nvidia-text-primary truncate">
+                  <span class="font-mono text-nvidia-text-primary truncate font-medium">
                     {archive.file_name}
                   </span>
                 </div>
 
+                <!-- Saturated Pill Badges -->
                 <div class="shrink-0">
                   {#if isLosing}
-                    <span class="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                    <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-red-500/20 text-red-400 border border-red-500/40">
                       -{archive.loses.length}
                     </span>
                   {:else}
-                    <span class="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-nvidia-accent/20 text-nvidia-accent border border-nvidia-accent/30">
+                    <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-nvidia-accent/20 text-nvidia-accent border border-nvidia-accent/40">
                       +{archive.wins.length}
                     </span>
                   {/if}
