@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ArchiveItem, ArchiveScanReport, XlItem } from '$lib/types';
   import CategoryDelimiterRow from '$lib/components/CategoryDelimiterRow.svelte';
+  import DialogModal from '$lib/components/DialogModal.svelte';
   import {
     GripVertical,
     ChevronDown,
@@ -50,6 +51,27 @@
   let localArchives = $state<ArchiveItem[]>([]);
   let scrollContainer = $state<HTMLElement | null>(null);
   let showXlHelp = $state(false);
+
+  // Reusable Dialog Modal State
+  let dialogState = $state<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    mode: 'prompt' | 'confirm';
+    initialValue: string;
+    confirmText: string;
+    isDanger: boolean;
+    onConfirm: (val: string) => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    mode: 'prompt',
+    initialValue: '',
+    confirmText: 'Confirm',
+    isDanger: false,
+    onConfirm: () => {}
+  });
 
   // Category Collapsing State
   let collapsedCategories = $state<Record<string, boolean>>({});
@@ -145,73 +167,104 @@
     }
   }
 
-  async function addCategory() {
-    const name = prompt("Enter new category name:", "New Category");
-    if (!name || name.trim() === '') return;
-    
-    try {
-      const report = await invoke<ArchiveScanReport>('create_physical_category', {
-        gamePath,
-        categoryName: name.trim()
-      });
-      if (report && Array.isArray(report.archives)) {
-        archives = report.archives;
-        if (onStateChanged) onStateChanged();
-        setTimeout(() => {
-          if (scrollContainer) {
-            scrollContainer.scrollTop = 0;
+  function addCategory() {
+    dialogState = {
+      isOpen: true,
+      title: 'Create Category',
+      message: 'Enter a name for the new category delimiter:',
+      mode: 'prompt',
+      initialValue: 'New Category',
+      confirmText: 'Create Category',
+      isDanger: false,
+      onConfirm: async (name: string) => {
+        dialogState.isOpen = false;
+        if (!name || name.trim() === '') return;
+        
+        try {
+          const report = await invoke<ArchiveScanReport>('create_physical_category', {
+            gamePath,
+            categoryName: name.trim()
+          });
+          if (report && Array.isArray(report.archives)) {
+            archives = report.archives;
+            if (onStateChanged) onStateChanged();
+            setTimeout(() => {
+              if (scrollContainer) {
+                scrollContainer.scrollTop = 0;
+              }
+            }, 100);
           }
-        }, 100);
-      }
-    } catch (err) {
-      console.error("Failed to create physical category:", err);
-    }
-  }
-
-  async function handleRenameCategory(archive: ArchiveItem) {
-    const currentName = archive.category_name || archive.file_name.replace('[CAT] ', '').replace('.archive', '');
-    const newName = prompt("Enter new category name:", currentName);
-    if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
-
-    try {
-      const report = await invoke<ArchiveScanReport>('rename_physical_category', {
-        gamePath,
-        oldFileName: archive.file_name,
-        newCategoryName: newName.trim()
-      });
-      if (report && Array.isArray(report.archives)) {
-        const wasCollapsed = !!collapsedCategories[archive.file_name];
-        delete collapsedCategories[archive.file_name];
-        const newFileName = `[CAT] ${newName.trim()}.archive`;
-        if (wasCollapsed) {
-          collapsedCategories[newFileName] = true;
+        } catch (err) {
+          console.error("Failed to create physical category:", err);
         }
-
-        archives = report.archives;
-        if (onStateChanged) onStateChanged();
       }
-    } catch (err) {
-      console.error("Failed to rename physical category:", err);
-    }
+    };
   }
 
-  async function handleDeleteCategory(archive: ArchiveItem) {
-    const confirmed = confirm("Are you sure you wish to delete this category?");
-    if (!confirmed) return;
+  function handleRenameCategory(archive: ArchiveItem) {
+    const currentName = archive.category_name || archive.file_name.replace('[CAT] ', '').replace('.archive', '');
+    dialogState = {
+      isOpen: true,
+      title: 'Rename Category',
+      message: 'Enter a new name for this category delimiter:',
+      mode: 'prompt',
+      initialValue: currentName,
+      confirmText: 'Rename',
+      isDanger: false,
+      onConfirm: async (newName: string) => {
+        dialogState.isOpen = false;
+        if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
 
-    try {
-      const report = await invoke<ArchiveScanReport>('delete_physical_category', {
-        gamePath,
-        categoryFileName: archive.file_name
-      });
-      if (report && Array.isArray(report.archives)) {
-        delete collapsedCategories[archive.file_name];
-        archives = report.archives;
-        if (onStateChanged) onStateChanged();
+        try {
+          const report = await invoke<ArchiveScanReport>('rename_physical_category', {
+            gamePath,
+            oldFileName: archive.file_name,
+            newCategoryName: newName.trim()
+          });
+          if (report && Array.isArray(report.archives)) {
+            const wasCollapsed = !!collapsedCategories[archive.file_name];
+            delete collapsedCategories[archive.file_name];
+            const newFileName = `[CAT] ${newName.trim()}.archive`;
+            if (wasCollapsed) {
+              collapsedCategories[newFileName] = true;
+            }
+
+            archives = report.archives;
+            if (onStateChanged) onStateChanged();
+          }
+        } catch (err) {
+          console.error("Failed to rename physical category:", err);
+        }
       }
-    } catch (err) {
-      console.error("Failed to delete physical category:", err);
-    }
+    };
+  }
+
+  function handleDeleteCategory(archive: ArchiveItem) {
+    dialogState = {
+      isOpen: true,
+      title: 'Delete Category',
+      message: 'Are you sure you wish to delete this category? The category marker will be removed, but all contained mods will remain preserved in their exact sequential order.',
+      mode: 'confirm',
+      initialValue: '',
+      confirmText: 'Delete Category',
+      isDanger: true,
+      onConfirm: async () => {
+        dialogState.isOpen = false;
+        try {
+          const report = await invoke<ArchiveScanReport>('delete_physical_category', {
+            gamePath,
+            categoryFileName: archive.file_name
+          });
+          if (report && Array.isArray(report.archives)) {
+            delete collapsedCategories[archive.file_name];
+            archives = report.archives;
+            if (onStateChanged) onStateChanged();
+          }
+        } catch (err) {
+          console.error("Failed to delete physical category:", err);
+        }
+      }
+    };
   }
 
   async function toggleMod(archive: ArchiveItem) {
@@ -1013,3 +1066,15 @@
     {/if}
   </div>
 </div>
+
+<!-- Reusable In-App Themed Dialog Modal -->
+<DialogModal
+  bind:isOpen={dialogState.isOpen}
+  title={dialogState.title}
+  message={dialogState.message}
+  mode={dialogState.mode}
+  initialValue={dialogState.initialValue}
+  confirmText={dialogState.confirmText}
+  isDanger={dialogState.isDanger}
+  onConfirm={dialogState.onConfirm}
+/>
