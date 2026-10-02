@@ -1,25 +1,66 @@
-﻿@import "../node_modules/tailwindcss/index.css";
-
-@theme {
-  --color-nvidia-bg: #121517;
-  --color-nvidia-surface: #181c20;
-  --color-nvidia-card: #1e2328;
-  --color-nvidia-border: #2a323d;
-  --color-nvidia-accent: #76b900;
-  --color-nvidia-accent-hover: #88d600;
-  --color-nvidia-text-muted: #94a3b8;
-}
+@import "../node_modules/tailwindcss/index.css";
 
 :root {
   color-scheme: dark;
+  
+  /* 8 Core Semantic Color Tokens (Default Dark) */
+  --theme-bg: #121517;
+  --theme-surface: #181c20;
+  --theme-card: #1e2328;
+  --theme-border: #2a323d;
+  --theme-accent: #76b900;
+  --theme-accent-hover: #88d600;
+  --theme-text-muted: #94a3b8;
+  --theme-text-primary: #ffffff;
+
+  /* Typography Token */
+  --theme-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* Row Density Variables: Standard View (36px) */
+  --row-h: 2.25rem;
+  --row-py: 0.375rem;
+  --row-icon-size: 0.875rem;
+  --row-font-size: 0.75rem;
+}
+
+/* Row Density Variables: Compact View (28px) */
+:root[data-density="compact"] {
+  --row-h: 1.75rem;
+  --row-py: 0.125rem;
+  --row-icon-size: 0.75rem;
+  --row-font-size: 0.6875rem;
+}
+
+@theme {
+  --color-nvidia-bg: var(--theme-bg);
+  --color-nvidia-surface: var(--theme-surface);
+  --color-nvidia-card: var(--theme-card);
+  --color-nvidia-border: var(--theme-border);
+  --color-nvidia-accent: var(--theme-accent);
+  --color-nvidia-accent-hover: var(--theme-accent-hover);
+  --color-nvidia-text-muted: var(--theme-text-muted);
+  --color-nvidia-text-primary: var(--theme-text-primary);
 }
 
 body {
   margin: 0;
   padding: 0;
   background-color: var(--color-nvidia-bg);
-  color: #ffffff;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--theme-text-primary, #ffffff);
+  font-family: var(--theme-font-family);
   overflow: hidden;
   user-select: none;
+}
+
+/* Universal Density Classes for Mod Rows */
+.density-row {
+  height: var(--row-h) !important;
+  padding-top: var(--row-py) !important;
+  padding-bottom: var(--row-py) !important;
+  font-size: var(--row-font-size);
+}
+
+.density-icon {
+  height: var(--row-icon-size) !important;
+  width: var(--row-icon-size) !important;
 }

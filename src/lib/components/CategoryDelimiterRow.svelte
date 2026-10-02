@@ -35,9 +35,9 @@
   use:registerNode={archive.file_name}
   onpointermove={(e) => onPointerMove(e, originalIndex)}
   oncontextmenu={(e) => onContextMenu(e, archive, 'archive')}
-  class="rounded-lg border transition-all duration-300 {isHighlighted ? 'border-[#76b900] ring-2 ring-[#76b900] bg-[#76b900]/20 shadow-[0_0_15px_rgba(118,185,0,0.35)] scale-[1.008]' : 'border-nvidia-accent/40 bg-gradient-to-r from-nvidia-card via-[#161a1e] to-nvidia-surface hover:border-nvidia-accent/70'} {archive.enabled ? 'opacity-100' : 'opacity-50'} {isSource ? 'opacity-20 border-dashed border-nvidia-accent/50' : ''} mt-2 mb-1"
+  class="rounded-lg border transition-all duration-300 {isHighlighted ? 'border-[#76b900] ring-2 ring-[#76b900] bg-[#76b900]/20 shadow-[0_0_15px_rgba(118,185,0,0.35)] scale-[1.008]' : 'border-nvidia-accent/40 bg-gradient-to-r from-nvidia-card to-nvidia-surface hover:border-nvidia-accent/70'} {archive.enabled ? 'opacity-100' : 'opacity-50'} {isSource ? 'opacity-20 border-dashed border-nvidia-accent/50' : ''} mt-2 mb-1"
 >
-  <div class="flex items-center justify-between px-3 py-2 gap-2 h-10 relative overflow-hidden">
+  <div class="flex items-center justify-between px-3 gap-2 density-row relative overflow-hidden">
     <!-- Left accent line -->
     <div class="absolute left-0 top-0 bottom-0 w-1 bg-nvidia-accent"></div>
 
@@ -76,7 +76,7 @@
         {/if}
       </button>
 
-      <span class="text-sm font-bold text-white uppercase tracking-wider truncate">
+      <span class="font-bold text-nvidia-text-primary uppercase tracking-wider truncate">
         {archive.category_name || archive.file_name.replace('[CAT] ', '').replace('.archive', '')}
       </span>
     </div>

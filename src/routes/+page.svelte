@@ -3,6 +3,7 @@
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
   import { openUrl } from '@tauri-apps/plugin-opener';
+  import { loadThemeSettings, applyThemeSettings } from '$lib/theme';
   import type {
     ScanResult,
     ArchiveItem,
@@ -137,9 +138,12 @@
   }
 
   onMount(() => {
-    const splashStartTime = Date.now();
+    // 1. Initialize and apply user saved theme, typography & density on startup
+    const settings = loadThemeSettings();
+    applyThemeSettings(settings);
 
-    // Smoothly dismiss the instant title screen after a minimum ~800ms threshold
+    // 2. Smoothly dismiss startup title screen
+    const splashStartTime = Date.now();
     const dismissSplash = () => {
       const elapsed = Date.now() - splashStartTime;
       const remaining = Math.max(0, 800 - elapsed);
@@ -167,7 +171,7 @@
   });
 </script>
 
-<div class="flex h-screen w-screen overflow-hidden bg-nvidia-bg text-white font-sans">
+<div class="flex h-screen w-screen overflow-hidden bg-nvidia-bg text-nvidia-text-primary font-sans">
   <!-- Left Navigation Sidebar -->
   <aside class="w-64 border-r border-nvidia-border flex flex-col justify-between bg-nvidia-surface/40 select-none shrink-0">
     <div>
@@ -176,7 +180,7 @@
           R4
         </div>
         <div>
-          <h1 class="text-xs font-bold tracking-wider uppercase text-white">RED4 Mod Toolbox</h1>
+          <h1 class="text-xs font-bold tracking-wider uppercase text-nvidia-text-primary">RED4 Mod Toolbox</h1>
           <p class="text-[10px] text-nvidia-text-muted font-mono truncate max-w-[140px]" title="Mod Load Order and Conflict Resolver">
             CONFLICT RESOLVER
           </p>
@@ -187,7 +191,7 @@
         <button
           type="button"
           onclick={() => setTab('home')}
-          class="w-full flex items-center gap-3 px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'home' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-gray-300 hover:bg-nvidia-surface hover:text-white'}"
+          class="w-full flex items-center gap-3 px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'home' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
         >
           <Home class="h-4 w-4" />
           <span>Home</span>
@@ -196,7 +200,7 @@
         <button
           type="button"
           onclick={() => setTab('archive')}
-          class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'archive' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-gray-300 hover:bg-nvidia-surface hover:text-white'}"
+          class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'archive' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
         >
           <div class="flex items-center gap-3">
             <Archive class="h-4 w-4" />
@@ -212,7 +216,7 @@
         <button
           type="button"
           onclick={() => setTab('cet')}
-          class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'cet' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-gray-300 hover:bg-nvidia-surface hover:text-white'}"
+          class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'cet' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
         >
           <div class="flex items-center gap-3">
             <Cpu class="h-4 w-4" />
@@ -228,7 +232,7 @@
         <button
           type="button"
           onclick={() => setTab('red4ext')}
-          class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'red4ext' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-gray-300 hover:bg-nvidia-surface hover:text-white'}"
+          class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'red4ext' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
         >
           <div class="flex items-center gap-3">
             <Puzzle class="h-4 w-4" />
@@ -244,7 +248,7 @@
         <button
           type="button"
           onclick={() => setTab('redscript')}
-          class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'redscript' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-gray-300 hover:bg-nvidia-surface hover:text-white'}"
+          class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'redscript' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
         >
           <div class="flex items-center gap-3">
             <FileCode2 class="h-4 w-4" />
@@ -277,7 +281,7 @@
           onclick={() => openDependencyLink('CP77')}
           class="w-full flex items-center justify-between py-0.5 px-1 rounded hover:bg-nvidia-surface/80 group transition text-left cursor-pointer"
         >
-          <span class="text-nvidia-text-muted group-hover:text-gray-200 transition">CP77</span>
+          <span class="text-nvidia-text-muted group-hover:text-nvidia-text-primary transition">CP77</span>
           <span class="text-nvidia-accent font-semibold">{scanResult?.game_version || '2.31'}</span>
         </button>
       </div>
@@ -296,7 +300,7 @@
             <CheckCircle2 class="h-4 w-4" />
             <span>ENGINE CONNECTED</span>
           </div>
-          <h2 class="text-xl font-bold text-white mb-1">RED4 Conflict Engine</h2>
+          <h2 class="text-xl font-bold text-nvidia-text-primary mb-1">RED4 Conflict Engine</h2>
           <p class="text-xs text-nvidia-text-muted max-w-xl">
             Inspect loose load orders, monitor overwrite priority conflicts across .archive, CET, and RedScript mod trees.
           </p>
@@ -318,7 +322,7 @@
             </div>
             <div>
               <div class="flex items-baseline gap-1.5">
-                <span class="text-2xl font-bold font-mono text-white group-hover:text-nvidia-accent transition-colors">{scanResult?.archive_active ?? 0}</span>
+                <span class="text-2xl font-bold font-mono text-nvidia-text-primary group-hover:text-nvidia-accent transition-colors">{scanResult?.archive_active ?? 0}</span>
                 <span class="text-xs font-mono text-nvidia-text-muted">of {scanResult?.archive_total ?? 0}</span>
               </div>
               <p class="text-[10px] text-nvidia-text-muted font-mono mt-0.5">archive/pc/mod</p>
@@ -340,7 +344,7 @@
             </div>
             <div>
               <div class="flex items-baseline gap-1.5">
-                <span class="text-2xl font-bold font-mono text-white group-hover:text-nvidia-accent transition-colors">{scanResult?.cet_active ?? 0}</span>
+                <span class="text-2xl font-bold font-mono text-nvidia-text-primary group-hover:text-nvidia-accent transition-colors">{scanResult?.cet_active ?? 0}</span>
                 <span class="text-xs font-mono text-nvidia-text-muted">of {scanResult?.cet_total ?? 0}</span>
               </div>
               <p class="text-[10px] text-nvidia-text-muted font-mono mt-0.5">bin/x64/plugins/cyber_engine_tweaks</p>
@@ -362,7 +366,7 @@
             </div>
             <div>
               <div class="flex items-baseline gap-1.5">
-                <span class="text-2xl font-bold font-mono text-white group-hover:text-nvidia-accent transition-colors">{scanResult?.red4ext_active ?? 0}</span>
+                <span class="text-2xl font-bold font-mono text-nvidia-text-primary group-hover:text-nvidia-accent transition-colors">{scanResult?.red4ext_active ?? 0}</span>
                 <span class="text-xs font-mono text-nvidia-text-muted">of {scanResult?.red4ext_total ?? 0}</span>
               </div>
               <p class="text-[10px] text-nvidia-text-muted font-mono mt-0.5">red4ext/plugins</p>
@@ -384,7 +388,7 @@
             </div>
             <div>
               <div class="flex items-baseline gap-1.5">
-                <span class="text-2xl font-bold font-mono text-white group-hover:text-nvidia-accent transition-colors">{scanResult?.redscript_active ?? 0}</span>
+                <span class="text-2xl font-bold font-mono text-nvidia-text-primary group-hover:text-nvidia-accent transition-colors">{scanResult?.redscript_active ?? 0}</span>
                 <span class="text-xs font-mono text-nvidia-text-muted">of {scanResult?.redscript_total ?? 0}</span>
               </div>
               <p class="text-[10px] text-nvidia-text-muted font-mono mt-0.5">r6/scripts</p>

@@ -256,7 +256,6 @@
         size++;
       }
 
-      // Save user's current collapse preferences and force-collapse all categories
       preDragCollapseState = { ...collapsedCategories };
       const allCollapsed: Record<string, boolean> = {};
       for (const item of localArchives) {
@@ -299,7 +298,6 @@
   function onRowPointerMove(event: PointerEvent, index: number) {
     if (activeDragIndex === null) return;
     
-    // Prevent dropping inside the dragged block itself
     if (index >= activeDragIndex && index < activeDragIndex + dragBlockSize) return;
 
     dropTargetIndex = index;
@@ -319,7 +317,6 @@
       let targetIndex = dropTargetIndex;
       
       if (dropPlacement === 'after') {
-        // If dropping after a collapsed category header, drop after all of its hidden mods!
         if (localArchives[dropTargetIndex].is_delimiter) {
           let targetBlockEnd = dropTargetIndex;
           for (let i = dropTargetIndex + 1; i < localArchives.length; i++) {
@@ -332,7 +329,6 @@
         }
       }
       
-      // Adjust target index if we are moving down the list
       if (activeDragIndex < targetIndex) {
         if (targetIndex > activeDragIndex + dragBlockSize) {
           targetIndex -= dragBlockSize;
@@ -351,7 +347,6 @@
       }
     }
     
-    // Restore user's previous collapse preferences
     if (preDragCollapseState !== null) {
       collapsedCategories = { ...preDragCollapseState };
       preDragCollapseState = null;
@@ -363,7 +358,6 @@
     dropPlacement = null;
   }
 
-  // --- Context Menu Handlers ---
   function openContextMenu(event: MouseEvent, archive: ArchiveItem, targetType: 'archive' | 'xl' = 'archive') {
     event.preventDefault();
     event.stopPropagation();
@@ -435,7 +429,6 @@
     }
   }
 
-  // Filtered view that honors collapsed category states
   let visibleItems = $derived.by(() => {
     const result: { archive: ArchiveItem; originalIndex: number; archiveRank: number }[] = [];
     let rank = 0;
@@ -455,7 +448,6 @@
         }
       } else {
         rank += 1;
-        // Hide mod if its parent category is collapsed (unless searching)
         if (!currentCategoryCollapsed || searchQuery !== '') {
           if (searchQuery === '' || archive.name.toLowerCase().includes(searchQuery.toLowerCase())) {
             result.push({ 
@@ -589,13 +581,13 @@
           type="text"
           bind:value={searchQuery}
           placeholder="Filter mods or categories..."
-          class="w-full pl-9 pr-8 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-white placeholder-nvidia-text-muted focus:outline-none focus:border-nvidia-accent"
+          class="w-full pl-9 pr-8 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary placeholder-nvidia-text-muted focus:outline-none focus:border-nvidia-accent"
         />
         {#if searchQuery !== ''}
           <button
             type="button"
             onclick={() => searchQuery = ''}
-            class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-nvidia-text-muted hover:text-white transition cursor-pointer"
+            class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer"
             title="Clear search"
           >
             <X class="h-3.5 w-3.5" />
@@ -610,7 +602,7 @@
     <div class="flex items-center gap-2.5">
       <button
         onclick={addCategory}
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-gray-200 font-medium transition"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary font-medium transition cursor-pointer"
       >
         <FolderPlus class="h-3.5 w-3.5 text-nvidia-accent" />
         <span>Add Category</span>
@@ -618,7 +610,7 @@
 
       <button
         onclick={toggleSummaryDrawer}
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition {showConflictSummary ? 'bg-nvidia-accent/15 border-nvidia-accent/40 text-nvidia-accent' : 'bg-nvidia-surface hover:bg-nvidia-card border-nvidia-border text-nvidia-text-muted hover:text-white'}"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition cursor-pointer {showConflictSummary ? 'bg-nvidia-accent/15 border-nvidia-accent/40 text-nvidia-accent' : 'bg-nvidia-surface hover:bg-nvidia-card border-nvidia-border text-nvidia-text-muted hover:text-nvidia-text-primary'}"
         title="Toggle Conflicting Mod Summary Column"
       >
         {#if showConflictSummary}
@@ -679,7 +671,8 @@
                 oncontextmenu={(e) => openContextMenu(e, archive, 'archive')}
                 class="rounded border transition-all duration-300 {isHighlighted ? 'border-[#76b900] ring-2 ring-[#76b900] bg-[#76b900]/20 shadow-[0_0_15px_rgba(118,185,0,0.35)] scale-[1.008]' : 'border-nvidia-border/70 bg-nvidia-surface hover:border-nvidia-border'} {archive.enabled ? 'opacity-100' : 'opacity-40'} {isSource ? 'opacity-20 border-dashed border-nvidia-accent/50' : ''}"
               >
-                <div class="flex items-center justify-between px-3 py-1.5 gap-2 h-9">
+                <!-- Density-aware Row Container -->
+                <div class="flex items-center justify-between px-3 gap-2 density-row">
                   <div class="flex items-center gap-2.5 min-w-0 flex-1">
                     <div
                       role="button"
@@ -705,7 +698,7 @@
                       #{archiveRank}
                     </span>
 
-                    <span class="text-xs font-mono font-medium text-white truncate max-w-md">
+                    <span class="font-mono font-medium text-nvidia-text-primary truncate max-w-md">
                       {archive.file_name}
                     </span>
 
@@ -754,7 +747,7 @@
                     {#if archive.has_conflicts}
                       <button
                         onclick={() => { expandedRows[archive.file_name] = !expandedRows[archive.file_name]; }}
-                        class="p-1 rounded hover:bg-nvidia-card text-nvidia-text-muted hover:text-white transition"
+                        class="p-1 rounded hover:bg-nvidia-card text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer"
                       >
                         {#if isExpanded}
                           <ChevronDown class="h-3.5 w-3.5" />
@@ -775,7 +768,7 @@
                         <span class="text-[10px] font-semibold text-nvidia-accent uppercase tracking-wider">Overwrites Lower Mods:</span>
                         <div class="mt-1 flex flex-wrap gap-1">
                           {#each archive.wins as target}
-                            <span class="px-1.5 py-0.2 rounded bg-nvidia-surface border border-nvidia-border text-[10px] font-mono text-gray-300">
+                            <span class="px-1.5 py-0.2 rounded bg-nvidia-surface border border-nvidia-border text-[10px] font-mono text-nvidia-text-primary">
                               {target}
                             </span>
                           {/each}
@@ -841,19 +834,19 @@
           </div>
 
           {#if showXlHelp}
-            <div class="p-3 rounded-lg border border-cyan-800/50 bg-cyan-950/20 text-xs text-gray-300 space-y-1.5">
+            <div class="p-3 rounded-lg border border-cyan-800/50 bg-cyan-950/20 text-xs text-nvidia-text-primary space-y-1.5">
               <div class="flex items-center gap-2 text-cyan-300 font-semibold">
                 <Info class="h-4 w-4 shrink-0" />
                 <span>How to link an unassociated .xl file to its parent .archive mod:</span>
               </div>
-              <p class="text-[11px] text-gray-400 pl-6 leading-relaxed">
-                1. Open your mod folder in Windows Explorer: <span class="font-mono text-gray-200">{gamePath ? gamePath + '\\archive\\pc\\mod' : '\\archive\\pc\\mod'}</span>.
+              <p class="text-[11px] text-nvidia-text-muted pl-6 leading-relaxed">
+                1. Open your mod folder in Windows Explorer: <span class="font-mono text-nvidia-text-primary">{gamePath ? gamePath + '\\archive\\pc\\mod' : '\\archive\\pc\\mod'}</span>.
                 <br />
                 2. Rename the <span class="font-mono text-cyan-300">.xl</span> file to match its parent archive name exactly:
                 <br />
-                &nbsp;&nbsp;&nbsp;• Standard: <span class="font-mono text-gray-200">&lt;ModName&gt;.archive.xl</span> or <span class="font-mono text-gray-200">&lt;ModName&gt;.xl</span>
+                &nbsp;&nbsp;&nbsp;• Standard: <span class="font-mono text-nvidia-text-primary">&lt;ModName&gt;.archive.xl</span> or <span class="font-mono text-nvidia-text-primary">&lt;ModName&gt;.xl</span>
                 <br />
-                3. Click <span class="font-semibold text-white">Run Conflict Scan</span> at the top of the app. The file will automatically link to the archive, display the <span class="font-mono text-cyan-400 font-bold">[XL]</span> badge, and synchronize its toggle state.
+                3. Click <span class="font-semibold text-nvidia-text-primary">Run Conflict Scan</span> at the top of the app. The file will automatically link to the archive, display the <span class="font-mono text-cyan-400 font-bold">[XL]</span> badge, and synchronize its toggle state.
               </p>
             </div>
           {/if}
@@ -881,14 +874,15 @@
       {/if}
     </div>
 
+    <!-- Conflict Summary Drawer -->
     {#if showConflictSummary}
       <aside class="w-80 rounded-lg border border-nvidia-border bg-nvidia-surface flex flex-col overflow-hidden shrink-0 shadow-xl transition-all duration-200">
         <div class="p-3 border-b border-nvidia-border bg-nvidia-card/50 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <AlertTriangle class="h-4 w-4 text-amber-400" />
-            <span class="text-xs font-bold text-white uppercase tracking-wider">Conflicting Summary</span>
+            <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Conflicting Summary</span>
           </div>
-          <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-nvidia-surface border border-nvidia-border text-gray-300">
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-nvidia-surface border border-nvidia-border text-nvidia-text-primary">
             {conflictingArchives.length} Contested
           </span>
         </div>
@@ -910,7 +904,7 @@
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                   <div class="h-2 w-2 rounded-full shrink-0 {isLosing ? 'bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.6)]' : 'bg-nvidia-accent shadow-[0_0_6px_rgba(118,185,0,0.6)]'}"></div>
 
-                  <span class="text-xs font-mono text-gray-200 group-hover:text-white truncate">
+                  <span class="text-xs font-mono text-nvidia-text-primary truncate">
                     {archive.file_name}
                   </span>
                 </div>

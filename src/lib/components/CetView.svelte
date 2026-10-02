@@ -59,13 +59,13 @@
           type="text"
           bind:value={searchQuery}
           placeholder="Filter CET plugins..."
-          class="w-full pl-9 pr-8 py-1.5 rounded border border-nvidia-border bg-nvidia-surface/80 text-xs text-white placeholder:text-nvidia-text-muted/60 focus:outline-hidden focus:border-nvidia-accent font-sans"
+          class="w-full pl-9 pr-8 py-1.5 rounded border border-nvidia-border bg-nvidia-surface/80 text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/60 focus:outline-hidden focus:border-nvidia-accent font-sans"
         />
         {#if searchQuery !== ''}
           <button
             type="button"
             onclick={() => searchQuery = ''}
-            class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-nvidia-text-muted hover:text-white transition cursor-pointer"
+            class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer"
             title="Clear search"
           >
             <X class="h-3.5 w-3.5" />
@@ -91,14 +91,14 @@
           data-mod-path={plugin.path}
           data-mod-type="cet"
           data-is-file="false"
-          class="flex items-center justify-between px-3 py-2 rounded border border-nvidia-border/70 bg-nvidia-surface/40 hover:bg-nvidia-surface/70 transition
-            {plugin.enabled ? 'text-gray-200' : 'opacity-50 text-nvidia-text-muted'}"
+          class="flex items-center justify-between px-3 rounded border border-nvidia-border/70 bg-nvidia-surface/40 hover:bg-nvidia-surface/70 transition density-row
+            {plugin.enabled ? 'text-nvidia-text-primary' : 'opacity-50 text-nvidia-text-muted'}"
         >
           <div class="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
               onclick={() => handleToggle(plugin)}
-              class="p-1 rounded hover:bg-nvidia-surface text-nvidia-text-muted hover:text-white transition cursor-pointer"
+              class="p-1 rounded hover:bg-nvidia-surface text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer"
               title={plugin.enabled ? 'Click to disable' : 'Click to enable'}
             >
               {#if plugin.enabled}
@@ -107,7 +107,7 @@
                 <EyeOff class="h-3.5 w-3.5 text-nvidia-text-muted" />
               {/if}
             </button>
-            <span class="text-xs font-mono truncate {plugin.enabled ? 'text-white' : 'line-through text-nvidia-text-muted'}">
+            <span class="font-mono truncate {plugin.enabled ? 'text-nvidia-text-primary' : 'line-through text-nvidia-text-muted'}">
               {plugin.name}
             </span>
           </div>

@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { RefreshCw, FolderSearch } from 'lucide-svelte';
+  import { RefreshCw, FolderSearch, Palette } from 'lucide-svelte';
   import { open } from '@tauri-apps/plugin-dialog';
+  import ThemeModal from '$lib/components/ThemeModal.svelte';
 
   let { 
     gamePath = $bindable(''), 
@@ -11,6 +12,8 @@
     isLoading: boolean;
     onRefresh: () => void;
   } = $props();
+
+  let isThemeModalOpen = $state(false);
 
   async function chooseDirectory() {
     try {
@@ -37,21 +40,34 @@
 <header data-tauri-drag-region class="h-16 border-b border-nvidia-border bg-nvidia-bg flex items-center justify-between px-8 select-none">
   <div class="flex items-center gap-3">
     <span class="text-xs font-semibold uppercase tracking-wider text-nvidia-text-muted">Target Path:</span>
-    <span class="text-xs font-mono px-2 py-0.5 rounded bg-nvidia-card border border-nvidia-border text-gray-200 max-w-sm truncate">
+    <span class="text-xs font-mono px-2 py-0.5 rounded bg-nvidia-card border border-nvidia-border text-nvidia-text-primary max-w-sm truncate">
       {gamePath || 'No folder selected'}
     </span>
   </div>
 
   <div class="flex items-center gap-3">
+    <!-- Theme Customizer Modal Trigger -->
     <button 
+      type="button"
+      onclick={() => isThemeModalOpen = true}
+      class="flex items-center gap-2 px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-card/80 border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer"
+      title="Customize App Colors"
+    >
+      <Palette class="h-3.5 w-3.5 text-nvidia-accent" />
+      <span>Theme</span>
+    </button>
+
+    <button 
+      type="button"
       onclick={chooseDirectory}
-      class="flex items-center gap-2 px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-card/80 border border-nvidia-border text-xs text-gray-200 transition cursor-pointer"
+      class="flex items-center gap-2 px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-card/80 border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer"
     >
       <FolderSearch class="h-3.5 w-3.5 text-nvidia-text-muted" />
       <span>Verify Game Path</span>
     </button>
 
     <button 
+      type="button"
       onclick={handleHardRefresh}
       disabled={!gamePath || isLoading}
       class="flex items-center gap-2 px-3.5 py-1.5 rounded bg-nvidia-accent hover:bg-nvidia-accent-hover text-black font-semibold text-xs transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
@@ -61,3 +77,6 @@
     </button>
   </div>
 </header>
+
+<!-- Theme Customizer Dialog -->
+<ThemeModal bind:isOpen={isThemeModalOpen} />
