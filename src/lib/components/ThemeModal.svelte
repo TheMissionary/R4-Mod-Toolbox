@@ -6,7 +6,7 @@
     THEME_COLOR_META,
     FONT_PRESETS,
     loadThemeSettings,
-    applyThemeSettings,
+    applyAndPersistTheme,
     type AppThemeColors,
     type ThemeSettings
   } from '$lib/theme';
@@ -115,8 +115,8 @@
     manualHex = (draft.mode === 'light' ? DEFAULT_LIGHT_THEME : DEFAULT_DARK_THEME)[activeEditingKey].toUpperCase();
   }
 
-  function handleApply() {
-    applyThemeSettings(draft);
+  async function handleApply() {
+    await applyAndPersistTheme(draft);
     isOpen = false;
   }
 

@@ -3,7 +3,12 @@
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
   import { openUrl } from '@tauri-apps/plugin-opener';
-  import { loadThemeSettings, applyThemeSettings } from '$lib/theme';
+  import {
+    loadThemeSettings,
+    applyThemeSettings,
+    loadConfigFromDisk,
+    saveConfigToDisk
+  } from '$lib/theme';
   import type {
     ScanResult,
     ArchiveItem,
@@ -44,10 +49,17 @@
 
   let currentTab = $state<TabType>(getInitialTab());
 
-  function setTab(tab: TabType) {
+  async function setTab(tab: TabType) {
     currentTab = tab;
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.setItem('cp2077_active_tab', tab);
+    }
+    try {
+      const config = await loadConfigFromDisk();
+      config.activeTab = tab;
+      await saveConfigToDisk(config);
+    } catch (err) {
+      // non-critical
     }
   }
 
@@ -138,11 +150,11 @@
   }
 
   onMount(() => {
-    // 1. Initialize and apply user saved theme, typography & density on startup
-    const settings = loadThemeSettings();
-    applyThemeSettings(settings);
+    // 1. Instant fallback paint from cache/defaults
+    const localSettings = loadThemeSettings();
+    applyThemeSettings(localSettings);
 
-    // 2. Smoothly dismiss startup title screen
+    // 2. Smoothly dismiss startup title screen helper
     const splashStartTime = Date.now();
     const dismissSplash = () => {
       const elapsed = Date.now() - splashStartTime;
@@ -156,8 +168,25 @@
       }, remaining);
     };
 
-    refreshAll().finally(() => {
-      dismissSplash();
+    // 3. Hydrate persistent configuration from disk (%APPDATA%\red4-mod-toolbox\config.json)
+    loadConfigFromDisk().then(config => {
+      if (config.theme) {
+        applyThemeSettings(config.theme);
+      }
+      if (config.targetGamePath) {
+        gamePath = config.targetGamePath;
+      }
+      if (typeof sessionStorage !== 'undefined' && !sessionStorage.getItem('cp2077_active_tab')) {
+        if (config.activeTab) {
+          currentTab = config.activeTab as TabType;
+        }
+      }
+    }).catch(err => {
+      console.error('Config hydration error:', err);
+    }).finally(() => {
+      refreshAll().finally(() => {
+        dismissSplash();
+      });
     });
 
     invoke('start_directory_watcher', { gamePath }).catch(() => {});

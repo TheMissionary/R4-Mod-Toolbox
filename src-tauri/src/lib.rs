@@ -5,6 +5,95 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AppThemeColors {
+    pub accent: String,
+    pub accent_hover: String,
+    pub bg: String,
+    pub surface: String,
+    pub card: String,
+    pub border: String,
+    pub text_muted: String,
+    pub text_primary: String,
+}
+
+impl Default for AppThemeColors {
+    fn default() -> Self {
+        Self {
+            accent: "#76b900".to_string(),
+            accent_hover: "#88d600".to_string(),
+            bg: "#121517".to_string(),
+            surface: "#181c20".to_string(),
+            card: "#1e2328".to_string(),
+            border: "#2a323d".to_string(),
+            text_muted: "#94a3b8".to_string(),
+            text_primary: "#ffffff".to_string(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ThemeConfig {
+    pub mode: String,
+    pub dark_colors: AppThemeColors,
+    pub light_colors: AppThemeColors,
+    pub font_family: String,
+    pub is_compact: bool,
+}
+
+impl Default for ThemeConfig {
+    fn default() -> Self {
+        Self {
+            mode: "dark".to_string(),
+            dark_colors: AppThemeColors::default(),
+            light_colors: AppThemeColors {
+                accent: "#5a8f00".to_string(),
+                accent_hover: "#4c7a00".to_string(),
+                bg: "#f1f5f9".to_string(),
+                surface: "#f8fafc".to_string(),
+                card: "#ffffff".to_string(),
+                border: "#cbd5e1".to_string(),
+                text_muted: "#64748b".to_string(),
+                text_primary: "#0f172a".to_string(),
+            },
+            font_family: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif".to_string(),
+            is_compact: false,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AppConfig {
+    pub target_game_path: String,
+    pub active_tab: String,
+    pub show_conflict_summary: bool,
+    pub theme: ThemeConfig,
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            target_game_path: "G:\\SteamLibrary\\steamapps\\common\\Cyberpunk 2077".to_string(),
+            active_tab: "home".to_string(),
+            show_conflict_summary: true,
+            theme: ThemeConfig::default(),
+        }
+    }
+}
+
+fn get_app_config_path() -> PathBuf {
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        PathBuf::from(appdata).join("red4-mod-toolbox").join("config.json")
+    } else if let Ok(userprofile) = std::env::var("USERPROFILE") {
+        PathBuf::from(userprofile).join("AppData").join("Roaming").join("red4-mod-toolbox").join("config.json")
+    } else {
+        PathBuf::from("config.json")
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ScanResult {
     pub is_valid_game_path: bool,
     pub game_version: String,
@@ -72,6 +161,30 @@ fn count_reds_files(path: &Path) -> usize {
         }
     }
     count
+}
+
+#[tauri::command]
+fn load_app_config() -> Result<AppConfig, String> {
+    let path = get_app_config_path();
+    if path.exists() {
+        if let Ok(content) = fs::read_to_string(&path) {
+            if let Ok(config) = serde_json::from_str::<AppConfig>(&content) {
+                return Ok(config);
+            }
+        }
+    }
+    Ok(AppConfig::default())
+}
+
+#[tauri::command]
+fn save_app_config(config: AppConfig) -> Result<(), String> {
+    let path = get_app_config_path();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let serialized = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    fs::write(&path, serialized).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -387,6 +500,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            load_app_config,
+            save_app_config,
             scan_game_directory,
             get_archive_details,
             toggle_mod_state,

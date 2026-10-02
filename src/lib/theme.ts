@@ -1,13 +1,7 @@
-export interface AppThemeColors {
-  accent: string;
-  accentHover: string;
-  bg: string;
-  surface: string;
-  card: string;
-  border: string;
-  textMuted: string;
-  textPrimary: string;
-}
+import { invoke } from '@tauri-apps/api/core';
+import type { AppThemeColors, ThemeSettings, AppConfig } from '$lib/types';
+
+export type { AppThemeColors, ThemeSettings, AppConfig };
 
 export const DEFAULT_DARK_THEME: AppThemeColors = {
   accent: '#76b900',
@@ -56,14 +50,6 @@ export const FONT_PRESETS = [
 
 export type ThemeMode = 'default' | 'custom' | 'dark' | 'light';
 
-export interface ThemeSettings {
-  mode: 'dark' | 'light';
-  darkColors: AppThemeColors;
-  lightColors: AppThemeColors;
-  fontFamily: string;
-  isCompact: boolean;
-}
-
 export const DEFAULT_THEME_SETTINGS: ThemeSettings = {
   mode: 'dark',
   darkColors: { ...DEFAULT_DARK_THEME },
@@ -72,9 +58,16 @@ export const DEFAULT_THEME_SETTINGS: ThemeSettings = {
   isCompact: false,
 };
 
+export const DEFAULT_APP_CONFIG: AppConfig = {
+  targetGamePath: 'G:\\SteamLibrary\\steamapps\\common\\Cyberpunk 2077',
+  activeTab: 'home',
+  showConflictSummary: true,
+  theme: { ...DEFAULT_THEME_SETTINGS },
+};
+
 const STORAGE_KEY = 'cp2077_theme_settings_v2';
 
-// Modern Settings Loader
+// Synchronous Fallback Settings Loader (used for initial component rendering)
 export function loadThemeSettings(): ThemeSettings {
   if (typeof localStorage === 'undefined') {
     return {
@@ -96,7 +89,7 @@ export function loadThemeSettings(): ThemeSettings {
         isCompact: !!parsed.isCompact,
       };
     } catch {
-      // fallback
+      // fallback to defaults
     }
   }
 
@@ -107,7 +100,7 @@ export function loadThemeSettings(): ThemeSettings {
   };
 }
 
-// Modern Settings Applier
+// Applies theme settings directly to CSS variables on :root
 export function applyThemeSettings(settings: ThemeSettings) {
   if (typeof document === 'undefined') return;
 
@@ -127,7 +120,50 @@ export function applyThemeSettings(settings: ThemeSettings) {
   }
 }
 
-// Backward-compatible Loader for existing components
+// Asynchronously loads the complete configuration from disk (%APPDATA%\red4-mod-toolbox\config.json)
+export async function loadConfigFromDisk(): Promise<AppConfig> {
+  try {
+    const config = await invoke<AppConfig>('load_app_config');
+    if (config && config.theme) {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(config.theme));
+      }
+      return config;
+    }
+  } catch (err) {
+    console.error('Failed to load config from disk, falling back to local defaults:', err);
+  }
+  return {
+    ...DEFAULT_APP_CONFIG,
+    theme: loadThemeSettings(),
+  };
+}
+
+// Asynchronously writes the complete configuration to disk
+export async function saveConfigToDisk(config: AppConfig): Promise<void> {
+  try {
+    await invoke('save_app_config', { config });
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(config.theme));
+    }
+  } catch (err) {
+    console.error('Failed to save config to disk:', err);
+  }
+}
+
+// Applies theme CSS immediately and commits to disk
+export async function applyAndPersistTheme(settings: ThemeSettings): Promise<void> {
+  applyThemeSettings(settings);
+  try {
+    const config = await loadConfigFromDisk();
+    config.theme = settings;
+    await saveConfigToDisk(config);
+  } catch (err) {
+    console.error('Failed to persist theme to disk:', err);
+  }
+}
+
+// Backward-compatible Loader
 export function loadSavedTheme(): { mode: any; customColors: AppThemeColors } {
   const settings = loadThemeSettings();
   return {
@@ -136,7 +172,7 @@ export function loadSavedTheme(): { mode: any; customColors: AppThemeColors } {
   };
 }
 
-// Backward-compatible Applier for existing components
+// Backward-compatible Applier
 export function applyTheme(mode: any, customColors?: AppThemeColors) {
   const settings = loadThemeSettings();
   if (customColors) {

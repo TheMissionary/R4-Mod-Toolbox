@@ -78,3 +78,29 @@ export interface ScanResult {
   redscript_active: number;
   redscript_total: number;
 }
+
+export interface AppThemeColors {
+  accent: string;
+  accentHover: string;
+  bg: string;
+  surface: string;
+  card: string;
+  border: string;
+  textMuted: string;
+  textPrimary: string;
+}
+
+export interface ThemeSettings {
+  mode: 'dark' | 'light';
+  darkColors: AppThemeColors;
+  lightColors: AppThemeColors;
+  fontFamily: string;
+  isCompact: boolean;
+}
+
+export interface AppConfig {
+  targetGamePath: string;
+  activeTab: string;
+  showConflictSummary: boolean;
+  theme: ThemeSettings;
+}
