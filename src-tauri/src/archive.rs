@@ -396,7 +396,6 @@ pub fn create_physical_category(base_game_path: &str, category_name: &str) -> Re
     let archive_dir = PathBuf::from(base_game_path).join("archive").join("pc").join("mod");
     fs::create_dir_all(&archive_dir).map_err(|e| e.to_string())?;
     
-    // Sanitize category name to prevent path traversal or invalid characters
     let safe_name = category_name.replace(|c: char| !c.is_ascii_alphanumeric() && c != ' ' && c != '-' && c != '_', "");
     let file_name = format!("[CAT] {}.archive", safe_name.trim());
     let file_path = archive_dir.join(&file_name);
@@ -404,7 +403,6 @@ pub fn create_physical_category(base_game_path: &str, category_name: &str) -> Re
     if !file_path.exists() {
         File::create(&file_path).map_err(|e| e.to_string())?;
         
-        // Prepend to modlist.txt so it appears at the top of the load order
         let modlist_path = archive_dir.join("modlist.txt");
         let mut existing_content = String::new();
         
@@ -422,5 +420,98 @@ pub fn create_physical_category(base_game_path: &str, category_name: &str) -> Re
         fs::write(&modlist_path, new_content).map_err(|e| e.to_string())?;
     }
     
+    scan_archives(base_game_path)
+}
+
+pub fn delete_physical_category(base_game_path: &str, category_file_name: &str) -> Result<ArchiveScanReport, String> {
+    let clean_name = clean_name_str(category_file_name);
+    if !clean_name.starts_with("[CAT] ") || !clean_name.ends_with(".archive") {
+        return Err("Safety check failed: Target is not a physical category delimiter".to_string());
+    }
+
+    let archive_dir = PathBuf::from(base_game_path).join("archive").join("pc").join("mod");
+    let active_path = archive_dir.join(&clean_name);
+    let disabled_path = archive_dir.join(format!("{}.disabled", clean_name));
+
+    // Strictly remove only the 0-byte delimiter marker
+    if active_path.exists() {
+        fs::remove_file(&active_path).map_err(|e| e.to_string())?;
+    }
+    if disabled_path.exists() {
+        fs::remove_file(&disabled_path).map_err(|e| e.to_string())?;
+    }
+
+    // Remove delimiter line from modlist.txt while preserving all mod lines and order
+    let modlist_path = archive_dir.join("modlist.txt");
+    if modlist_path.exists() {
+        if let Ok(content) = fs::read_to_string(&modlist_path) {
+            let mut updated_lines = Vec::new();
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if trimmed.is_empty() { continue; }
+                if trimmed != clean_name && trimmed != category_file_name {
+                    updated_lines.push(trimmed.to_string());
+                }
+            }
+            let mut new_modlist = updated_lines.join("\r\n");
+            if !new_modlist.is_empty() {
+                new_modlist.push_str("\r\n");
+            }
+            fs::write(&modlist_path, new_modlist).map_err(|e| e.to_string())?;
+        }
+    }
+
+    scan_archives(base_game_path)
+}
+
+pub fn rename_physical_category(base_game_path: &str, old_file_name: &str, new_category_name: &str) -> Result<ArchiveScanReport, String> {
+    let old_clean_name = clean_name_str(old_file_name);
+    if !old_clean_name.starts_with("[CAT] ") || !old_clean_name.ends_with(".archive") {
+        return Err("Safety check failed: Target is not a physical category delimiter".to_string());
+    }
+
+    let safe_name = new_category_name.replace(|c: char| !c.is_ascii_alphanumeric() && c != ' ' && c != '-' && c != '_', "");
+    let safe_trimmed = safe_name.trim();
+    if safe_trimmed.is_empty() {
+        return Err("Category name cannot be empty".to_string());
+    }
+
+    let new_clean_name = format!("[CAT] {}.archive", safe_trimmed);
+    let archive_dir = PathBuf::from(base_game_path).join("archive").join("pc").join("mod");
+
+    let old_active_path = archive_dir.join(&old_clean_name);
+    let old_disabled_path = archive_dir.join(format!("{}.disabled", old_clean_name));
+    let new_active_path = archive_dir.join(&new_clean_name);
+    let new_disabled_path = archive_dir.join(format!("{}.disabled", new_clean_name));
+
+    // Rename on disk preserving enabled/disabled status
+    if old_active_path.exists() {
+        fs::rename(&old_active_path, &new_active_path).map_err(|e| e.to_string())?;
+    } else if old_disabled_path.exists() {
+        fs::rename(&old_disabled_path, &new_disabled_path).map_err(|e| e.to_string())?;
+    }
+
+    // In-place rewrite of modlist.txt swapping the old delimiter for the new delimiter
+    let modlist_path = archive_dir.join("modlist.txt");
+    if modlist_path.exists() {
+        if let Ok(content) = fs::read_to_string(&modlist_path) {
+            let mut updated_lines = Vec::new();
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if trimmed.is_empty() { continue; }
+                if trimmed == old_clean_name || trimmed == old_file_name {
+                    updated_lines.push(new_clean_name.clone());
+                } else {
+                    updated_lines.push(trimmed.to_string());
+                }
+            }
+            let mut new_modlist = updated_lines.join("\r\n");
+            if !new_modlist.is_empty() {
+                new_modlist.push_str("\r\n");
+            }
+            fs::write(&modlist_path, new_modlist).map_err(|e| e.to_string())?;
+        }
+    }
+
     scan_archives(base_game_path)
 }

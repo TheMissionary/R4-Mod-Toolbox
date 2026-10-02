@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ArchiveItem } from '$lib/types';
-  import { GripVertical, Folder, FolderOpen } from 'lucide-svelte';
+  import { GripVertical, Folder, FolderOpen, Pencil, Trash2 } from 'lucide-svelte';
 
   let {
     archive,
@@ -13,6 +13,8 @@
     onPointerMove,
     onToggle,
     onContextMenu,
+    onRenameCategory,
+    onDeleteCategory,
     registerNode
   }: {
     archive: ArchiveItem;
@@ -25,6 +27,8 @@
     onPointerMove: (e: PointerEvent, index: number) => void;
     onToggle: (archive: ArchiveItem) => void;
     onContextMenu: (e: MouseEvent, archive: ArchiveItem, type: 'archive' | 'xl') => void;
+    onRenameCategory?: (archive: ArchiveItem) => void;
+    onDeleteCategory?: (archive: ArchiveItem) => void;
     registerNode: (node: HTMLElement, name: string) => any;
   } = $props();
 </script>
@@ -81,10 +85,31 @@
       </span>
     </div>
 
+    <!-- Right Controls: Badge + In-line Rename and Delete -->
     <div class="flex items-center gap-2 shrink-0">
       <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-nvidia-accent/10 border border-nvidia-accent/30 text-nvidia-accent uppercase tracking-widest">
         Category Marker
       </span>
+
+      <!-- In-line Rename Button -->
+      <button
+        type="button"
+        onclick={(e) => { e.stopPropagation(); onRenameCategory && onRenameCategory(archive); }}
+        class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-accent hover:bg-nvidia-surface/80 transition cursor-pointer"
+        title="Rename category"
+      >
+        <Pencil class="h-3.5 w-3.5" />
+      </button>
+
+      <!-- In-line Trash Can Delete Button -->
+      <button
+        type="button"
+        onclick={(e) => { e.stopPropagation(); onDeleteCategory && onDeleteCategory(archive); }}
+        class="p-1 rounded text-nvidia-text-muted hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer"
+        title="Delete category (mods remain preserved)"
+      >
+        <Trash2 class="h-3.5 w-3.5" />
+      </button>
     </div>
   </div>
 </div>

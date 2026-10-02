@@ -21,7 +21,9 @@
     FolderSearch,
     Copy,
     Power,
-    Check
+    Check,
+    Pencil,
+    Trash2
   } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -166,6 +168,52 @@
     }
   }
 
+  async function handleRenameCategory(archive: ArchiveItem) {
+    const currentName = archive.category_name || archive.file_name.replace('[CAT] ', '').replace('.archive', '');
+    const newName = prompt("Enter new category name:", currentName);
+    if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
+
+    try {
+      const report = await invoke<ArchiveScanReport>('rename_physical_category', {
+        gamePath,
+        oldFileName: archive.file_name,
+        newCategoryName: newName.trim()
+      });
+      if (report && Array.isArray(report.archives)) {
+        const wasCollapsed = !!collapsedCategories[archive.file_name];
+        delete collapsedCategories[archive.file_name];
+        const newFileName = `[CAT] ${newName.trim()}.archive`;
+        if (wasCollapsed) {
+          collapsedCategories[newFileName] = true;
+        }
+
+        archives = report.archives;
+        if (onStateChanged) onStateChanged();
+      }
+    } catch (err) {
+      console.error("Failed to rename physical category:", err);
+    }
+  }
+
+  async function handleDeleteCategory(archive: ArchiveItem) {
+    const confirmed = confirm("Are you sure you wish to delete this category?");
+    if (!confirmed) return;
+
+    try {
+      const report = await invoke<ArchiveScanReport>('delete_physical_category', {
+        gamePath,
+        categoryFileName: archive.file_name
+      });
+      if (report && Array.isArray(report.archives)) {
+        delete collapsedCategories[archive.file_name];
+        archives = report.archives;
+        if (onStateChanged) onStateChanged();
+      }
+    } catch (err) {
+      console.error("Failed to delete physical category:", err);
+    }
+  }
+
   async function toggleMod(archive: ArchiveItem) {
     const next = !archive.enabled;
     archive.enabled = next;
@@ -251,19 +299,24 @@
 
     let size = 1;
     if (localArchives[index].is_delimiter) {
+      // Calculate child block size
       for (let i = index + 1; i < localArchives.length; i++) {
         if (localArchives[i].is_delimiter) break;
         size++;
       }
 
+      // Preserve the user's active viewport collapse preferences
       preDragCollapseState = { ...collapsedCategories };
-      const allCollapsed: Record<string, boolean> = {};
-      for (const item of localArchives) {
-        if (item.is_delimiter) {
-          allCollapsed[item.file_name] = true;
-        }
+
+      // Targeted Encapsulation: If the dragged category has child mods (size > 1),
+      // collapse ONLY this active category during transit so its mods travel packed together.
+      // Other categories remain in their exact current open/closed state!
+      if (size > 1) {
+        collapsedCategories = {
+          ...collapsedCategories,
+          [localArchives[index].file_name]: true
+        };
       }
-      collapsedCategories = allCollapsed;
     }
     dragBlockSize = size;
   }
@@ -298,6 +351,7 @@
   function onRowPointerMove(event: PointerEvent, index: number) {
     if (activeDragIndex === null) return;
     
+    // Ignore hovering over items within the actively moving block
     if (index >= activeDragIndex && index < activeDragIndex + dragBlockSize) return;
 
     dropTargetIndex = index;
@@ -317,7 +371,9 @@
       let targetIndex = dropTargetIndex;
       
       if (dropPlacement === 'after') {
-        if (localArchives[dropTargetIndex].is_delimiter) {
+        const targetItem = localArchives[dropTargetIndex];
+        // If dropping after a collapsed category header, insert after its hidden block
+        if (targetItem.is_delimiter && collapsedCategories[targetItem.file_name]) {
           let targetBlockEnd = dropTargetIndex;
           for (let i = dropTargetIndex + 1; i < localArchives.length; i++) {
             if (localArchives[i].is_delimiter) break;
@@ -325,10 +381,12 @@
           }
           targetIndex = targetBlockEnd + 1;
         } else {
+          // Dropping after an individual mod or after an open category header
           targetIndex += 1;
         }
       }
       
+      // Adjust target index if moving downward past the original block
       if (activeDragIndex < targetIndex) {
         if (targetIndex > activeDragIndex + dragBlockSize) {
           targetIndex -= dragBlockSize;
@@ -347,6 +405,7 @@
       }
     }
     
+    // Restore the user's active collapse state
     if (preDragCollapseState !== null) {
       collapsedCategories = { ...preDragCollapseState };
       preDragCollapseState = null;
@@ -364,7 +423,7 @@
     copiedFeedback = false;
 
     const menuWidth = 230;
-    const menuHeight = 145;
+    const menuHeight = archive.is_delimiter ? 190 : 145;
     const posX = (event.clientX + menuWidth > window.innerWidth) ? (window.innerWidth - menuWidth - 10) : event.clientX;
     const posY = (event.clientY + menuHeight > window.innerHeight) ? (window.innerHeight - menuHeight - 10) : event.clientY;
 
@@ -511,12 +570,12 @@
 {#if contextMenu.visible && contextMenu.archive}
   {@const activeTargetName = (contextMenu.targetType === 'xl' && contextMenu.archive.associated_xl) ? contextMenu.archive.associated_xl.file_name : contextMenu.archive.file_name}
   <div
-    class="fixed z-50 w-56 rounded-md border border-[#303841] bg-[#161a1e] py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
+    class="fixed z-50 w-56 rounded-md border border-nvidia-border bg-nvidia-card py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
     style="left: {contextMenu.x}px; top: {contextMenu.y}px;"
     onclick={(e) => e.stopPropagation()}
     oncontextmenu={(e) => e.preventDefault()}
   >
-    <div class="px-3 py-1.5 border-b border-nvidia-border/60 bg-nvidia-card/40 flex items-center justify-between gap-2">
+    <div class="px-3 py-1.5 border-b border-nvidia-border/60 bg-nvidia-surface/40 flex items-center justify-between gap-2">
       <div class="flex items-center gap-1.5 min-w-0 flex-1">
         {#if contextMenu.targetType === 'xl'}
           <FileCode class="h-3.5 w-3.5 text-cyan-400 shrink-0" />
@@ -525,7 +584,7 @@
         {:else}
           <div class="h-2 w-2 rounded-full shrink-0 {contextMenu.archive.enabled ? 'bg-nvidia-accent' : 'bg-red-500'}"></div>
         {/if}
-        <span class="font-mono text-[11px] font-bold text-white truncate" title={activeTargetName}>
+        <span class="font-mono text-[11px] font-bold text-nvidia-text-primary truncate" title={activeTargetName}>
           {activeTargetName}
         </span>
       </div>
@@ -538,7 +597,7 @@
       <button
         type="button"
         onclick={handleContextMenuShowInExplorer}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-gray-200 hover:text-white transition text-left cursor-pointer group"
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
       >
         <FolderSearch class="h-3.5 w-3.5 text-nvidia-accent group-hover:brightness-110" />
         <span>Show in Explorer</span>
@@ -547,23 +606,43 @@
       <button
         type="button"
         onclick={handleContextMenuToggle}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-gray-200 hover:text-white transition text-left cursor-pointer group"
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
       >
         <Power class="h-3.5 w-3.5 {contextMenu.archive.enabled ? 'text-amber-400' : 'text-nvidia-accent'}" />
         <span>{contextMenu.archive.enabled ? (contextMenu.archive.is_delimiter ? 'Disable Category' : 'Disable Mod') : (contextMenu.archive.is_delimiter ? 'Enable Category' : 'Enable Mod')}</span>
       </button>
 
+      {#if contextMenu.archive.is_delimiter}
+        <button
+          type="button"
+          onclick={() => { const item = contextMenu.archive; closeContextMenu(); if (item) handleRenameCategory(item); }}
+          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        >
+          <Pencil class="h-3.5 w-3.5 text-nvidia-accent" />
+          <span>Rename Category</span>
+        </button>
+
+        <button
+          type="button"
+          onclick={() => { const item = contextMenu.archive; closeContextMenu(); if (item) handleDeleteCategory(item); }}
+          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-red-500/10 text-red-400 transition text-left cursor-pointer group"
+        >
+          <Trash2 class="h-3.5 w-3.5 text-red-400" />
+          <span>Delete Category</span>
+        </button>
+      {/if}
+
       <button
         type="button"
         onclick={handleContextMenuCopyName}
-        class="w-full flex items-center justify-between px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-gray-200 hover:text-white transition text-left cursor-pointer group"
+        class="w-full flex items-center justify-between px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
       >
         <div class="flex items-center gap-2.5">
           {#if copiedFeedback}
             <Check class="h-3.5 w-3.5 text-nvidia-accent" />
             <span class="text-nvidia-accent font-medium">Copied!</span>
           {:else}
-            <Copy class="h-3.5 w-3.5 text-gray-400 group-hover:text-white" />
+            <Copy class="h-3.5 w-3.5 text-nvidia-text-muted group-hover:text-nvidia-text-primary" />
             <span>Copy File Name</span>
           {/if}
         </div>
@@ -572,7 +651,7 @@
   </div>
 {/if}
 
-<div class="space-y-3 select-none flex flex-col h-full">
+<div class="space-y-3 select-none flex flex-col h-full" oncontextmenu={(e) => e.preventDefault()}>
   <div class="flex items-center justify-between gap-4 shrink-0">
     <div class="flex items-center gap-3 flex-1 max-w-md">
       <div class="relative flex-1">
@@ -657,6 +736,8 @@
                 onPointerMove={onRowPointerMove}
                 onToggle={toggleMod}
                 onContextMenu={openContextMenu}
+                onRenameCategory={handleRenameCategory}
+                onDeleteCategory={handleDeleteCategory}
                 registerNode={registerModNode}
               />
             {:else}
@@ -853,10 +934,10 @@
 
           <div class="space-y-1">
             {#each unassociatedXlFiles as xl (xl.file_name)}
-              <div class="rounded border border-cyan-950/60 bg-nvidia-surface/80 px-3 py-1.5 flex items-center justify-between h-8">
+              <div class="rounded border border-cyan-950/60 bg-nvidia-surface/80 px-3 flex items-center justify-between density-row">
                 <div class="flex items-center gap-2.5 min-w-0">
                   <FileCode class="h-3.5 w-3.5 text-cyan-500 shrink-0" />
-                  <span class="text-xs font-mono text-cyan-200 truncate">{xl.file_name}</span>
+                  <span class="font-mono text-cyan-200 truncate">{xl.file_name}</span>
                   <span class="text-[11px] font-mono text-nvidia-text-muted shrink-0">
                     {formatBytes(xl.size_bytes)}
                   </span>
@@ -874,7 +955,7 @@
       {/if}
     </div>
 
-    <!-- Conflict Summary Drawer -->
+    <!-- Conflict Summary Drawer (Density-aware) -->
     {#if showConflictSummary}
       <aside class="w-80 rounded-lg border border-nvidia-border bg-nvidia-surface flex flex-col overflow-hidden shrink-0 shadow-xl transition-all duration-200">
         <div class="p-3 border-b border-nvidia-border bg-nvidia-card/50 flex items-center justify-between">
@@ -898,24 +979,24 @@
               <button
                 type="button"
                 onclick={() => focusModInMainList(archive.file_name)}
-                class="w-full text-left rounded p-2 flex items-center justify-between gap-2 border transition cursor-pointer {isLosing ? 'border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/15' : 'border-nvidia-accent/30 bg-nvidia-accent/5 hover:bg-nvidia-accent/15'} hover:border-nvidia-accent group"
+                class="w-full text-left rounded px-2.5 flex items-center justify-between gap-2 border transition cursor-pointer density-row {isLosing ? 'border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/15' : 'border-nvidia-accent/30 bg-nvidia-accent/5 hover:bg-nvidia-accent/15'} hover:border-nvidia-accent group"
                 title="Click to locate in main load order"
               >
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                   <div class="h-2 w-2 rounded-full shrink-0 {isLosing ? 'bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.6)]' : 'bg-nvidia-accent shadow-[0_0_6px_rgba(118,185,0,0.6)]'}"></div>
 
-                  <span class="text-xs font-mono text-nvidia-text-primary truncate">
+                  <span class="font-mono text-nvidia-text-primary truncate">
                     {archive.file_name}
                   </span>
                 </div>
 
                 <div class="shrink-0">
                   {#if isLosing}
-                    <span class="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                    <span class="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
                       -{archive.loses.length}
                     </span>
                   {:else}
-                    <span class="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-nvidia-accent/20 text-nvidia-accent border border-nvidia-accent/30">
+                    <span class="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-nvidia-accent/20 text-nvidia-accent border border-nvidia-accent/30">
                       +{archive.wins.length}
                     </span>
                   {/if}
