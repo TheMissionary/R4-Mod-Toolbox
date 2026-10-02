@@ -142,12 +142,12 @@
       <div class="px-5 py-3.5 border-b border-nvidia-border flex items-center justify-between bg-nvidia-surface/40 shrink-0">
         <div class="flex items-center gap-2.5">
           <Palette class="h-4 w-4 text-nvidia-accent" />
-          <span class="text-xs font-bold text-white uppercase tracking-wider">Theme & Display Studio</span>
+          <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Theme & Display Studio</span>
         </div>
         <button
           type="button"
           onclick={handleCancel}
-          class="p-1 rounded text-nvidia-text-muted hover:text-white hover:bg-nvidia-surface transition cursor-pointer"
+          class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-text-primary hover:bg-nvidia-surface transition cursor-pointer"
         >
           <X class="h-4 w-4" />
         </button>
@@ -162,7 +162,7 @@
             <button
               type="button"
               onclick={() => handleModeToggle('dark')}
-              class="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer {draft.mode === 'dark' ? 'bg-nvidia-card text-white shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-white'}"
+              class="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer {draft.mode === 'dark' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
             >
               <Moon class="h-3.5 w-3.5 text-nvidia-accent" />
               <span>Dark Mode</span>
@@ -170,7 +170,7 @@
             <button
               type="button"
               onclick={() => handleModeToggle('light')}
-              class="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer {draft.mode === 'light' ? 'bg-white text-slate-900 shadow-sm border border-slate-300' : 'text-nvidia-text-muted hover:text-white'}"
+              class="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer {draft.mode === 'light' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
             >
               <Sun class="h-3.5 w-3.5 text-amber-500" />
               <span>Light Mode</span>
@@ -185,10 +185,10 @@
           >
             {#if draft.isCompact}
               <Minimize2 class="h-3.5 w-3.5 text-nvidia-accent" />
-              <span class="text-white font-semibold">Compact View: <strong class="text-nvidia-accent">ON</strong> (28px)</span>
+              <span class="text-nvidia-text-primary font-semibold">Compact View: <strong class="text-nvidia-accent">ON</strong> (28px)</span>
             {:else}
               <Maximize2 class="h-3.5 w-3.5 text-nvidia-text-muted" />
-              <span class="text-gray-300">Compact View: <strong class="text-nvidia-text-muted">OFF</strong> (36px)</span>
+              <span class="text-nvidia-text-muted">Compact View: <strong class="text-nvidia-text-muted">OFF</strong> (36px)</span>
             {/if}
           </button>
         </div>
@@ -308,10 +308,10 @@
                 class="flex flex-col items-center gap-1.5 p-2 rounded-lg border transition cursor-pointer {isSelected ? 'border-nvidia-accent bg-nvidia-surface ring-2 ring-nvidia-accent/50 shadow-sm' : 'border-nvidia-border bg-nvidia-surface/40 hover:border-nvidia-border/90'}"
               >
                 <div
-                  class="h-6 w-6 rounded-md border border-white/20 shadow-xs"
+                  class="h-6 w-6 rounded-md border border-nvidia-border shadow-xs"
                   style="background-color: {currentColor};"
                 ></div>
-                <span class="text-[10px] font-mono font-medium text-gray-300 truncate w-full text-center">
+                <span class="text-[10px] font-mono font-medium text-nvidia-text-primary truncate w-full text-center">
                   {meta.label}
                 </span>
               </button>
@@ -324,7 +324,7 @@
           {@const meta = THEME_COLOR_META.find(m => m.key === activeEditingKey)}
           <div class="p-3 rounded-lg border border-nvidia-border bg-nvidia-surface/60 flex items-center justify-between gap-4">
             <div class="min-w-0">
-              <span class="text-xs font-bold text-white uppercase">{meta?.label} Color</span>
+              <span class="text-xs font-bold text-nvidia-text-primary uppercase">{meta?.label} Color</span>
               <p class="text-[11px] text-nvidia-text-muted truncate">{meta?.description}</p>
             </div>
 
@@ -345,7 +345,7 @@
                 oninput={handleManualHexInput}
                 placeholder="#76B900"
                 maxlength="7"
-                class="w-24 px-2.5 py-1 bg-nvidia-bg border border-nvidia-border rounded text-xs font-mono text-white focus:outline-none focus:border-nvidia-accent uppercase text-center"
+                class="w-24 px-2.5 py-1 bg-nvidia-surface border border-nvidia-border rounded text-xs font-mono text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent uppercase text-center"
               />
             </div>
           </div>
@@ -365,10 +365,14 @@
             <div>
               <select
                 onchange={handleFontPresetChange}
-                class="w-full px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-white focus:outline-none focus:border-nvidia-accent cursor-pointer"
+                class="w-full px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent cursor-pointer"
               >
                 {#each FONT_PRESETS as preset}
-                  <option value={preset.value} selected={draft.fontFamily === preset.value}>
+                  <option
+                    value={preset.value}
+                    selected={draft.fontFamily === preset.value}
+                    class="bg-nvidia-surface text-nvidia-text-primary"
+                  >
                     {preset.label}
                   </option>
                 {/each}
@@ -382,7 +386,7 @@
                 bind:value={customFontText}
                 oninput={handleCustomFontInput}
                 placeholder="Or type any Windows font (e.g. Cascadia Code)"
-                class="w-full px-3 py-1.5 bg-nvidia-bg border border-nvidia-border rounded text-xs text-white placeholder-nvidia-text-muted focus:outline-none focus:border-nvidia-accent"
+                class="w-full px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/70 focus:outline-none focus:border-nvidia-accent"
               />
             </div>
           </div>
@@ -394,7 +398,7 @@
         <button
           type="button"
           onclick={handleResetDefault}
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-gray-300 hover:text-white transition cursor-pointer"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer"
           title="Restore factory default for active mode"
         >
           <RotateCcw class="h-3.5 w-3.5 text-nvidia-text-muted" />
@@ -405,7 +409,7 @@
           <button
             type="button"
             onclick={handleCancel}
-            class="px-3.5 py-1.5 rounded hover:bg-nvidia-surface text-xs text-gray-300 hover:text-white transition cursor-pointer"
+            class="px-3.5 py-1.5 rounded hover:bg-nvidia-surface text-xs text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer"
           >
             Cancel
           </button>
