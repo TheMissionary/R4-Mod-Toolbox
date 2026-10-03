@@ -38,6 +38,11 @@ pub struct ThemeConfig {
     pub mode: String,
     pub dark_colors: AppThemeColors,
     pub light_colors: AppThemeColors,
+    #[serde(default)]
+    pub font_family_base: String,
+    #[serde(default)]
+    pub font_family_mods: String,
+    #[serde(default)]
     pub font_family: String,
     pub is_compact: bool,
 }
@@ -57,6 +62,8 @@ impl Default for ThemeConfig {
                 text_muted: "#64748b".to_string(),
                 text_primary: "#0f172a".to_string(),
             },
+            font_family_base: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif".to_string(),
+            font_family_mods: "\"Cascadia Code\", \"Consolas\", monospace".to_string(),
             font_family: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif".to_string(),
             is_compact: false,
         }
@@ -289,7 +296,6 @@ fn rename_physical_category(game_path: String, old_file_name: String, new_catego
 
 #[tauri::command]
 fn start_directory_watcher(_game_path: String) -> Result<(), String> {
-    // Directory watcher integration stub
     Ok(())
 }
 

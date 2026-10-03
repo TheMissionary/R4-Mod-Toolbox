@@ -25,7 +25,6 @@ export const DEFAULT_LIGHT_THEME: AppThemeColors = {
   textPrimary: '#0f172a',
 };
 
-// Backward-compatibility alias for existing components
 export const DEFAULT_THEME = DEFAULT_DARK_THEME;
 
 export const THEME_COLOR_META = [
@@ -39,14 +38,27 @@ export const THEME_COLOR_META = [
   { key: 'textMuted', label: 'Muted Text', description: 'Asset counts, file paths, helper text', cssVar: '--theme-text-muted' },
 ] as const;
 
-export const FONT_PRESETS = [
+export const APP_FONT_PRESETS = [
   { label: 'System Sans (Default)', value: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' },
-  { label: 'Cyberpunk Mono (Consolas)', value: '"Consolas", "Courier New", monospace' },
-  { label: 'Cascadia Code', value: '"Cascadia Code", "Consolas", monospace' },
-  { label: 'Segoe UI', value: '"Segoe UI", sans-serif' },
-  { label: 'Bahnschrift', value: '"Bahnschrift", sans-serif' },
-  { label: 'Arial', value: 'Arial, sans-serif' },
+  { label: 'Segoe UI (Modern Windows)', value: '"Segoe UI", sans-serif' },
+  { label: 'Bahnschrift (Industrial DIN)', value: '"Bahnschrift", sans-serif' },
+  { label: 'Aptos (Modern Clean)', value: '"Aptos", sans-serif' },
+  { label: 'Verdana (High Legibility)', value: 'Verdana, sans-serif' },
+  { label: 'Tahoma (Compact UI)', value: 'Tahoma, sans-serif' },
+  { label: 'Trebuchet MS (Humanist UI)', value: '"Trebuchet MS", sans-serif' },
+  { label: 'Arial (Neutral)', value: 'Arial, sans-serif' },
 ] as const;
+
+export const MOD_FONT_PRESETS = [
+  { label: 'Cascadia Code (Default Windows Terminal)', value: '"Cascadia Code", "Consolas", monospace' },
+  { label: 'Consolas (Crisp Monospace)', value: '"Consolas", "Courier New", monospace' },
+  { label: 'Lucida Console (Terminal Classic)', value: '"Lucida Console", monospace' },
+  { label: 'Courier New (Fixed Pitch)', value: '"Courier New", monospace' },
+  { label: 'Bahnschrift (Technical Geometric)', value: '"Bahnschrift", sans-serif' },
+  { label: 'Segoe UI Mono (Clean Monospace)', value: '"Segoe UI Mono", "Segoe UI", monospace' },
+] as const;
+
+export const FONT_PRESETS = APP_FONT_PRESETS;
 
 export type ThemeMode = 'default' | 'custom' | 'dark' | 'light';
 
@@ -54,7 +66,8 @@ export const DEFAULT_THEME_SETTINGS: ThemeSettings = {
   mode: 'dark',
   darkColors: { ...DEFAULT_DARK_THEME },
   lightColors: { ...DEFAULT_LIGHT_THEME },
-  fontFamily: FONT_PRESETS[0].value,
+  fontFamilyBase: APP_FONT_PRESETS[0].value,
+  fontFamilyMods: MOD_FONT_PRESETS[0].value,
   isCompact: false,
 };
 
@@ -67,7 +80,6 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
 
 const STORAGE_KEY = 'cp2077_theme_settings_v2';
 
-// Synchronous Fallback Settings Loader (used for initial component rendering)
 export function loadThemeSettings(): ThemeSettings {
   if (typeof localStorage === 'undefined') {
     return {
@@ -81,15 +93,18 @@ export function loadThemeSettings(): ThemeSettings {
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
+      const legacyFont = parsed.fontFamily || APP_FONT_PRESETS[0].value;
       return {
         mode: parsed.mode === 'light' ? 'light' : 'dark',
         darkColors: { ...DEFAULT_DARK_THEME, ...parsed.darkColors },
         lightColors: { ...DEFAULT_LIGHT_THEME, ...parsed.lightColors },
-        fontFamily: parsed.fontFamily || FONT_PRESETS[0].value,
+        fontFamilyBase: parsed.fontFamilyBase || legacyFont,
+        fontFamilyMods: parsed.fontFamilyMods || MOD_FONT_PRESETS[0].value,
+        fontFamily: parsed.fontFamilyBase || legacyFont,
         isCompact: !!parsed.isCompact,
       };
     } catch {
-      // fallback to defaults
+      // fallback
     }
   }
 
@@ -100,7 +115,6 @@ export function loadThemeSettings(): ThemeSettings {
   };
 }
 
-// Applies theme settings directly to CSS variables on :root
 export function applyThemeSettings(settings: ThemeSettings) {
   if (typeof document === 'undefined') return;
 
@@ -111,7 +125,11 @@ export function applyThemeSettings(settings: ThemeSettings) {
     root.style.setProperty(meta.cssVar, activeColors[meta.key as keyof AppThemeColors]);
   }
 
-  root.style.setProperty('--theme-font-family', settings.fontFamily);
+  const baseFont = settings.fontFamilyBase || settings.fontFamily || APP_FONT_PRESETS[0].value;
+  const modsFont = settings.fontFamilyMods || MOD_FONT_PRESETS[0].value;
+
+  root.style.setProperty('--theme-font-base', baseFont);
+  root.style.setProperty('--theme-font-mods', modsFont);
   root.style.colorScheme = settings.mode;
   root.setAttribute('data-density', settings.isCompact ? 'compact' : 'normal');
 
@@ -120,11 +138,18 @@ export function applyThemeSettings(settings: ThemeSettings) {
   }
 }
 
-// Asynchronously loads the complete configuration from disk (%APPDATA%\red4-mod-toolbox\config.json)
 export async function loadConfigFromDisk(): Promise<AppConfig> {
   try {
     const config = await invoke<AppConfig>('load_app_config');
     if (config && config.theme) {
+      if (!config.theme.fontFamilyBase && (config.theme as any).fontFamily) {
+        config.theme.fontFamilyBase = (config.theme as any).fontFamily;
+      }
+      if (!config.theme.fontFamilyMods) {
+        config.theme.fontFamilyMods = MOD_FONT_PRESETS[0].value;
+      }
+      config.theme.fontFamily = config.theme.fontFamilyBase;
+
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(config.theme));
       }
@@ -139,7 +164,6 @@ export async function loadConfigFromDisk(): Promise<AppConfig> {
   };
 }
 
-// Asynchronously writes the complete configuration to disk
 export async function saveConfigToDisk(config: AppConfig): Promise<void> {
   try {
     await invoke('save_app_config', { config });
@@ -151,19 +175,24 @@ export async function saveConfigToDisk(config: AppConfig): Promise<void> {
   }
 }
 
-// Applies theme CSS immediately and commits to disk
 export async function applyAndPersistTheme(settings: ThemeSettings): Promise<void> {
+  // 1. Immediately apply to DOM and warm cache in localStorage
   applyThemeSettings(settings);
+
+  // 2. Persist to disk with normalized fields
   try {
-    const config = await loadConfigFromDisk();
+    settings.fontFamily = settings.fontFamilyBase;
+    let config = await invoke<AppConfig>('load_app_config').catch(() => null);
+    if (!config) {
+      config = { ...DEFAULT_APP_CONFIG };
+    }
     config.theme = settings;
-    await saveConfigToDisk(config);
+    await invoke('save_app_config', { config });
   } catch (err) {
     console.error('Failed to persist theme to disk:', err);
   }
 }
 
-// Backward-compatible Loader
 export function loadSavedTheme(): { mode: any; customColors: AppThemeColors } {
   const settings = loadThemeSettings();
   return {
@@ -172,7 +201,6 @@ export function loadSavedTheme(): { mode: any; customColors: AppThemeColors } {
   };
 }
 
-// Backward-compatible Applier
 export function applyTheme(mode: any, customColors?: AppThemeColors) {
   const settings = loadThemeSettings();
   if (customColors) {

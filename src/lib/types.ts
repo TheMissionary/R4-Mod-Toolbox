@@ -94,7 +94,9 @@ export interface ThemeSettings {
   mode: 'dark' | 'light';
   darkColors: AppThemeColors;
   lightColors: AppThemeColors;
-  fontFamily: string;
+  fontFamilyBase: string;
+  fontFamilyMods: string;
+  fontFamily?: string; // backward-compatibility fallback
   isCompact: boolean;
 }
 

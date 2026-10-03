@@ -4,7 +4,8 @@
     DEFAULT_DARK_THEME,
     DEFAULT_LIGHT_THEME,
     THEME_COLOR_META,
-    FONT_PRESETS,
+    APP_FONT_PRESETS,
+    MOD_FONT_PRESETS,
     loadThemeSettings,
     applyAndPersistTheme,
     type AppThemeColors,
@@ -21,7 +22,8 @@
     Crown,
     Maximize2,
     Minimize2,
-    Type
+    Type,
+    FileCode2
   } from 'lucide-svelte';
 
   let {
@@ -30,16 +32,18 @@
     isOpen: boolean;
   } = $props();
 
-  // Local sandboxed draft settings
   let draft = $state<ThemeSettings>(loadThemeSettings());
   let activeEditingKey = $state<keyof AppThemeColors>('accent');
   let manualHex = $state('#76B900');
-  let customFontText = $state('');
 
-  // Active palette for the draft mode (Dark or Light)
+  let selectedBasePreset = $state<string>(APP_FONT_PRESETS[0].value);
+  let customBaseInput = $state('');
+
+  let selectedModsPreset = $state<string>(MOD_FONT_PRESETS[0].value);
+  let customModsInput = $state('');
+
   let activeColors = $derived(draft.mode === 'light' ? draft.lightColors : draft.darkColors);
 
-  // Isolate initialization so mutating draft NEVER re-triggers this effect
   $effect(() => {
     if (isOpen) {
       untrack(() => {
@@ -47,7 +51,26 @@
         activeEditingKey = 'accent';
         const currentVal = (draft.mode === 'light' ? draft.lightColors : draft.darkColors)['accent'];
         manualHex = currentVal.toUpperCase();
-        customFontText = draft.fontFamily;
+
+        const currentBase = draft.fontFamilyBase || APP_FONT_PRESETS[0].value;
+        const matchedBase = APP_FONT_PRESETS.find(p => p.value === currentBase);
+        if (matchedBase) {
+          selectedBasePreset = matchedBase.value;
+          customBaseInput = '';
+        } else {
+          selectedBasePreset = 'custom';
+          customBaseInput = currentBase.replace(/^"|"$/g, '').replace(/, sans-serif$/, '');
+        }
+
+        const currentMods = draft.fontFamilyMods || MOD_FONT_PRESETS[0].value;
+        const matchedMods = MOD_FONT_PRESETS.find(p => p.value === currentMods);
+        if (matchedMods) {
+          selectedModsPreset = matchedMods.value;
+          customModsInput = '';
+        } else {
+          selectedModsPreset = 'custom';
+          customModsInput = currentMods.replace(/^"|"$/g, '').replace(/, monospace$/, '');
+        }
       });
     }
   });
@@ -91,16 +114,36 @@
     }
   }
 
-  function handleFontPresetChange(e: Event) {
+  function handleBasePresetChange(e: Event) {
     const val = (e.target as HTMLSelectElement).value;
-    draft.fontFamily = val;
-    customFontText = val;
+    selectedBasePreset = val;
+    if (val !== 'custom') {
+      draft.fontFamilyBase = val;
+    } else {
+      draft.fontFamilyBase = customBaseInput ? `"${customBaseInput}", sans-serif` : APP_FONT_PRESETS[0].value;
+    }
   }
 
-  function handleCustomFontInput(e: Event) {
-    const val = (e.target as HTMLInputElement).value;
-    customFontText = val;
-    draft.fontFamily = val || FONT_PRESETS[0].value;
+  function handleCustomBaseInput(e: Event) {
+    const raw = (e.target as HTMLInputElement).value.trim();
+    customBaseInput = raw;
+    draft.fontFamilyBase = raw ? `"${raw}", sans-serif` : APP_FONT_PRESETS[0].value;
+  }
+
+  function handleModsPresetChange(e: Event) {
+    const val = (e.target as HTMLSelectElement).value;
+    selectedModsPreset = val;
+    if (val !== 'custom') {
+      draft.fontFamilyMods = val;
+    } else {
+      draft.fontFamilyMods = customModsInput ? `"${customModsInput}", monospace` : MOD_FONT_PRESETS[0].value;
+    }
+  }
+
+  function handleCustomModsInput(e: Event) {
+    const raw = (e.target as HTMLInputElement).value.trim();
+    customModsInput = raw;
+    draft.fontFamilyMods = raw ? `"${raw}", monospace` : MOD_FONT_PRESETS[0].value;
   }
 
   function handleResetDefault() {
@@ -109,14 +152,28 @@
     } else {
       draft.darkColors = { ...DEFAULT_DARK_THEME };
     }
-    draft.fontFamily = FONT_PRESETS[0].value;
-    customFontText = FONT_PRESETS[0].value;
+    draft.fontFamilyBase = APP_FONT_PRESETS[0].value;
+    draft.fontFamilyMods = MOD_FONT_PRESETS[0].value;
+    selectedBasePreset = APP_FONT_PRESETS[0].value;
+    selectedModsPreset = MOD_FONT_PRESETS[0].value;
+    customBaseInput = '';
+    customModsInput = '';
     draft.isCompact = false;
     manualHex = (draft.mode === 'light' ? DEFAULT_LIGHT_THEME : DEFAULT_DARK_THEME)[activeEditingKey].toUpperCase();
   }
 
   async function handleApply() {
-    await applyAndPersistTheme(draft);
+    if (selectedBasePreset === 'custom' && customBaseInput.trim()) {
+      draft.fontFamilyBase = `"${customBaseInput.trim()}", sans-serif`;
+    }
+    if (selectedModsPreset === 'custom' && customModsInput.trim()) {
+      draft.fontFamilyMods = `"${customModsInput.trim()}", monospace`;
+    }
+    draft.fontFamily = draft.fontFamilyBase;
+
+    // Unpack plain object snapshot from Svelte 5 reactive proxy
+    const plainPayload: ThemeSettings = JSON.parse(JSON.stringify(draft));
+    await applyAndPersistTheme(plainPayload);
     isOpen = false;
   }
 
@@ -194,12 +251,12 @@
         </div>
 
         <!-- ----------------------------------------------------------------- -->
-        <!-- THE INTERACTIVE SANDBOXED CANVAS (Live Mockup)                     -->
+        <!-- LIVE STAGING SANDBOX: Demonstrates Dual Fonts & Colors            -->
         <!-- ----------------------------------------------------------------- -->
         <div class="space-y-1">
           <div class="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-nvidia-text-muted">
             <span>Live Staging Sandbox (Preview Only)</span>
-            <span class="text-[10px] lowercase font-normal opacity-70">updates in real-time</span>
+            <span class="text-[10px] lowercase font-normal opacity-70">shows app + mod fonts</span>
           </div>
 
           <div
@@ -207,11 +264,11 @@
             style="
               background-color: {activeColors.bg};
               border-color: {activeColors.border};
-              font-family: {draft.fontFamily};
+              font-family: {draft.fontFamilyBase};
               color: {activeColors.textPrimary};
             "
           >
-            <!-- Mockup Mini Header -->
+            <!-- Mockup Header (uses App Font) -->
             <div
               class="px-3 py-2 rounded border flex items-center justify-between"
               style="
@@ -228,21 +285,21 @@
                 </div>
                 <span class="text-xs font-bold tracking-wider uppercase">RED4 MOD TOOLBOX</span>
               </div>
-              <span class="text-[10px] font-mono px-2 py-0.5 rounded border" style="background-color: {activeColors.card}; border-color: {activeColors.border}; color: {activeColors.textMuted};">
+              <span class="text-[10px] px-2 py-0.5 rounded border font-mono" style="background-color: {activeColors.card}; border-color: {activeColors.border}; color: {activeColors.textMuted}; font-family: {draft.fontFamilyMods};">
                 G:\Cyberpunk 2077
               </span>
             </div>
 
-            <!-- Mockup Mini Nav & Mod Row -->
+            <!-- Mockup Nav & Mod Row -->
             <div class="flex gap-2.5 items-start">
-              <!-- Mini Sidebar Nav -->
+              <!-- Mini Sidebar Nav (uses App Font) -->
               <div class="w-28 space-y-1 shrink-0">
                 <div
                   class="px-2 py-1 rounded text-[11px] font-bold flex items-center justify-between"
                   style="background-color: {activeColors.card}; color: {activeColors.accent}; border: 1px solid {activeColors.border};"
                 >
                   <span>Archive</span>
-                  <span class="text-[9px] font-mono opacity-80">45</span>
+                  <span class="text-[9px] font-mono opacity-80" style="font-family: {draft.fontFamilyMods};">45</span>
                 </div>
                 <div
                   class="px-2 py-1 rounded text-[11px] opacity-75"
@@ -252,7 +309,7 @@
                 </div>
               </div>
 
-              <!-- Mini Mod Row (Responds to Compact Density!) -->
+              <!-- Mini Mod Row (uses Mod Listing Font!) -->
               <div
                 class="flex-1 rounded border flex items-center justify-between px-3 transition-all duration-150"
                 style="
@@ -268,16 +325,17 @@
                   <div class="w-6 h-3.5 rounded-full relative p-0.5 shrink-0" style="background-color: {activeColors.accent};">
                     <div class="h-2.5 w-2.5 rounded-full bg-black translate-x-2.5"></div>
                   </div>
-                  <span class="text-xs font-mono font-medium truncate" style="color: {activeColors.textPrimary};">
+                  <!-- Mod Filename in Mod Listing Font -->
+                  <span class="text-xs font-medium truncate" style="color: {activeColors.textPrimary}; font-family: {draft.fontFamilyMods};">
                     EquipmentEx.archive
                   </span>
-                  <span class="text-[9px] font-mono font-bold px-1 rounded border shrink-0" style="background-color: {activeColors.surface}; color: {activeColors.accent}; border-color: {activeColors.accent};">
+                  <span class="text-[9px] font-bold px-1 rounded border shrink-0" style="background-color: {activeColors.surface}; color: {activeColors.accent}; border-color: {activeColors.accent}; font-family: {draft.fontFamilyMods};">
                     XL
                   </span>
                 </div>
 
                 <div class="flex items-center gap-2 shrink-0">
-                  <span class="text-[10px] font-mono shrink-0" style="color: {activeColors.textMuted};">
+                  <span class="text-[10px] shrink-0" style="color: {activeColors.textMuted}; font-family: {draft.fontFamilyMods};">
                     (142 assets)
                   </span>
                   <div class="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium" style="background-color: {activeColors.accent}25; color: {activeColors.accent}; border: 1px solid {activeColors.accent}50;">
@@ -352,43 +410,89 @@
         {/if}
 
         <!-- ----------------------------------------------------------------- -->
-        <!-- TYPOGRAPHY / FONT SELECTOR                                        -->
+        <!-- CLEAN DUAL TYPOGRAPHY CONTROLS (Full-Width + Custom Font Option)  -->
         <!-- ----------------------------------------------------------------- -->
-        <div class="space-y-1.5 pt-1">
-          <div class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-nvidia-text-muted">
-            <Type class="h-3.5 w-3.5" />
-            <span>Installed System Typography</span>
+        <div class="space-y-3.5 pt-1 border-t border-nvidia-border/60">
+          <!-- 1. Application Base Typography -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-nvidia-text-muted">
+              <div class="flex items-center gap-1.5">
+                <Type class="h-3.5 w-3.5 text-nvidia-accent" />
+                <span>1. Application UI Typography (Buttons, Menus, Chrome)</span>
+              </div>
+              <span class="text-[10px] font-normal lowercase opacity-75">sans-serif</span>
+            </div>
+
+            <select
+              onchange={handleBasePresetChange}
+              class="w-full px-3 py-2 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent cursor-pointer font-sans"
+            >
+              {#each APP_FONT_PRESETS as preset}
+                <option
+                  value={preset.value}
+                  selected={selectedBasePreset === preset.value}
+                  class="bg-nvidia-surface text-nvidia-text-primary"
+                >
+                  {preset.label}
+                </option>
+              {/each}
+              <option value="custom" selected={selectedBasePreset === 'custom'} class="bg-nvidia-surface text-nvidia-accent font-semibold">
+                + Custom Font (Type Name)...
+              </option>
+            </select>
+
+            {#if selectedBasePreset === 'custom'}
+              <div class="pt-1">
+                <input
+                  type="text"
+                  bind:value={customBaseInput}
+                  oninput={handleCustomBaseInput}
+                  placeholder="Enter font name installed on your PC (e.g. Inter, Roboto, SF Pro)..."
+                  class="w-full px-3 py-1.5 bg-nvidia-surface border border-nvidia-accent/60 rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/60 focus:outline-none focus:border-nvidia-accent"
+                />
+              </div>
+            {/if}
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <!-- Preset Selector -->
-            <div>
-              <select
-                onchange={handleFontPresetChange}
-                class="w-full px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent cursor-pointer"
-              >
-                {#each FONT_PRESETS as preset}
-                  <option
-                    value={preset.value}
-                    selected={draft.fontFamily === preset.value}
-                    class="bg-nvidia-surface text-nvidia-text-primary"
-                  >
-                    {preset.label}
-                  </option>
-                {/each}
-              </select>
+          <!-- 2. Mod Listing Typography -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-nvidia-text-muted">
+              <div class="flex items-center gap-1.5">
+                <FileCode2 class="h-3.5 w-3.5 text-cyan-400" />
+                <span>2. Mod Listing Typography (Filenames, Ranks, Metrics)</span>
+              </div>
+              <span class="text-[10px] font-normal lowercase opacity-75">monospace</span>
             </div>
 
-            <!-- Custom Font Name Input -->
-            <div>
-              <input
-                type="text"
-                bind:value={customFontText}
-                oninput={handleCustomFontInput}
-                placeholder="Or type any Windows font (e.g. Cascadia Code)"
-                class="w-full px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/70 focus:outline-none focus:border-nvidia-accent"
-              />
-            </div>
+            <select
+              onchange={handleModsPresetChange}
+              class="w-full px-3 py-2 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent cursor-pointer font-sans"
+            >
+              {#each MOD_FONT_PRESETS as preset}
+                <option
+                  value={preset.value}
+                  selected={selectedModsPreset === preset.value}
+                  class="bg-nvidia-surface text-nvidia-text-primary"
+                >
+                  {preset.label}
+                </option>
+              {/each}
+              <option value="custom" selected={selectedModsPreset === 'custom'} class="bg-nvidia-surface text-cyan-400 font-semibold">
+                + Custom Font (Type Name)...
+              </option>
+            </select>
+
+            {#if selectedModsPreset === 'custom'}
+              <div class="pt-1">
+                <input
+                  type="text"
+                  bind:value={customModsInput}
+                  oninput={handleCustomModsInput}
+                  placeholder="Enter coding font installed on your PC (e.g. JetBrains Mono, Fira Code)..."
+                  class="w-full px-3 py-1.5 bg-nvidia-surface border border-cyan-500/60 rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/60 focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+            {/if}
           </div>
         </div>
       </div>

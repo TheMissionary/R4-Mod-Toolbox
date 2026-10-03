@@ -13,8 +13,9 @@
   --theme-text-muted: #94a3b8;
   --theme-text-primary: #ffffff;
 
-  /* Typography Token */
-  --theme-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* Dual Typography Tokens */
+  --theme-font-base: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --theme-font-mods: "Cascadia Code", "Consolas", monospace;
 
   /* Row Density Variables: Standard View (36px) */
   --row-h: 2.25rem;
@@ -47,9 +48,14 @@ body {
   padding: 0;
   background-color: var(--color-nvidia-bg);
   color: var(--theme-text-primary, #ffffff);
-  font-family: var(--theme-font-family);
+  font-family: var(--theme-font-base);
   overflow: hidden;
   user-select: none;
+}
+
+/* Dedicated Mod Listing Typography Engine */
+.font-mono {
+  font-family: var(--theme-font-mods) !important;
 }
 
 /* Universal Density Classes for Mod Rows */
