@@ -1,14 +1,11 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import {
-    DEFAULT_DARK_THEME,
-    DEFAULT_LIGHT_THEME,
-    THEME_COLOR_META,
     APP_FONT_PRESETS,
     MOD_FONT_PRESETS,
+    generateThemeColors,
     loadThemeSettings,
     applyAndPersistTheme,
-    type AppThemeColors,
     type ThemeSettings
   } from '$lib/theme';
   import {
@@ -23,7 +20,7 @@
     Maximize2,
     Minimize2,
     Type,
-    FileCode2
+    Sparkles
   } from 'lucide-svelte';
 
   let {
@@ -33,8 +30,9 @@
   } = $props();
 
   let draft = $state<ThemeSettings>(loadThemeSettings());
-  let activeEditingKey = $state<keyof AppThemeColors>('accent');
-  let manualHex = $state('#76B900');
+  
+  // Single active hero accent hex
+  let currentAccentHex = $state('#76B900');
 
   let selectedBasePreset = $state<string>(APP_FONT_PRESETS[0].value);
   let customBaseInput = $state('');
@@ -48,9 +46,8 @@
     if (isOpen) {
       untrack(() => {
         draft = loadThemeSettings();
-        activeEditingKey = 'accent';
-        const currentVal = (draft.mode === 'light' ? draft.lightColors : draft.darkColors)['accent'];
-        manualHex = currentVal.toUpperCase();
+        const activePal = draft.mode === 'light' ? draft.lightColors : draft.darkColors;
+        currentAccentHex = activePal.accent.toUpperCase();
 
         const currentBase = draft.fontFamilyBase || APP_FONT_PRESETS[0].value;
         const matchedBase = APP_FONT_PRESETS.find(p => p.value === currentBase);
@@ -75,15 +72,19 @@
     }
   });
 
-  function selectToken(key: keyof AppThemeColors) {
-    activeEditingKey = key;
-    manualHex = activeColors[key].toUpperCase();
+  function setAccentColor(hex: string) {
+    currentAccentHex = hex.toUpperCase();
+    if (draft.mode === 'light') {
+      draft.lightColors = generateThemeColors('light', hex);
+    } else {
+      draft.darkColors = generateThemeColors('dark', hex);
+    }
   }
 
   function handleModeToggle(newMode: 'dark' | 'light') {
     draft.mode = newMode;
-    const currentPalette = newMode === 'light' ? draft.lightColors : draft.darkColors;
-    manualHex = currentPalette[activeEditingKey].toUpperCase();
+    const activePal = newMode === 'light' ? draft.lightColors : draft.darkColors;
+    currentAccentHex = activePal.accent.toUpperCase();
   }
 
   function handleDensityToggle() {
@@ -92,25 +93,16 @@
 
   function handleColorWheelChange(e: Event) {
     const val = (e.target as HTMLInputElement).value;
-    if (draft.mode === 'light') {
-      draft.lightColors[activeEditingKey] = val;
-    } else {
-      draft.darkColors[activeEditingKey] = val;
-    }
-    manualHex = val.toUpperCase();
+    setAccentColor(val);
   }
 
   function handleManualHexInput(e: Event) {
     let val = (e.target as HTMLInputElement).value.trim();
     if (!val.startsWith('#')) val = '#' + val;
-    manualHex = val.toUpperCase();
+    currentAccentHex = val.toUpperCase();
 
     if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
-      if (draft.mode === 'light') {
-        draft.lightColors[activeEditingKey] = val;
-      } else {
-        draft.darkColors[activeEditingKey] = val;
-      }
+      setAccentColor(val);
     }
   }
 
@@ -148,9 +140,11 @@
 
   function handleResetDefault() {
     if (draft.mode === 'light') {
-      draft.lightColors = { ...DEFAULT_LIGHT_THEME };
+      draft.lightColors = generateThemeColors('light', '#5A8F00');
+      currentAccentHex = '#5A8F00';
     } else {
-      draft.darkColors = { ...DEFAULT_DARK_THEME };
+      draft.darkColors = generateThemeColors('dark', '#76B900');
+      currentAccentHex = '#76B900';
     }
     draft.fontFamilyBase = APP_FONT_PRESETS[0].value;
     draft.fontFamilyMods = MOD_FONT_PRESETS[0].value;
@@ -159,7 +153,6 @@
     customBaseInput = '';
     customModsInput = '';
     draft.isCompact = false;
-    manualHex = (draft.mode === 'light' ? DEFAULT_LIGHT_THEME : DEFAULT_DARK_THEME)[activeEditingKey].toUpperCase();
   }
 
   async function handleApply() {
@@ -171,7 +164,6 @@
     }
     draft.fontFamily = draft.fontFamilyBase;
 
-    // Unpack plain object snapshot from Svelte 5 reactive proxy
     const plainPayload: ThemeSettings = JSON.parse(JSON.stringify(draft));
     await applyAndPersistTheme(plainPayload);
     isOpen = false;
@@ -189,17 +181,17 @@
     role="presentation"
   >
     <div
-      class="w-full max-w-2xl rounded-xl border border-nvidia-border bg-nvidia-card shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+      class="w-full max-w-xl rounded-xl border border-nvidia-border bg-nvidia-card shadow-2xl overflow-hidden flex flex-col"
       onclick={(e) => e.stopPropagation()}
       role="dialog"
       aria-modal="true"
       tabindex="-1"
     >
       <!-- Modal Header -->
-      <div class="px-5 py-3.5 border-b border-nvidia-border flex items-center justify-between bg-nvidia-surface/40 shrink-0">
-        <div class="flex items-center gap-2.5">
+      <div class="px-5 py-3 border-b border-nvidia-border flex items-center justify-between bg-nvidia-surface/40 shrink-0">
+        <div class="flex items-center gap-2">
           <Palette class="h-4 w-4 text-nvidia-accent" />
-          <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Theme & Display Studio</span>
+          <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Theme</span>
         </div>
         <button
           type="button"
@@ -211,15 +203,15 @@
       </div>
 
       <!-- Modal Body -->
-      <div class="p-5 space-y-4 overflow-y-auto flex-1">
+      <div class="p-5 space-y-3.5 overflow-y-auto">
         <!-- Top Controls: Mode & Density Switches -->
         <div class="flex items-center justify-between gap-4">
           <!-- Light / Dark Mode Toggle -->
-          <div class="flex items-center p-1 rounded-lg border border-nvidia-border bg-nvidia-surface/60">
+          <div class="flex items-center p-0.5 rounded-lg border border-nvidia-border bg-nvidia-surface/60">
             <button
               type="button"
               onclick={() => handleModeToggle('dark')}
-              class="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer {draft.mode === 'dark' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer {draft.mode === 'dark' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
             >
               <Moon class="h-3.5 w-3.5 text-nvidia-accent" />
               <span>Dark Mode</span>
@@ -227,18 +219,18 @@
             <button
               type="button"
               onclick={() => handleModeToggle('light')}
-              class="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer {draft.mode === 'light' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer {draft.mode === 'light' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
             >
               <Sun class="h-3.5 w-3.5 text-amber-500" />
               <span>Light Mode</span>
             </button>
           </div>
 
-          <!-- Density (Compact View) Toggle -->
+          <!-- Density Toggle -->
           <button
             type="button"
             onclick={handleDensityToggle}
-            class="flex items-center gap-2 px-3.5 py-2 rounded-lg border border-nvidia-border bg-nvidia-surface/60 hover:bg-nvidia-surface transition text-xs font-medium cursor-pointer"
+            class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-nvidia-border bg-nvidia-surface/60 hover:bg-nvidia-surface transition text-xs font-medium cursor-pointer"
           >
             {#if draft.isCompact}
               <Minimize2 class="h-3.5 w-3.5 text-nvidia-accent" />
@@ -251,248 +243,197 @@
         </div>
 
         <!-- ----------------------------------------------------------------- -->
-        <!-- LIVE STAGING SANDBOX: Demonstrates Dual Fonts & Colors            -->
+        <!-- LIVE PREVIEW MOCKUP (Clean Framed Presentation)                   -->
         <!-- ----------------------------------------------------------------- -->
-        <div class="space-y-1">
-          <div class="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-nvidia-text-muted">
-            <span>Live Staging Sandbox (Preview Only)</span>
-            <span class="text-[10px] lowercase font-normal opacity-70">shows app + mod fonts</span>
-          </div>
-
+        <div
+          class="rounded-lg border shadow-inner p-3 space-y-2.5 transition-colors duration-200"
+          style="
+            background-color: {activeColors.bg};
+            border-color: {activeColors.border};
+            font-family: {draft.fontFamilyBase};
+            color: {activeColors.textPrimary};
+          "
+        >
+          <!-- Mockup Header -->
           <div
-            class="rounded-lg border shadow-inner p-3.5 space-y-3 transition-colors duration-200"
+            class="px-2.5 py-1.5 rounded border flex items-center justify-between"
             style="
-              background-color: {activeColors.bg};
+              background-color: {activeColors.surface};
               border-color: {activeColors.border};
-              font-family: {draft.fontFamilyBase};
-              color: {activeColors.textPrimary};
             "
           >
-            <!-- Mockup Header (uses App Font) -->
+            <div class="flex items-center gap-2">
+              <div
+                class="h-4 w-4 rounded flex items-center justify-center text-[9px] font-black"
+                style="background-color: {activeColors.accent}; color: #000000;"
+              >
+                R4
+              </div>
+              <span class="text-[11px] font-bold tracking-wider uppercase">RED4 MOD TOOLBOX</span>
+            </div>
+            <span class="text-[9px] px-1.5 py-0.2 rounded border font-mono" style="background-color: {activeColors.card}; border-color: {activeColors.border}; color: {activeColors.textMuted}; font-family: {draft.fontFamilyMods};">
+              G:\Cyberpunk 2077
+            </span>
+          </div>
+
+          <!-- Mockup Nav & Mod Row -->
+          <div class="flex gap-2 items-start">
+            <div class="w-24 space-y-1 shrink-0">
+              <div
+                class="px-2 py-1 rounded text-[10px] font-bold flex items-center justify-between"
+                style="background-color: {activeColors.card}; color: {activeColors.accent}; border: 1px solid {activeColors.border};"
+              >
+                <span>Archive</span>
+                <span class="text-[8px] font-mono opacity-80" style="font-family: {draft.fontFamilyMods};">45</span>
+              </div>
+              <div
+                class="px-2 py-1 rounded text-[10px] opacity-75"
+                style="color: {activeColors.textMuted};"
+              >
+                <span>CET Mods</span>
+              </div>
+            </div>
+
+            <!-- Mod Row -->
             <div
-              class="px-3 py-2 rounded border flex items-center justify-between"
+              class="flex-1 rounded border flex items-center justify-between px-2.5 transition-all duration-150"
               style="
-                background-color: {activeColors.surface};
+                background-color: {activeColors.card};
                 border-color: {activeColors.border};
+                height: {draft.isCompact ? '1.75rem' : '2.25rem'};
+                padding-top: {draft.isCompact ? '0.125rem' : '0.375rem'};
+                padding-bottom: {draft.isCompact ? '0.125rem' : '0.375rem'};
               "
             >
-              <div class="flex items-center gap-2">
-                <div
-                  class="h-5 w-5 rounded flex items-center justify-center text-[10px] font-black"
-                  style="background-color: {activeColors.accent}; color: #000000;"
-                >
-                  R4
+              <div class="flex items-center gap-1.5 min-w-0">
+                <GripVertical class="h-3 w-3 shrink-0" style="color: {activeColors.textMuted};" />
+                <div class="w-5 h-3 rounded-full relative p-0.5 shrink-0" style="background-color: {activeColors.accent};">
+                  <div class="h-2 w-2 rounded-full bg-black translate-x-2"></div>
                 </div>
-                <span class="text-xs font-bold tracking-wider uppercase">RED4 MOD TOOLBOX</span>
-              </div>
-              <span class="text-[10px] px-2 py-0.5 rounded border font-mono" style="background-color: {activeColors.card}; border-color: {activeColors.border}; color: {activeColors.textMuted}; font-family: {draft.fontFamilyMods};">
-                G:\Cyberpunk 2077
-              </span>
-            </div>
-
-            <!-- Mockup Nav & Mod Row -->
-            <div class="flex gap-2.5 items-start">
-              <!-- Mini Sidebar Nav (uses App Font) -->
-              <div class="w-28 space-y-1 shrink-0">
-                <div
-                  class="px-2 py-1 rounded text-[11px] font-bold flex items-center justify-between"
-                  style="background-color: {activeColors.card}; color: {activeColors.accent}; border: 1px solid {activeColors.border};"
-                >
-                  <span>Archive</span>
-                  <span class="text-[9px] font-mono opacity-80" style="font-family: {draft.fontFamilyMods};">45</span>
-                </div>
-                <div
-                  class="px-2 py-1 rounded text-[11px] opacity-75"
-                  style="color: {activeColors.textMuted};"
-                >
-                  <span>CET Mods</span>
-                </div>
-              </div>
-
-              <!-- Mini Mod Row (uses Mod Listing Font!) -->
-              <div
-                class="flex-1 rounded border flex items-center justify-between px-3 transition-all duration-150"
-                style="
-                  background-color: {activeColors.card};
-                  border-color: {activeColors.border};
-                  height: {draft.isCompact ? '1.75rem' : '2.25rem'};
-                  padding-top: {draft.isCompact ? '0.125rem' : '0.375rem'};
-                  padding-bottom: {draft.isCompact ? '0.125rem' : '0.375rem'};
-                "
-              >
-                <div class="flex items-center gap-2 min-w-0">
-                  <GripVertical class="h-3.5 w-3.5 shrink-0" style="color: {activeColors.textMuted};" />
-                  <div class="w-6 h-3.5 rounded-full relative p-0.5 shrink-0" style="background-color: {activeColors.accent};">
-                    <div class="h-2.5 w-2.5 rounded-full bg-black translate-x-2.5"></div>
-                  </div>
-                  <!-- Mod Filename in Mod Listing Font -->
-                  <span class="text-xs font-medium truncate" style="color: {activeColors.textPrimary}; font-family: {draft.fontFamilyMods};">
-                    EquipmentEx.archive
-                  </span>
-                  <span class="text-[9px] font-bold px-1 rounded border shrink-0" style="background-color: {activeColors.surface}; color: {activeColors.accent}; border-color: {activeColors.accent}; font-family: {draft.fontFamilyMods};">
-                    XL
-                  </span>
-                </div>
-
-                <div class="flex items-center gap-2 shrink-0">
-                  <span class="text-[10px] shrink-0" style="color: {activeColors.textMuted}; font-family: {draft.fontFamilyMods};">
-                    (142 assets)
-                  </span>
-                  <div class="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium" style="background-color: {activeColors.accent}25; color: {activeColors.accent}; border: 1px solid {activeColors.accent}50;">
-                    <Crown class="h-2.5 w-2.5" />
-                    <span>Winning</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ----------------------------------------------------------------- -->
-        <!-- COLOR TOKEN PALETTE: 8 Swatches                                   -->
-        <!-- ----------------------------------------------------------------- -->
-        <div class="space-y-1.5 pt-1">
-          <span class="text-[11px] font-semibold uppercase tracking-wider text-nvidia-text-muted">
-            Color Tokens (Click to customize)
-          </span>
-
-          <div class="grid grid-cols-4 sm:grid-cols-8 gap-2">
-            {#each THEME_COLOR_META as meta}
-              {@const isSelected = activeEditingKey === meta.key}
-              {@const currentColor = activeColors[meta.key]}
-              <button
-                type="button"
-                onclick={() => selectToken(meta.key)}
-                class="flex flex-col items-center gap-1.5 p-2 rounded-lg border transition cursor-pointer {isSelected ? 'border-nvidia-accent bg-nvidia-surface ring-2 ring-nvidia-accent/50 shadow-sm' : 'border-nvidia-border bg-nvidia-surface/40 hover:border-nvidia-border/90'}"
-              >
-                <div
-                  class="h-6 w-6 rounded-md border border-nvidia-border shadow-xs"
-                  style="background-color: {currentColor};"
-                ></div>
-                <span class="text-[10px] font-mono font-medium text-nvidia-text-primary truncate w-full text-center">
-                  {meta.label}
+                <span class="text-xs font-medium truncate" style="color: {activeColors.textPrimary}; font-family: {draft.fontFamilyMods};">
+                  EquipmentEx.archive
                 </span>
-              </button>
-            {/each}
+                <span class="text-[8px] font-bold px-1 rounded border shrink-0" style="background-color: {activeColors.surface}; color: {activeColors.accent}; border-color: {activeColors.accent}; font-family: {draft.fontFamilyMods};">
+                  XL
+                </span>
+              </div>
+
+              <div class="flex items-center gap-1.5 shrink-0">
+                <span class="text-[9px] shrink-0" style="color: {activeColors.textMuted}; font-family: {draft.fontFamilyMods};">
+                  (142 assets)
+                </span>
+                <div class="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium" style="background-color: {activeColors.accent}25; color: {activeColors.accent}; border: 1px solid {activeColors.accent}50;">
+                  <Crown class="h-2 w-2" />
+                  <span>Winning</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Active Color Swatch Picker -->
-        {#if activeEditingKey}
-          {@const meta = THEME_COLOR_META.find(m => m.key === activeEditingKey)}
-          <div class="p-3 rounded-lg border border-nvidia-border bg-nvidia-surface/60 flex items-center justify-between gap-4">
-            <div class="min-w-0">
-              <span class="text-xs font-bold text-nvidia-text-primary uppercase">{meta?.label} Color</span>
-              <p class="text-[11px] text-nvidia-text-muted truncate">{meta?.description}</p>
+        <!-- ----------------------------------------------------------------- -->
+        <!-- 2-COLUMN SIDE-BY-SIDE CONFIGURATION GRID                          -->
+        <!-- ----------------------------------------------------------------- -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+          <!-- Left Column: Accent Color -->
+          <div class="p-3 rounded-xl border border-nvidia-border bg-nvidia-surface/50 flex flex-col justify-between space-y-2.5">
+            <div class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-nvidia-text-muted">
+              <Sparkles class="h-3.5 w-3.5 text-nvidia-accent" />
+              <span>Accent Color</span>
             </div>
 
-            <div class="flex items-center gap-2.5 shrink-0">
-              <div class="relative h-8 w-11 rounded border border-nvidia-border overflow-hidden shrink-0 shadow-sm">
+            <div class="flex items-center gap-2.5 py-0.5">
+              <!-- Clickable Native Swatch -->
+              <div class="relative h-9 w-12 rounded-lg border border-nvidia-border overflow-hidden shrink-0 shadow-sm hover:border-nvidia-accent transition cursor-pointer">
                 <input
                   type="color"
-                  value={activeColors[activeEditingKey]}
+                  value={currentAccentHex}
                   oninput={handleColorWheelChange}
-                  class="absolute -inset-4 h-18 w-18 cursor-pointer bg-transparent"
-                  title="Click to open color picker"
+                  class="absolute -inset-4 h-18 w-20 cursor-pointer bg-transparent"
+                  title="Click to choose accent color"
                 />
               </div>
 
-              <input
-                type="text"
-                bind:value={manualHex}
-                oninput={handleManualHexInput}
-                placeholder="#76B900"
-                maxlength="7"
-                class="w-24 px-2.5 py-1 bg-nvidia-surface border border-nvidia-border rounded text-xs font-mono text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent uppercase text-center"
-              />
-            </div>
-          </div>
-        {/if}
-
-        <!-- ----------------------------------------------------------------- -->
-        <!-- CLEAN DUAL TYPOGRAPHY CONTROLS (Full-Width + Custom Font Option)  -->
-        <!-- ----------------------------------------------------------------- -->
-        <div class="space-y-3.5 pt-1 border-t border-nvidia-border/60">
-          <!-- 1. Application Base Typography -->
-          <div class="space-y-1.5">
-            <div class="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-nvidia-text-muted">
-              <div class="flex items-center gap-1.5">
-                <Type class="h-3.5 w-3.5 text-nvidia-accent" />
-                <span>1. Application UI Typography (Buttons, Menus, Chrome)</span>
+              <!-- Manual Hex Input -->
+              <div class="flex-1">
+                <input
+                  type="text"
+                  bind:value={currentAccentHex}
+                  oninput={handleManualHexInput}
+                  placeholder="#76B900"
+                  maxlength="7"
+                  class="w-full px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded-lg text-xs font-mono text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent uppercase text-center font-bold tracking-wider"
+                />
               </div>
-              <span class="text-[10px] font-normal lowercase opacity-75">sans-serif</span>
             </div>
 
-            <select
-              onchange={handleBasePresetChange}
-              class="w-full px-3 py-2 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent cursor-pointer font-sans"
-            >
-              {#each APP_FONT_PRESETS as preset}
-                <option
-                  value={preset.value}
-                  selected={selectedBasePreset === preset.value}
-                  class="bg-nvidia-surface text-nvidia-text-primary"
-                >
-                  {preset.label}
-                </option>
-              {/each}
-              <option value="custom" selected={selectedBasePreset === 'custom'} class="bg-nvidia-surface text-nvidia-accent font-semibold">
-                + Custom Font (Type Name)...
-              </option>
-            </select>
+            <p class="text-[10px] text-nvidia-text-muted leading-tight">
+              Foundational shades derive automatically from your chosen accent.
+            </p>
+          </div>
 
-            {#if selectedBasePreset === 'custom'}
-              <div class="pt-1">
+          <!-- Right Column: Typography -->
+          <div class="p-3 rounded-xl border border-nvidia-border bg-nvidia-surface/50 space-y-2">
+            <div class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-nvidia-text-muted">
+              <Type class="h-3.5 w-3.5 text-nvidia-accent" />
+              <span>Typography</span>
+            </div>
+
+            <!-- Application Font -->
+            <div class="space-y-0.5">
+              <span class="text-[10px] text-nvidia-text-muted font-medium">Application</span>
+              <select
+                onchange={handleBasePresetChange}
+                class="w-full px-2.5 py-1.5 bg-nvidia-surface border border-nvidia-border rounded-md text-xs text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent cursor-pointer font-sans"
+              >
+                {#each APP_FONT_PRESETS as preset}
+                  <option value={preset.value} selected={selectedBasePreset === preset.value} class="bg-nvidia-surface text-nvidia-text-primary">
+                    {preset.label}
+                  </option>
+                {/each}
+                <option value="custom" selected={selectedBasePreset === 'custom'} class="bg-nvidia-surface text-nvidia-accent font-semibold">
+                  + Custom Font...
+                </option>
+              </select>
+
+              {#if selectedBasePreset === 'custom'}
                 <input
                   type="text"
                   bind:value={customBaseInput}
                   oninput={handleCustomBaseInput}
-                  placeholder="Enter font name installed on your PC (e.g. Inter, Roboto, SF Pro)..."
-                  class="w-full px-3 py-1.5 bg-nvidia-surface border border-nvidia-accent/60 rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/60 focus:outline-none focus:border-nvidia-accent"
+                  placeholder="Enter font name..."
+                  class="w-full px-2.5 py-1 bg-nvidia-surface border border-nvidia-accent/60 rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/60 focus:outline-none focus:border-nvidia-accent mt-1"
                 />
-              </div>
-            {/if}
-          </div>
-
-          <!-- 2. Mod Listing Typography -->
-          <div class="space-y-1.5">
-            <div class="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-nvidia-text-muted">
-              <div class="flex items-center gap-1.5">
-                <FileCode2 class="h-3.5 w-3.5 text-cyan-400" />
-                <span>2. Mod Listing Typography (Filenames, Ranks, Metrics)</span>
-              </div>
-              <span class="text-[10px] font-normal lowercase opacity-75">monospace</span>
+              {/if}
             </div>
 
-            <select
-              onchange={handleModsPresetChange}
-              class="w-full px-3 py-2 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent cursor-pointer font-sans"
-            >
-              {#each MOD_FONT_PRESETS as preset}
-                <option
-                  value={preset.value}
-                  selected={selectedModsPreset === preset.value}
-                  class="bg-nvidia-surface text-nvidia-text-primary"
-                >
-                  {preset.label}
+            <!-- Mod Listing Font -->
+            <div class="space-y-0.5">
+              <span class="text-[10px] text-nvidia-text-muted font-medium">Mod Listing</span>
+              <select
+                onchange={handleModsPresetChange}
+                class="w-full px-2.5 py-1.5 bg-nvidia-surface border border-nvidia-border rounded-md text-xs text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent cursor-pointer font-sans"
+              >
+                {#each MOD_FONT_PRESETS as preset}
+                  <option value={preset.value} selected={selectedModsPreset === preset.value} class="bg-nvidia-surface text-nvidia-text-primary">
+                    {preset.label}
+                  </option>
+                {/each}
+                <option value="custom" selected={selectedModsPreset === 'custom'} class="bg-nvidia-surface text-cyan-400 font-semibold">
+                  + Custom Font...
                 </option>
-              {/each}
-              <option value="custom" selected={selectedModsPreset === 'custom'} class="bg-nvidia-surface text-cyan-400 font-semibold">
-                + Custom Font (Type Name)...
-              </option>
-            </select>
+              </select>
 
-            {#if selectedModsPreset === 'custom'}
-              <div class="pt-1">
+              {#if selectedModsPreset === 'custom'}
                 <input
                   type="text"
                   bind:value={customModsInput}
                   oninput={handleCustomModsInput}
-                  placeholder="Enter coding font installed on your PC (e.g. JetBrains Mono, Fira Code)..."
-                  class="w-full px-3 py-1.5 bg-nvidia-surface border border-cyan-500/60 rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/60 focus:outline-none focus:border-cyan-400"
+                  placeholder="Enter coding font name..."
+                  class="w-full px-2.5 py-1 bg-nvidia-surface border border-cyan-500/60 rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/60 focus:outline-none focus:border-cyan-400 mt-1"
                 />
-              </div>
-            {/if}
+              {/if}
+            </div>
           </div>
         </div>
       </div>
