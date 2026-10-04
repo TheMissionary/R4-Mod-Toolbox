@@ -15,7 +15,8 @@
     ArchiveScanReport,
     CetPluginItem,
     Red4extPluginItem,
-    RedScriptItem
+    RedScriptItem,
+    ProfilesConfig
   } from '$lib/types';
 
   import HeaderBar from '$lib/components/HeaderBar.svelte';
@@ -23,6 +24,7 @@
   import CetView from '$lib/components/CetView.svelte';
   import Red4extView from '$lib/components/Red4extView.svelte';
   import RedscriptView from '$lib/components/RedscriptView.svelte';
+  import DialogModal from '$lib/components/DialogModal.svelte';
 
   import {
     Home,
@@ -32,7 +34,9 @@
     FileCode2,
     Play,
     CheckCircle2,
-    ArrowUpRight
+    ArrowUpRight,
+    Save,
+    Radio
   } from 'lucide-svelte';
 
   type TabType = 'home' | 'archive' | 'cet' | 'red4ext' | 'redscript';
@@ -74,6 +78,19 @@
   let red4extPlugins = $state<Red4extPluginItem[]>([]);
   let redscriptPackages = $state<RedScriptItem[]>([]);
 
+  // Archive Profiles State
+  let profilesConfig = $state<ProfilesConfig | null>(null);
+  let activeProfileSlot = $state<1 | 2 | null>(null);
+  let isApplyingProfile = $state(false);
+
+  let profileDialogState = $state({
+    isOpen: false,
+    slot: 1 as 1 | 2,
+    title: '',
+    message: '',
+    initialValue: '',
+  });
+
   const coreUrls: Record<string, string> = {
     CP77: 'https://support.cdprojektred.com/en/cyberpunk/pc/sp-technical/issue/2734/patch-2-31-download-now',
     CET: 'https://www.nexusmods.com/cyberpunk2077/mods/107',
@@ -102,6 +119,78 @@
       console.error('Failed to launch game:', err);
     } finally {
       setTimeout(() => { isLaunching = false; }, 2500);
+    }
+  }
+
+  async function loadProfiles() {
+    try {
+      profilesConfig = await invoke<ProfilesConfig>('get_archive_profiles');
+    } catch (err) {
+      console.error('Failed to load profiles:', err);
+    }
+  }
+
+  async function persistActiveProfileSlot(slot: 1 | 2 | null) {
+    activeProfileSlot = slot;
+    try {
+      const config = await loadConfigFromDisk();
+      config.activeProfileSlot = slot;
+      await saveConfigToDisk(config);
+    } catch (err) {
+      console.error('Failed to persist active profile slot:', err);
+    }
+  }
+
+  function promptSaveProfile(slot: 1 | 2) {
+    const currentName = slot === 1 ? profilesConfig?.preset_1?.name : profilesConfig?.preset_2?.name;
+    profileDialogState = {
+      isOpen: true,
+      slot,
+      title: `Save Preset ${slot}`,
+      message: 'Enter a name for this archive load order profile:',
+      initialValue: currentName || `Profile ${slot}`
+    };
+  }
+
+  async function confirmSaveProfile(name: string) {
+    profileDialogState.isOpen = false;
+    if (!name.trim()) return;
+    try {
+      profilesConfig = await invoke<ProfilesConfig>('save_archive_profile', {
+        gamePath,
+        slot: profileDialogState.slot,
+        name: name.trim()
+      });
+      await persistActiveProfileSlot(profileDialogState.slot);
+    } catch (err) {
+      console.error('Failed to save profile:', err);
+    }
+  }
+
+  async function handleLoadProfile(slot: 1 | 2) {
+    const preset = slot === 1 ? profilesConfig?.preset_1 : profilesConfig?.preset_2;
+    if (!preset) return;
+
+    isApplyingProfile = true;
+    try {
+      const report = await invoke<ArchiveScanReport>('load_archive_profile', {
+        gamePath,
+        slot
+      });
+      archiveReport = report;
+      archives = report.archives;
+      await refreshCountsOnly();
+      await persistActiveProfileSlot(slot);
+    } catch (err) {
+      console.error('Failed to load profile:', err);
+    } finally {
+      isApplyingProfile = false;
+    }
+  }
+
+  function handleProfileDrift() {
+    if (activeProfileSlot !== null) {
+      persistActiveProfileSlot(null);
     }
   }
 
@@ -178,6 +267,9 @@
           currentTab = config.activeTab as TabType;
         }
       }
+      if (config.activeProfileSlot !== undefined) {
+        activeProfileSlot = config.activeProfileSlot as 1 | 2 | null;
+      }
     }).catch(err => {
       console.error('Config hydration error:', err);
     }).finally(() => {
@@ -185,6 +277,8 @@
         dismissSplash();
       });
     });
+
+    loadProfiles();
 
     invoke('start_directory_watcher', { gamePath }).catch(() => {});
     const unlisten = listen('directory-changed', () => {
@@ -202,93 +296,147 @@
 <div class="flex h-screen w-screen overflow-hidden bg-nvidia-bg text-nvidia-text-primary font-sans">
   <!-- Left Navigation Sidebar -->
   <aside class="w-64 border-r border-nvidia-border flex flex-col justify-between bg-nvidia-surface/40 select-none shrink-0">
-    <div>
-      <div class="h-14 border-b border-nvidia-border px-5 flex items-center gap-3">
+    <div class="flex flex-col h-full">
+      <div class="h-14 border-b border-nvidia-border px-5 flex items-center gap-3 shrink-0">
         <div class="h-6 w-6 rounded bg-nvidia-accent flex items-center justify-center text-black font-black text-sm shadow-sm">
           R4
         </div>
         <div>
-          <h1 class="text-xs font-bold tracking-wider uppercase text-nvidia-text-primary">RED4 Mod Toolbox</h1>
-          <p class="text-[10px] text-nvidia-text-muted font-mono truncate max-w-[140px]" title="Mod Load Order and Conflict Resolver">
-            CONFLICT RESOLVER
+          <h1 class="text-xs font-bold tracking-wider uppercase text-nvidia-text-primary">R4 Mod Toolbox</h1>
+          <p class="text-[10px] text-nvidia-text-muted font-mono truncate max-w-[140px]" title="Advanced Mod Manager">
+            ADVANCED MOD MANAGER
           </p>
         </div>
       </div>
 
-      <nav class="p-3 space-y-1">
-        <button
-          type="button"
-          onclick={() => setTab('home')}
-          class="w-full flex items-center gap-3 px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'home' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
-        >
-          <Home class="h-4 w-4" />
-          <span>Home</span>
-        </button>
+      <div class="flex-1 overflow-y-auto">
+        <nav class="p-3 space-y-1">
+          <button
+            type="button"
+            onclick={() => setTab('home')}
+            class="w-full flex items-center gap-3 px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'home' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
+          >
+            <Home class="h-4 w-4" />
+            <span>Home</span>
+          </button>
 
-        <button
-          type="button"
-          onclick={() => setTab('archive')}
-          class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'archive' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
-        >
-          <div class="flex items-center gap-3">
-            <Archive class="h-4 w-4" />
-            <span>Archive</span>
-          </div>
-          {#if scanResult}
-            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
-              {scanResult.archive_active}/{scanResult.archive_total}
-            </span>
-          {/if}
-        </button>
+          <button
+            type="button"
+            onclick={() => setTab('archive')}
+            class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'archive' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
+          >
+            <div class="flex items-center gap-3">
+              <Archive class="h-4 w-4" />
+              <span>Archive</span>
+            </div>
+            {#if scanResult}
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
+                {scanResult.archive_active}/{scanResult.archive_total}
+              </span>
+            {/if}
+          </button>
 
-        <button
-          type="button"
-          onclick={() => setTab('cet')}
-          class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'cet' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
-        >
-          <div class="flex items-center gap-3">
-            <Cpu class="h-4 w-4" />
-            <span>CET Mods</span>
-          </div>
-          {#if scanResult}
-            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
-              {scanResult.cet_active}/{scanResult.cet_total}
-            </span>
-          {/if}
-        </button>
+          <button
+            type="button"
+            onclick={() => setTab('cet')}
+            class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'cet' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
+          >
+            <div class="flex items-center gap-3">
+              <Cpu class="h-4 w-4" />
+              <span>CET Mods</span>
+            </div>
+            {#if scanResult}
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
+                {scanResult.cet_active}/{scanResult.cet_total}
+              </span>
+            {/if}
+          </button>
 
-        <button
-          type="button"
-          onclick={() => setTab('red4ext')}
-          class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'red4ext' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
-        >
-          <div class="flex items-center gap-3">
-            <Puzzle class="h-4 w-4" />
-            <span>RED4ext</span>
-          </div>
-          {#if scanResult}
-            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
-              {scanResult.red4ext_active}/{scanResult.red4ext_total}
-            </span>
-          {/if}
-        </button>
+          <button
+            type="button"
+            onclick={() => setTab('red4ext')}
+            class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'red4ext' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
+          >
+            <div class="flex items-center gap-3">
+              <Puzzle class="h-4 w-4" />
+              <span>RED4ext</span>
+            </div>
+            {#if scanResult}
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
+                {scanResult.red4ext_active}/{scanResult.red4ext_total}
+              </span>
+            {/if}
+          </button>
 
-        <button
-          type="button"
-          onclick={() => setTab('redscript')}
-          class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'redscript' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
-        >
-          <div class="flex items-center gap-3">
-            <FileCode2 class="h-4 w-4" />
-            <span>Redscript\R6</span>
+          <button
+            type="button"
+            onclick={() => setTab('redscript')}
+            class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'redscript' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
+          >
+            <div class="flex items-center gap-3">
+              <FileCode2 class="h-4 w-4" />
+              <span>Redscript\R6</span>
+            </div>
+            {#if scanResult}
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
+                {scanResult.redscript_active}/{scanResult.redscript_total}
+              </span>
+            {/if}
+          </button>
+        </nav>
+
+        <!-- Archive Profiles Module (Visible only on Archive Tab) -->
+        {#if currentTab === 'archive'}
+          <div class="px-4 py-3 border-t border-nvidia-border/50 bg-nvidia-surface/20">
+            <div class="flex items-center gap-1.5 mb-3">
+              <Radio class="h-3.5 w-3.5 text-nvidia-accent" />
+              <span class="text-[10px] font-bold text-nvidia-text-muted uppercase tracking-wider">Archive Profiles</span>
+            </div>
+            <div class="space-y-2">
+              <!-- Slot 1 -->
+              <div class="flex items-center gap-1">
+                <button
+                  type="button"
+                  onclick={() => handleLoadProfile(1)}
+                  disabled={!profilesConfig?.preset_1 || isApplyingProfile}
+                  class="flex-1 text-left px-2.5 py-1.5 rounded text-xs font-medium transition truncate border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed {activeProfileSlot === 1 ? 'bg-nvidia-accent/15 text-nvidia-accent border-nvidia-accent/50 shadow-[0_0_10px_var(--theme-accent)]' : 'bg-nvidia-surface text-nvidia-text-muted hover:text-nvidia-text-primary border-nvidia-border hover:border-nvidia-border/80'}"
+                >
+                  {profilesConfig?.preset_1?.name || 'Empty Slot'}
+                </button>
+                <button
+                  type="button"
+                  onclick={() => promptSaveProfile(1)}
+                  disabled={isApplyingProfile}
+                  class="p-1.5 rounded bg-nvidia-surface border border-nvidia-border text-nvidia-text-muted hover:text-nvidia-accent hover:border-nvidia-accent/50 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                  title="Save current load order to Preset 1"
+                >
+                  <Save class="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <!-- Slot 2 -->
+              <div class="flex items-center gap-1">
+                <button
+                  type="button"
+                  onclick={() => handleLoadProfile(2)}
+                  disabled={!profilesConfig?.preset_2 || isApplyingProfile}
+                  class="flex-1 text-left px-2.5 py-1.5 rounded text-xs font-medium transition truncate border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed {activeProfileSlot === 2 ? 'bg-nvidia-accent/15 text-nvidia-accent border-nvidia-accent/50 shadow-[0_0_10px_var(--theme-accent)]' : 'bg-nvidia-surface text-nvidia-text-muted hover:text-nvidia-text-primary border-nvidia-border hover:border-nvidia-border/80'}"
+                >
+                  {profilesConfig?.preset_2?.name || 'Empty Slot'}
+                </button>
+                <button
+                  type="button"
+                  onclick={() => promptSaveProfile(2)}
+                  disabled={isApplyingProfile}
+                  class="p-1.5 rounded bg-nvidia-surface border border-nvidia-border text-nvidia-text-muted hover:text-nvidia-accent hover:border-nvidia-accent/50 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                  title="Save current load order to Preset 2"
+                >
+                  <Save class="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
-          {#if scanResult}
-            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
-              {scanResult.redscript_active}/{scanResult.redscript_total}
-            </span>
-          {/if}
-        </button>
-      </nav>
+        {/if}
+      </div>
     </div>
 
     <!-- Lower Left Launch Game & Status -->
@@ -317,7 +465,7 @@
   </aside>
 
   <!-- Workspace Canvas -->
-  <div class="flex-1 flex flex-col h-full overflow-hidden">
+  <div class="flex-1 flex flex-col h-full overflow-hidden relative">
     <HeaderBar bind:gamePath onRefresh={refreshAll} {isLoading} />
 
     <main class="flex-1 p-6 overflow-y-auto">
@@ -328,9 +476,9 @@
             <CheckCircle2 class="h-4 w-4" />
             <span>ENGINE CONNECTED</span>
           </div>
-          <h2 class="text-xl font-bold text-nvidia-text-primary mb-1">RED4 Conflict Engine</h2>
+          <h2 class="text-xl font-bold text-nvidia-text-primary mb-1">R4 Management Engine</h2>
           <p class="text-xs text-nvidia-text-muted max-w-xl">
-            Inspect loose load orders, monitor overwrite priority conflicts across .archive, CET, and RedScript mod trees.
+            Master your mod conflicts with real-time archive resolution. Organize your workspace using custom categories, drag-and-drop load ordering, and seamless management across all mod frameworks.
           </p>
         </div>
 
@@ -427,7 +575,7 @@
 
       <!-- Persistent Tab Views -->
       <div class={currentTab === 'archive' ? 'h-full' : 'hidden'}>
-        <ArchiveView bind:archives {gamePath} scanReport={archiveReport} onScanRequested={refreshAll} onStateChanged={refreshCountsOnly} />
+        <ArchiveView bind:archives {gamePath} scanReport={archiveReport} onScanRequested={refreshAll} onStateChanged={refreshCountsOnly} onProfileDrift={handleProfileDrift} />
       </div>
 
       <div class={currentTab === 'cet' ? 'h-full' : 'hidden'}>
@@ -442,5 +590,24 @@
         <RedscriptView bind:packages={redscriptPackages} {gamePath} onStateChanged={refreshCountsOnly} />
       </div>
     </main>
+
+    <!-- Full Screen Blocking Overlay for Profile Application -->
+    {#if isApplyingProfile}
+      <div class="absolute inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center select-none">
+        <div class="h-12 w-12 rounded-full border-4 border-nvidia-surface border-t-nvidia-accent animate-spin mb-4"></div>
+        <h2 class="text-lg font-bold text-nvidia-text-primary tracking-wider uppercase mb-2">Applying Profile</h2>
+        <p class="text-xs text-nvidia-text-muted font-mono">Verifying integrity and rewriting load order...</p>
+      </div>
+    {/if}
   </div>
 </div>
+
+<DialogModal
+  bind:isOpen={profileDialogState.isOpen}
+  title={profileDialogState.title}
+  message={profileDialogState.message}
+  mode="prompt"
+  initialValue={profileDialogState.initialValue}
+  confirmText="Save Profile"
+  onConfirm={confirmSaveProfile}
+/>

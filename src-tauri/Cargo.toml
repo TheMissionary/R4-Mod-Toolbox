@@ -1,12 +1,12 @@
 [package]
-name = "red4-mod-toolbox"
+name = "r4-mod-toolbox"
 version = "0.1.0"
 description = "Cyberpunk 2077 Mod and Conflict Management Tool"
 authors = ["Jason"]
 edition = "2021"
 
 [lib]
-name = "red4_desktop_app_lib"
+name = "r4_desktop_app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

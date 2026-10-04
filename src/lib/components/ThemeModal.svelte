@@ -256,7 +256,7 @@
               >
                 R4
               </div>
-              <span class="text-[11px] font-bold tracking-wider uppercase">RED4 MOD TOOLBOX</span>
+              <span class="text-[11px] font-bold tracking-wider uppercase">R4 MOD TOOLBOX</span>
             </div>
             <span class="text-[9px] px-1.5 py-0.2 rounded border font-mono" style="background-color: {activeColors.card}; border-color: {activeColors.border}; color: {activeColors.textMuted}; font-family: {draft.fontFamilyMods};">
               G:\Cyberpunk 2077

@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    red4_desktop_app_lib::run()
+    r4_desktop_app_lib::run()
 }

@@ -33,13 +33,15 @@
     gamePath = '',
     scanReport = null,
     onScanRequested,
-    onStateChanged
+    onStateChanged,
+    onProfileDrift
   }: {
     archives: ArchiveItem[];
     gamePath: string;
     scanReport?: ArchiveScanReport | null;
     onScanRequested?: () => void;
     onStateChanged?: () => void;
+    onProfileDrift?: () => void;
   } = $props();
 
   let searchQuery = $state('');
@@ -181,6 +183,7 @@
           if (report && Array.isArray(report.archives)) {
             archives = report.archives;
             if (onStateChanged) onStateChanged();
+            if (onProfileDrift) onProfileDrift();
             
             // Auto-scroll and highlight the newly created category
             const newFileName = `[CAT] ${name.trim()}.archive`;
@@ -225,6 +228,7 @@
 
             archives = report.archives;
             if (onStateChanged) onStateChanged();
+            if (onProfileDrift) onProfileDrift();
           }
         } catch (err) {
           console.error("Failed to rename physical category:", err);
@@ -253,6 +257,7 @@
             delete collapsedCategories[archive.file_name];
             archives = report.archives;
             if (onStateChanged) onStateChanged();
+            if (onProfileDrift) onProfileDrift();
           }
         } catch (err) {
           console.error("Failed to delete physical category:", err);
@@ -293,6 +298,7 @@
 
       persistState();
       if (onStateChanged) onStateChanged();
+      if (onProfileDrift) onProfileDrift();
     } catch (err) {
       console.error('Failed to toggle mod/category:', err);
     }
@@ -440,6 +446,7 @@
         
         localArchives = updated;
         persistState();
+        if (onProfileDrift) onProfileDrift();
       }
     }
     

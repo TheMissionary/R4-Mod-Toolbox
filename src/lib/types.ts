@@ -43,6 +43,17 @@ export interface ArchiveScanReport {
   unassociated_xl: XlItem[];
 }
 
+export interface ArchiveProfile {
+  name: string;
+  active_order: string[];
+  disabled_list: string[];
+}
+
+export interface ProfilesConfig {
+  preset_1?: ArchiveProfile | null;
+  preset_2?: ArchiveProfile | null;
+}
+
 export interface CetPluginItem {
   name: string;
   path: string;
@@ -111,5 +122,6 @@ export interface AppConfig {
   windowHeight?: number;
   windowX?: number;
   windowY?: number;
+  activeProfileSlot?: 1 | 2 | null;
   theme: ThemeSettings;
 }
