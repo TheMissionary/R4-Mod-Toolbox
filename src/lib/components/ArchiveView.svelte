@@ -589,22 +589,23 @@
   onclick={closeContextMenu}
 />
 
+<!-- Fully Themed Drag Ghost Preview (Request 2) -->
 {#if activeDragIndex !== null && draggedEntry}
   <div
-    class="fixed pointer-events-none z-50 px-3 py-1.5 rounded bg-[#1e2328] border border-[#76b900] shadow-2xl shadow-black/95 flex items-center gap-2.5 backdrop-blur-sm -translate-x-4 -translate-y-6"
+    class="fixed pointer-events-none z-50 px-3 py-1.5 rounded-lg bg-nvidia-card border border-nvidia-accent shadow-2xl shadow-black/60 flex items-center gap-2.5 backdrop-blur-md -translate-x-4 -translate-y-6"
     style="left: {cursorX}px; top: {cursorY}px;"
   >
-    <GripVertical class="h-3.5 w-3.5 text-[#76b900]" />
+    <GripVertical class="h-3.5 w-3.5 text-nvidia-accent" />
     {#if draggedEntry.is_delimiter}
-      <Folder class="h-3.5 w-3.5 text-[#76b900]" />
-      <span class="text-xs font-bold text-white uppercase tracking-wider">
+      <Folder class="h-3.5 w-3.5 text-nvidia-accent" />
+      <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">
         {draggedEntry.category_name || draggedEntry.file_name.replace('[CAT] ', '').replace('.archive', '')}
         {#if dragBlockSize > 1}
-          <span class="text-[#76b900] ml-1">({dragBlockSize - 1} mods)</span>
+          <span class="text-nvidia-accent ml-1 font-mono">({dragBlockSize - 1} mods)</span>
         {/if}
       </span>
     {:else}
-      <span class="text-xs font-mono font-semibold text-white">{draggedEntry.file_name}</span>
+      <span class="text-xs font-mono font-semibold text-nvidia-text-primary">{draggedEntry.file_name}</span>
     {/if}
   </div>
 {/if}
@@ -746,9 +747,10 @@
   </div>
 
   <div class="flex gap-3 flex-1 overflow-hidden min-h-0">
+    <!-- List Scroll Container with Added Top Headroom (Request 1) -->
     <div
       bind:this={scrollContainer}
-      class="space-y-1 overflow-y-auto pr-1 flex-1 max-h-[calc(100vh-170px)]"
+      class="space-y-1 overflow-y-auto pr-1 pt-2 flex-1 max-h-[calc(100vh-170px)]"
     >
       {#if visibleItems.length === 0}
         <div class="p-6 text-center text-xs text-nvidia-text-muted border border-nvidia-border rounded bg-nvidia-surface">
@@ -761,9 +763,10 @@
           {@const showLineAfter = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'after' && !isSource}
 
           <div class="relative flex flex-col">
+            <!-- High-Visibility Drop Indicator Line (Request 1) -->
             {#if showLineBefore}
-              <div class="absolute -top-1 left-0 right-0 h-0.5 bg-nvidia-accent z-30 shadow-[0_0_8px_rgba(118,185,0,0.8)] flex items-center">
-                <div class="h-2 w-2 rounded-full bg-nvidia-accent -ml-1"></div>
+              <div class="absolute {originalIndex === 0 ? '-top-1.5' : '-top-1'} left-0 right-0 h-[2.5px] bg-nvidia-accent z-30 shadow-[0_0_12px_var(--theme-accent)] flex items-center">
+                <div class="h-2.5 w-2.5 rounded-full bg-nvidia-accent -ml-1.5 shadow-[0_0_8px_var(--theme-accent)]"></div>
               </div>
             {/if}
 
@@ -846,7 +849,7 @@
                     </div>
                   </div>
 
-                  <!-- High-Contrast Status Badges (Items d & e) -->
+                  <!-- High-Contrast Status Badges -->
                   <div class="flex items-center gap-2 shrink-0">
                     {#if archive.wins.length > 0}
                       <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-nvidia-accent/15 border border-nvidia-accent/40 text-nvidia-accent text-[11px] font-semibold shadow-xs">
@@ -919,18 +922,17 @@
             {/if}
 
             {#if showLineAfter}
-              <div class="absolute -bottom-1 left-0 right-0 h-0.5 bg-nvidia-accent z-30 shadow-[0_0_8px_rgba(118,185,0,0.8)] flex items-center">
-                <div class="h-2 w-2 rounded-full bg-nvidia-accent -ml-1"></div>
+              <div class="absolute -bottom-1 left-0 right-0 h-[2.5px] bg-nvidia-accent z-30 shadow-[0_0_12px_var(--theme-accent)] flex items-center">
+                <div class="h-2.5 w-2.5 rounded-full bg-nvidia-accent -ml-1.5 shadow-[0_0_8px_var(--theme-accent)]"></div>
               </div>
             {/if}
           </div>
         {/each}
       {/if}
 
-      <!-- Dedicated Bottom Section: Unassociated .xl Files (Clean Light/Dark Adaptive) -->
+      <!-- Dedicated Bottom Section: Unassociated .xl Files -->
       {#if unassociatedXlFiles.length > 0}
         <div class="mt-6 pt-4 border-t border-nvidia-border/60 space-y-2">
-          <!-- Adaptive Cyan Wash Header (No Dark Gradient in Light Mode) -->
           <div class="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 flex items-center justify-between">
             <div class="flex items-center gap-2 min-w-0">
               <FileCode class="h-4 w-4 text-cyan-400 shrink-0" />
@@ -977,13 +979,11 @@
             </div>
           {/if}
 
-          <!-- High-Contrast Loose .XL Rows -->
           <div class="space-y-1">
             {#each unassociatedXlFiles as xl (xl.file_name)}
               <div class="rounded border border-nvidia-border bg-nvidia-surface/80 hover:bg-nvidia-surface px-3 flex items-center justify-between density-row">
                 <div class="flex items-center gap-2.5 min-w-0">
                   <FileCode class="h-3.5 w-3.5 text-cyan-400 shrink-0" />
-                  <!-- High Contrast Legible Title in Light and Dark Mode -->
                   <span class="font-mono text-nvidia-text-primary font-medium truncate">{xl.file_name}</span>
                   <span class="text-[11px] font-mono text-nvidia-text-muted shrink-0">
                     {formatBytes(xl.size_bytes)}
@@ -1030,7 +1030,6 @@
                 title="Click to locate in main load order"
               >
                 <div class="flex items-center gap-2 min-w-0 flex-1">
-                  <!-- Saturated Status Indicator Dot -->
                   <div class="h-2 w-2 rounded-full shrink-0 {isLosing ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.7)]' : 'bg-nvidia-accent shadow-[0_0_8px_rgba(118,185,0,0.7)]'}"></div>
 
                   <span class="font-mono text-nvidia-text-primary truncate font-medium">
@@ -1038,7 +1037,6 @@
                   </span>
                 </div>
 
-                <!-- Saturated Pill Badges -->
                 <div class="shrink-0">
                   {#if isLosing}
                     <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-red-500/20 text-red-400 border border-red-500/40">
