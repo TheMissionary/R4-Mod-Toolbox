@@ -17,8 +17,6 @@
     Moon,
     GripVertical,
     Crown,
-    Maximize2,
-    Minimize2,
     Type,
     Sparkles
   } from 'lucide-svelte';
@@ -31,7 +29,6 @@
 
   let draft = $state<ThemeSettings>(loadThemeSettings());
   
-  // Single active hero accent hex
   let currentAccentHex = $state('#76B900');
 
   let selectedBasePreset = $state<string>(APP_FONT_PRESETS[0].value);
@@ -85,10 +82,6 @@
     draft.mode = newMode;
     const activePal = newMode === 'light' ? draft.lightColors : draft.darkColors;
     currentAccentHex = activePal.accent.toUpperCase();
-  }
-
-  function handleDensityToggle() {
-    draft.isCompact = !draft.isCompact;
   }
 
   function handleColorWheelChange(e: Event) {
@@ -152,7 +145,6 @@
     selectedModsPreset = MOD_FONT_PRESETS[0].value;
     customBaseInput = '';
     customModsInput = '';
-    draft.isCompact = false;
   }
 
   async function handleApply() {
@@ -204,9 +196,8 @@
 
       <!-- Modal Body -->
       <div class="p-5 space-y-3.5 overflow-y-auto">
-        <!-- Top Controls: Mode & Density Switches -->
-        <div class="flex items-center justify-between gap-4">
-          <!-- Light / Dark Mode Toggle -->
+        <!-- Top Controls: Mode Switch Only (Compact View is Permanently Locked) -->
+        <div class="flex items-center justify-start">
           <div class="flex items-center p-0.5 rounded-lg border border-nvidia-border bg-nvidia-surface/60">
             <button
               type="button"
@@ -225,25 +216,10 @@
               <span>Light Mode</span>
             </button>
           </div>
-
-          <!-- Density Toggle -->
-          <button
-            type="button"
-            onclick={handleDensityToggle}
-            class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-nvidia-border bg-nvidia-surface/60 hover:bg-nvidia-surface transition text-xs font-medium cursor-pointer"
-          >
-            {#if draft.isCompact}
-              <Minimize2 class="h-3.5 w-3.5 text-nvidia-accent" />
-              <span class="text-nvidia-text-primary font-semibold">Compact View: <strong class="text-nvidia-accent">ON</strong> (28px)</span>
-            {:else}
-              <Maximize2 class="h-3.5 w-3.5 text-nvidia-text-muted" />
-              <span class="text-nvidia-text-muted">Compact View: <strong class="text-nvidia-text-muted">OFF</strong> (36px)</span>
-            {/if}
-          </button>
         </div>
 
         <!-- ----------------------------------------------------------------- -->
-        <!-- LIVE PREVIEW MOCKUP (Clean Framed Presentation)                   -->
+        <!-- LIVE PREVIEW MOCKUP (Permanently Compact 28px)                     -->
         <!-- ----------------------------------------------------------------- -->
         <div
           class="rounded-lg border shadow-inner p-3 space-y-2.5 transition-colors duration-200"
@@ -294,15 +270,15 @@
               </div>
             </div>
 
-            <!-- Mod Row -->
+            <!-- Mod Row (28px height) -->
             <div
               class="flex-1 rounded border flex items-center justify-between px-2.5 transition-all duration-150"
               style="
                 background-color: {activeColors.card};
                 border-color: {activeColors.border};
-                height: {draft.isCompact ? '1.75rem' : '2.25rem'};
-                padding-top: {draft.isCompact ? '0.125rem' : '0.375rem'};
-                padding-bottom: {draft.isCompact ? '0.125rem' : '0.375rem'};
+                height: 1.75rem;
+                padding-top: 0.125rem;
+                padding-bottom: 0.125rem;
               "
             >
               <div class="flex items-center gap-1.5 min-w-0">
@@ -343,7 +319,6 @@
             </div>
 
             <div class="flex items-center gap-2.5 py-0.5">
-              <!-- Clickable Native Swatch -->
               <div class="relative h-9 w-12 rounded-lg border border-nvidia-border overflow-hidden shrink-0 shadow-sm hover:border-nvidia-accent transition cursor-pointer">
                 <input
                   type="color"
@@ -354,7 +329,6 @@
                 />
               </div>
 
-              <!-- Manual Hex Input -->
               <div class="flex-1">
                 <input
                   type="text"

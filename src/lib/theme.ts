@@ -3,28 +3,73 @@ import type { AppThemeColors, ThemeSettings, AppConfig } from '$lib/types';
 
 export type { AppThemeColors, ThemeSettings, AppConfig };
 
-export const DEFAULT_DARK_THEME: AppThemeColors = {
-  accent: '#76b900',
-  accentHover: '#88d600',
+export const ACCENT_PRESETS = [
+  { label: 'NVIDIA Green', hex: '#76B900' },
+  { label: 'Cyberpunk Yellow', hex: '#FCEE0A' },
+  { label: 'Arasaka Crimson', hex: '#E11D48' },
+  { label: 'Netrunner Cyan', hex: '#06B6D4' },
+  { label: 'Tyger Violet', hex: '#A855F7' },
+  { label: 'Afterlife Amber', hex: '#F59E0B' },
+  { label: 'Militech Blue', hex: '#2563EB' },
+  { label: 'Clean Slate', hex: '#64748B' },
+] as const;
+
+export const DARK_BASE_FOUNDATION = {
   bg: '#121517',
   surface: '#181c20',
   card: '#1e2328',
   border: '#2a323d',
   textMuted: '#94a3b8',
   textPrimary: '#ffffff',
-};
+} as const;
 
-export const DEFAULT_LIGHT_THEME: AppThemeColors = {
-  accent: '#5a8f00',
-  accentHover: '#4c7a00',
+export const LIGHT_BASE_FOUNDATION = {
   bg: '#f1f5f9',
   surface: '#f8fafc',
   card: '#ffffff',
   border: '#cbd5e1',
   textMuted: '#64748b',
   textPrimary: '#0f172a',
-};
+} as const;
 
+export function adjustBrightness(hex: string, percent: number): string {
+  let cleanHex = hex.replace('#', '').trim();
+  if (cleanHex.length === 3) {
+    cleanHex = cleanHex.split('').map(c => c + c).join('');
+  }
+  const num = parseInt(cleanHex, 16);
+  if (isNaN(num)) return hex;
+
+  let r = (num >> 16) + percent;
+  let g = ((num >> 8) & 0x00ff) + percent;
+  let b = (num & 0x0000ff) + percent;
+
+  r = Math.min(255, Math.max(0, r));
+  g = Math.min(255, Math.max(0, g));
+  b = Math.min(255, Math.max(0, b));
+
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()}`;
+}
+
+export function generateThemeColors(mode: 'dark' | 'light', accentHex: string): AppThemeColors {
+  const normHex = accentHex.startsWith('#') ? accentHex.toUpperCase() : `#${accentHex.toUpperCase()}`;
+  const base = mode === 'light' ? LIGHT_BASE_FOUNDATION : DARK_BASE_FOUNDATION;
+  const hoverHex = mode === 'light' ? adjustBrightness(normHex, -22) : adjustBrightness(normHex, 20);
+
+  return {
+    accent: normHex,
+    accentHover: hoverHex,
+    bg: base.bg,
+    surface: base.surface,
+    card: base.card,
+    border: base.border,
+    textMuted: base.textMuted,
+    textPrimary: base.textPrimary,
+  };
+}
+
+export const DEFAULT_DARK_THEME: AppThemeColors = generateThemeColors('dark', ACCENT_PRESETS[0].hex);
+export const DEFAULT_LIGHT_THEME: AppThemeColors = generateThemeColors('light', '#5A8F00');
 export const DEFAULT_THEME = DEFAULT_DARK_THEME;
 
 export const THEME_COLOR_META = [
@@ -68,13 +113,15 @@ export const DEFAULT_THEME_SETTINGS: ThemeSettings = {
   lightColors: { ...DEFAULT_LIGHT_THEME },
   fontFamilyBase: APP_FONT_PRESETS[0].value,
   fontFamilyMods: MOD_FONT_PRESETS[0].value,
-  isCompact: false,
+  isCompact: true,
 };
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
   targetGamePath: 'G:\\SteamLibrary\\steamapps\\common\\Cyberpunk 2077',
   activeTab: 'home',
   showConflictSummary: true,
+  windowWidth: 1600,
+  windowHeight: 1000,
   theme: { ...DEFAULT_THEME_SETTINGS },
 };
 
@@ -94,14 +141,19 @@ export function loadThemeSettings(): ThemeSettings {
     try {
       const parsed = JSON.parse(raw);
       const legacyFont = parsed.fontFamily || APP_FONT_PRESETS[0].value;
+      const loadedMode = parsed.mode === 'light' ? 'light' : 'dark';
+
+      const darkAccent = parsed.darkColors?.accent || ACCENT_PRESETS[0].hex;
+      const lightAccent = parsed.lightColors?.accent || '#5A8F00';
+
       return {
-        mode: parsed.mode === 'light' ? 'light' : 'dark',
-        darkColors: { ...DEFAULT_DARK_THEME, ...parsed.darkColors },
-        lightColors: { ...DEFAULT_LIGHT_THEME, ...parsed.lightColors },
+        mode: loadedMode,
+        darkColors: generateThemeColors('dark', darkAccent),
+        lightColors: generateThemeColors('light', lightAccent),
         fontFamilyBase: parsed.fontFamilyBase || legacyFont,
         fontFamilyMods: parsed.fontFamilyMods || MOD_FONT_PRESETS[0].value,
         fontFamily: parsed.fontFamilyBase || legacyFont,
-        isCompact: !!parsed.isCompact,
+        isCompact: true,
       };
     } catch {
       // fallback
@@ -131,7 +183,6 @@ export function applyThemeSettings(settings: ThemeSettings) {
   root.style.setProperty('--theme-font-base', baseFont);
   root.style.setProperty('--theme-font-mods', modsFont);
   root.style.colorScheme = settings.mode;
-  root.setAttribute('data-density', settings.isCompact ? 'compact' : 'normal');
 
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
@@ -149,6 +200,9 @@ export async function loadConfigFromDisk(): Promise<AppConfig> {
         config.theme.fontFamilyMods = MOD_FONT_PRESETS[0].value;
       }
       config.theme.fontFamily = config.theme.fontFamilyBase;
+
+      config.theme.darkColors = generateThemeColors('dark', config.theme.darkColors?.accent || ACCENT_PRESETS[0].hex);
+      config.theme.lightColors = generateThemeColors('light', config.theme.lightColors?.accent || '#5A8F00');
 
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(config.theme));
@@ -176,10 +230,7 @@ export async function saveConfigToDisk(config: AppConfig): Promise<void> {
 }
 
 export async function applyAndPersistTheme(settings: ThemeSettings): Promise<void> {
-  // 1. Immediately apply to DOM and warm cache in localStorage
   applyThemeSettings(settings);
-
-  // 2. Persist to disk with normalized fields
   try {
     settings.fontFamily = settings.fontFamilyBase;
     let config = await invoke<AppConfig>('load_app_config').catch(() => null);

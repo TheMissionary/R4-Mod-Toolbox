@@ -38,20 +38,21 @@
 </script>
 
 <header data-tauri-drag-region class="h-16 border-b border-nvidia-border bg-nvidia-bg flex items-center justify-between px-8 select-none">
-  <div class="flex items-center gap-3">
-    <span class="text-xs font-semibold uppercase tracking-wider text-nvidia-text-muted">Target Path:</span>
-    <span class="text-xs font-mono px-2 py-0.5 rounded bg-nvidia-card border border-nvidia-border text-nvidia-text-primary max-w-sm truncate">
+  <!-- Left Target Path Container (Truncates smoothly on narrow windows) -->
+  <div class="flex items-center gap-2.5 min-w-0 flex-1 mr-4">
+    <span class="text-xs font-semibold uppercase tracking-wider text-nvidia-text-muted shrink-0">Target Path:</span>
+    <span class="text-xs font-mono px-2.5 py-1 rounded bg-nvidia-card border border-nvidia-border text-nvidia-text-primary truncate max-w-xl" title={gamePath || 'No folder selected'}>
       {gamePath || 'No folder selected'}
     </span>
   </div>
 
-  <div class="flex items-center gap-3">
-    <!-- Theme Customizer Modal Trigger -->
+  <!-- Right Actions Container (shrink-0 & whitespace-nowrap prevents button squishing) -->
+  <div class="flex items-center gap-2.5 shrink-0">
     <button 
       type="button"
       onclick={() => isThemeModalOpen = true}
-      class="flex items-center gap-2 px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-card/80 border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer"
-      title="Customize App Colors"
+      class="flex items-center gap-2 px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0 whitespace-nowrap shadow-xs"
+      title="Customize App Theme & Fonts"
     >
       <Palette class="h-3.5 w-3.5 text-nvidia-accent" />
       <span>Theme</span>
@@ -60,7 +61,7 @@
     <button 
       type="button"
       onclick={chooseDirectory}
-      class="flex items-center gap-2 px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-card/80 border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer"
+      class="flex items-center gap-2 px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0 whitespace-nowrap shadow-xs"
     >
       <FolderSearch class="h-3.5 w-3.5 text-nvidia-text-muted" />
       <span>Verify Game Path</span>
@@ -70,7 +71,7 @@
       type="button"
       onclick={handleHardRefresh}
       disabled={!gamePath || isLoading}
-      class="flex items-center gap-2 px-3.5 py-1.5 rounded bg-nvidia-accent hover:bg-nvidia-accent-hover text-black font-semibold text-xs transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+      class="flex items-center gap-2 px-3.5 py-1.5 rounded bg-nvidia-accent hover:brightness-105 text-black font-semibold text-xs transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0 whitespace-nowrap shadow-xs"
     >
       <RefreshCw class="h-3.5 w-3.5 {isLoading ? 'animate-spin' : ''}" />
       <span>{isLoading ? 'Analyzing...' : 'Sync & Rescan'}</span>
@@ -78,5 +79,4 @@
   </div>
 </header>
 
-<!-- Theme Customizer Dialog -->
 <ThemeModal bind:isOpen={isThemeModalOpen} />

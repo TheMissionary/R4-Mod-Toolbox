@@ -523,6 +523,74 @@
     }
   }
 
+  // Real-time Drag Conflict Preview Engine
+  let previewConflictState = $derived.by(() => {
+    if (activeDragIndex === null || dropTargetIndex === null || dropPlacement === null) {
+      return null;
+    }
+
+    let targetIndex = dropTargetIndex;
+    
+    if (dropPlacement === 'after') {
+      const targetItem = localArchives[dropTargetIndex];
+      if (targetItem.is_delimiter && collapsedCategories[targetItem.file_name]) {
+        let targetBlockEnd = dropTargetIndex;
+        for (let i = dropTargetIndex + 1; i < localArchives.length; i++) {
+          if (localArchives[i].is_delimiter) break;
+          targetBlockEnd++;
+        }
+        targetIndex = targetBlockEnd + 1;
+      } else {
+        targetIndex += 1;
+      }
+    }
+    
+    if (activeDragIndex < targetIndex) {
+      if (targetIndex > activeDragIndex + dragBlockSize) {
+        targetIndex -= dragBlockSize;
+      } else {
+        targetIndex = activeDragIndex;
+      }
+    }
+
+    if (activeDragIndex === targetIndex) {
+      return null;
+    }
+
+    const updated = [...localArchives];
+    const movedItems = updated.splice(activeDragIndex, dragBlockSize);
+    updated.splice(targetIndex, 0, ...movedItems);
+
+    const indexMap = new Map<string, number>();
+    for (let i = 0; i < updated.length; i++) {
+      indexMap.set(updated[i].file_name, i);
+    }
+
+    const stateMap = new Map<string, { wins: string[], loses: string[] }>();
+    
+    for (let i = 0; i < updated.length; i++) {
+      const item = updated[i];
+      if (item.has_conflicts) {
+        const newWins: string[] = [];
+        const newLoses: string[] = [];
+        
+        for (const rival of item.conflicts_with) {
+          const rivalIndex = indexMap.get(rival);
+          if (rivalIndex !== undefined) {
+            if (i < rivalIndex) {
+              newWins.push(rival);
+            } else {
+              newLoses.push(rival);
+            }
+          }
+        }
+        stateMap.set(item.file_name, { wins: newWins, loses: newLoses });
+      }
+    }
+
+    return stateMap;
+  });
+
   let visibleItems = $derived.by(() => {
     const result: { archive: ArchiveItem; originalIndex: number; archiveRank: number }[] = [];
     let rank = 0;
@@ -556,9 +624,18 @@
     return result;
   });
 
-  let conflictingArchives = $derived(
-    archives.filter(a => a.wins.length > 0 || a.loses.length > 0)
-  );
+  let conflictingArchives = $derived.by(() => {
+    return localArchives
+      .filter(a => a.has_conflicts)
+      .map(a => {
+        if (previewConflictState && previewConflictState.has(a.file_name)) {
+          const preview = previewConflictState.get(a.file_name)!;
+          return { ...a, wins: preview.wins, loses: preview.loses };
+        }
+        return a;
+      })
+      .filter(a => a.wins.length > 0 || a.loses.length > 0);
+  });
 
   let draggedEntry = $derived(
     activeDragIndex !== null ? localArchives[activeDragIndex] : null
@@ -725,14 +802,14 @@
       <button
         onclick={toggleSummaryDrawer}
         class="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition cursor-pointer {showConflictSummary ? 'bg-nvidia-accent/15 border-nvidia-accent/40 text-nvidia-accent' : 'bg-nvidia-surface hover:bg-nvidia-card border-nvidia-border text-nvidia-text-muted hover:text-nvidia-text-primary'}"
-        title="Toggle Conflicting Mod Summary Column"
+        title="Toggle Conflict Summary Column"
       >
         {#if showConflictSummary}
           <Eye class="h-3.5 w-3.5" />
         {:else}
           <EyeOff class="h-3.5 w-3.5" />
         {/if}
-        <span>Conflicting Mod Summary</span>
+        <span>Conflict Summary</span>
       </button>
     </div>
   </div>
@@ -778,6 +855,7 @@
             {:else}
               {@const isExpanded = !!expandedRows[archive.file_name]}
               {@const isHighlighted = highlightedModName === archive.file_name}
+              {@const activeConflicts = previewConflictState?.get(archive.file_name) || { wins: archive.wins, loses: archive.loses }}
 
               <div
                 role="group"
@@ -843,9 +921,9 @@
                   <div class="flex items-center gap-2 shrink-0 w-24">
                     <!-- Laser-Aligned Circle Anchor -->
                     <div class="w-3 flex items-center justify-center shrink-0">
-                      {#if archive.loses.length > 0}
+                      {#if activeConflicts.loses.length > 0}
                         <div class="h-2.5 w-2.5 rounded-full bg-[#ef4444] shadow-[0_0_6px_rgba(239,68,68,0.7)]" title="Overwritten by higher mod"></div>
-                      {:else if archive.wins.length > 0}
+                      {:else if activeConflicts.wins.length > 0}
                         <div class="h-2.5 w-2.5 rounded-full bg-[#22c55e] shadow-[0_0_6px_rgba(34,197,94,0.7)]" title="Winning overwrites"></div>
                       {:else}
                         <div class="h-2.5 w-2.5 rounded-full bg-[#22c55e]/90" title="Clean (No conflicts)"></div>
@@ -855,7 +933,7 @@
                     <!-- Streamlined "N >" Impacted Indicator (No Brackets, Matching Chevron Color) -->
                     <div class="flex items-center min-w-0 flex-1">
                       {#if archive.has_conflicts}
-                        {@const conflictCount = archive.loses.length > 0 ? archive.loses.length : archive.wins.length}
+                        {@const conflictCount = activeConflicts.loses.length > 0 ? activeConflicts.loses.length : activeConflicts.wins.length}
                         <button
                           type="button"
                           onclick={() => { expandedRows[archive.file_name] = !expandedRows[archive.file_name]; }}
@@ -876,11 +954,11 @@
 
                 {#if isExpanded && archive.has_conflicts}
                   <div class="px-4 py-2 border-t border-nvidia-border/60 bg-nvidia-card/30 space-y-2 text-xs">
-                    {#if archive.wins.length > 0}
+                    {#if activeConflicts.wins.length > 0}
                       <div>
                         <span class="text-[10px] font-semibold text-[#22c55e] uppercase tracking-wider">Overwrites Lower Mods:</span>
                         <div class="mt-1 flex flex-wrap gap-1">
-                          {#each archive.wins as target}
+                          {#each activeConflicts.wins as target}
                             <span class="px-1.5 py-0.2 rounded bg-nvidia-surface border border-nvidia-border text-[10px] font-mono text-nvidia-text-primary">
                               {target}
                             </span>
@@ -889,11 +967,11 @@
                       </div>
                     {/if}
 
-                    {#if archive.loses.length > 0}
+                    {#if activeConflicts.loses.length > 0}
                       <div>
                         <span class="text-[10px] font-semibold text-[#ef4444] uppercase tracking-wider">Loses To Higher Mods:</span>
                         <div class="mt-1 flex flex-wrap gap-1">
-                          {#each archive.loses as target}
+                          {#each activeConflicts.loses as target}
                             <span class="px-1.5 py-0.2 rounded bg-[#ef4444]/15 border border-[#ef4444]/40 text-[10px] font-mono text-[#ef4444] font-semibold">
                               {target}
                             </span>
@@ -993,7 +1071,7 @@
         <div class="p-3 border-b border-nvidia-border bg-nvidia-card/50 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <AlertTriangle class="h-4 w-4 text-[#ef4444]" />
-            <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Conflicting Summary</span>
+            <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Conflict Summary</span>
           </div>
           <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-nvidia-surface border border-nvidia-border text-nvidia-text-primary">
             {conflictingArchives.length} Contested
@@ -1008,10 +1086,16 @@
           {:else}
             {#each conflictingArchives as archive (archive.file_name)}
               {@const isLosing = archive.loses.length > 0}
+              {@const isDragged = draggedEntry?.file_name === archive.file_name}
               <button
                 type="button"
                 onclick={() => focusModInMainList(archive.file_name)}
-                class="w-full text-left rounded px-2.5 flex items-center justify-between gap-2 border border-nvidia-border/70 bg-nvidia-surface/80 hover:bg-nvidia-surface hover:border-nvidia-border transition cursor-pointer density-row group"
+                class="w-full text-left rounded px-2.5 flex items-center justify-between gap-2 border transition-all duration-200 cursor-pointer density-row group
+                  {isDragged 
+                    ? (isLosing 
+                        ? 'border-[#ef4444] bg-[#ef4444]/15 shadow-[0_0_12px_rgba(239,68,68,0.3)] scale-[1.02] z-10 relative' 
+                        : 'border-[#22c55e] bg-[#22c55e]/15 shadow-[0_0_12px_rgba(34,197,94,0.3)] scale-[1.02] z-10 relative')
+                    : 'border-nvidia-border/70 bg-nvidia-surface/80 hover:bg-nvidia-surface hover:border-nvidia-border'}"
                 title="Click to locate in main load order"
               >
                 <div class="flex items-center gap-2 min-w-0 flex-1">

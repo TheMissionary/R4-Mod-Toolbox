@@ -150,11 +150,9 @@
   }
 
   onMount(() => {
-    // 1. Instant fallback paint from cache/defaults
     const localSettings = loadThemeSettings();
     applyThemeSettings(localSettings);
 
-    // 2. Smoothly dismiss startup title screen helper
     const splashStartTime = Date.now();
     const dismissSplash = () => {
       const elapsed = Date.now() - splashStartTime;
@@ -168,7 +166,6 @@
       }, remaining);
     };
 
-    // 3. Hydrate persistent configuration from disk (%APPDATA%\red4-mod-toolbox\config.json)
     loadConfigFromDisk().then(config => {
       if (config.theme) {
         applyThemeSettings(config.theme);
@@ -274,6 +271,7 @@
           {/if}
         </button>
 
+        <!-- Renamed Category: Redscript\R6 (Request 4) -->
         <button
           type="button"
           onclick={() => setTab('redscript')}
@@ -281,7 +279,7 @@
         >
           <div class="flex items-center gap-3">
             <FileCode2 class="h-4 w-4" />
-            <span>Red Mods</span>
+            <span>Redscript\R6</span>
           </div>
           {#if scanResult}
             <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
@@ -402,14 +400,14 @@
             </div>
           </button>
 
-          <!-- Card 4: Redscript Packages -->
+          <!-- Card 4: Renamed to REDSCRIPT\R6 (Request 4) -->
           <button
             type="button"
             onclick={() => setTab('redscript')}
             class="p-4 rounded border border-nvidia-border bg-nvidia-surface/60 hover:bg-nvidia-surface/90 hover:border-nvidia-accent/70 transition-all duration-150 flex flex-col justify-between h-28 text-left cursor-pointer group shadow-xs"
           >
             <div class="flex justify-between items-start w-full">
-              <span class="text-[10px] font-mono uppercase text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">REDSCRIPT PACKAGES</span>
+              <span class="text-[10px] font-mono uppercase text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">REDSCRIPT\R6</span>
               <div class="flex items-center gap-1 text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">
                 <FileCode2 class="h-4 w-4" />
                 <ArrowUpRight class="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
