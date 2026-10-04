@@ -838,9 +838,9 @@
           <div class="relative flex flex-col {inCategory ? 'ml-3' : ''}">
             {#if inCategory}
               <!-- Vertical line bridging the gap -->
-              <div class="absolute -left-2 -top-1 bottom-0 w-[1px] bg-nvidia-border/30 z-0"></div>
+              <div class="absolute -left-2 -top-1 bottom-0 w-[1px] bg-nvidia-border/45 z-0"></div>
               <!-- Horizontal tick -->
-              <div class="absolute -left-2 top-1/2 w-2 h-[1px] bg-nvidia-border/30 z-0"></div>
+              <div class="absolute -left-2 top-1/2 w-2 h-[1px] bg-nvidia-border/45 z-0"></div>
             {/if}
 
             {#if showLineBefore}

@@ -197,6 +197,8 @@
   });
 </script>
 
+<svelte:window oncontextmenu={(e) => e.preventDefault()} />
+
 <div class="flex h-screen w-screen overflow-hidden bg-nvidia-bg text-nvidia-text-primary font-sans">
   <!-- Left Navigation Sidebar -->
   <aside class="w-64 border-r border-nvidia-border flex flex-col justify-between bg-nvidia-surface/40 select-none shrink-0">
@@ -271,7 +273,6 @@
           {/if}
         </button>
 
-        <!-- Renamed Category: Redscript\R6 (Request 4) -->
         <button
           type="button"
           onclick={() => setTab('redscript')}
@@ -400,7 +401,7 @@
             </div>
           </button>
 
-          <!-- Card 4: Renamed to REDSCRIPT\R6 (Request 4) -->
+          <!-- Card 4: REDSCRIPT\R6 -->
           <button
             type="button"
             onclick={() => setTab('redscript')}
