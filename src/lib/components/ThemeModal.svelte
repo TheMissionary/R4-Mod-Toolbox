@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
   import {
     APP_FONT_PRESETS,
     MOD_FONT_PRESETS,
@@ -12,13 +13,15 @@
     X,
     RotateCcw,
     Check,
-    Palette,
+    Settings,
     Sun,
     Moon,
     GripVertical,
     Crown,
     Type,
-    Sparkles
+    Sparkles,
+    FileText,
+    FolderOpen
   } from 'lucide-svelte';
 
   let {
@@ -164,6 +167,14 @@
   function handleCancel() {
     isOpen = false;
   }
+
+  async function handleOpenLogs() {
+    try {
+      await invoke('open_log_folder');
+    } catch (err) {
+      console.error('Failed to open log folder:', err);
+    }
+  }
 </script>
 
 {#if isOpen}
@@ -182,8 +193,8 @@
       <!-- Modal Header -->
       <div class="px-5 py-3 border-b border-nvidia-border flex items-center justify-between bg-nvidia-surface/40 shrink-0">
         <div class="flex items-center gap-2">
-          <Palette class="h-4 w-4 text-nvidia-accent" />
-          <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Theme</span>
+          <Settings class="h-4 w-4 text-nvidia-accent" />
+          <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Settings</span>
         </div>
         <button
           type="button"
@@ -410,6 +421,32 @@
             </div>
           </div>
         </div>
+
+        <!-- ----------------------------------------------------------------- -->
+        <!-- DIAGNOSTICS & SUPPORT SECTION                                     -->
+        <!-- ----------------------------------------------------------------- -->
+        <div class="pt-1">
+          <div class="p-3 rounded-xl border border-nvidia-border bg-nvidia-surface/50 flex items-center justify-between">
+            <div>
+              <div class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-nvidia-text-muted">
+                <FileText class="h-3.5 w-3.5 text-nvidia-accent" />
+                <span>Diagnostics & Support</span>
+              </div>
+              <p class="text-[10px] text-nvidia-text-muted mt-1">
+                Application logs are saved automatically. Use these files when reporting issues.
+              </p>
+            </div>
+            <button
+              type="button"
+              onclick={handleOpenLogs}
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0 shadow-xs"
+            >
+              <FolderOpen class="h-3.5 w-3.5 text-nvidia-text-muted" />
+              <span>Open Log Folder</span>
+            </button>
+          </div>
+        </div>
+
       </div>
 
       <!-- Modal Footer -->
@@ -428,7 +465,7 @@
           <button
             type="button"
             onclick={handleCancel}
-            class="px-3.5 py-1.5 rounded hover:bg-nvidia-surface text-xs text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer"
+            class="px-3.5 py-1.5 rounded hover:bg-nvidia-surface text-xs text-nvidia-text-primary hover:text-nvidia-text-primary transition cursor-pointer"
           >
             Cancel
           </button>
@@ -439,7 +476,7 @@
             class="flex items-center gap-1.5 px-4 py-1.5 rounded bg-nvidia-accent hover:brightness-105 text-black font-semibold text-xs transition shadow-sm cursor-pointer"
           >
             <Check class="h-3.5 w-3.5 stroke-[2.5]" />
-            <span>Apply Theme</span>
+            <span>Apply Settings</span>
           </button>
         </div>
       </div>

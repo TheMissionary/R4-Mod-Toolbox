@@ -535,9 +535,26 @@ fn toggle_plugin_state(
     Ok(())
 }
 
+#[tauri::command]
+fn open_log_folder(app: tauri::AppHandle) -> Result<(), String> {
+    let log_dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
+    if !log_dir.exists() {
+        std::fs::create_dir_all(&log_dir).map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&log_dir)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
@@ -585,7 +602,8 @@ pub fn run() {
             get_cet_details,
             get_red4ext_details,
             get_redscript_details,
-            toggle_plugin_state
+            toggle_plugin_state,
+            open_log_folder
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

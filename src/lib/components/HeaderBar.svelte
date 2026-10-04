@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { RefreshCw, FolderSearch, Palette } from 'lucide-svelte';
+  import { RefreshCw, FolderSearch, Settings } from 'lucide-svelte';
   import { open } from '@tauri-apps/plugin-dialog';
   import ThemeModal from '$lib/components/ThemeModal.svelte';
 
@@ -52,10 +52,10 @@
       type="button"
       onclick={() => isThemeModalOpen = true}
       class="flex items-center gap-2 px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0 whitespace-nowrap shadow-xs"
-      title="Customize App Theme & Fonts"
+      title="Application Settings & Logs"
     >
-      <Palette class="h-3.5 w-3.5 text-nvidia-accent" />
-      <span>Theme</span>
+      <Settings class="h-3.5 w-3.5 text-nvidia-accent" />
+      <span>Settings</span>
     </button>
 
     <button 
