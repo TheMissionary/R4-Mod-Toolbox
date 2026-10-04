@@ -6,11 +6,8 @@
     GripVertical,
     ChevronDown,
     ChevronRight,
-    CheckCircle2,
     Search,
     X,
-    Crown,
-    ShieldAlert,
     FolderPlus,
     Folder,
     Eye,
@@ -47,12 +44,10 @@
   let searchQuery = $state('');
   let expandedRows = $state<Record<string, boolean>>({});
   
-  // Flat array representing the exact physical load order
   let localArchives = $state<ArchiveItem[]>([]);
   let scrollContainer = $state<HTMLElement | null>(null);
   let showXlHelp = $state(false);
 
-  // Reusable Dialog Modal State
   let dialogState = $state<{
     isOpen: boolean;
     title: string;
@@ -73,7 +68,6 @@
     onConfirm: () => {}
   });
 
-  // Category Collapsing State
   let collapsedCategories = $state<Record<string, boolean>>({});
   let preDragCollapseState = $state<Record<string, boolean> | null>(null);
 
@@ -81,7 +75,6 @@
     collapsedCategories[categoryFileName] = !collapsedCategories[categoryFileName];
   }
 
-  // Context Menu State
   let contextMenu = $state<{
     visible: boolean;
     x: number;
@@ -122,7 +115,6 @@
   let highlightedModName = $state<string | null>(null);
   let highlightTimeoutId: number | null = null;
 
-  // Drag and Drop State
   let activeDragIndex = $state<number | null>(null);
   let dragBlockSize = $state<number>(1);
   let dropTargetIndex = $state<number | null>(null);
@@ -589,7 +581,6 @@
   onclick={closeContextMenu}
 />
 
-<!-- Fully Themed Drag Ghost Preview (Request 2) -->
 {#if activeDragIndex !== null && draggedEntry}
   <div
     class="fixed pointer-events-none z-50 px-3 py-1.5 rounded-lg bg-nvidia-card border border-nvidia-accent shadow-2xl shadow-black/60 flex items-center gap-2.5 backdrop-blur-md -translate-x-4 -translate-y-6"
@@ -747,7 +738,6 @@
   </div>
 
   <div class="flex gap-3 flex-1 overflow-hidden min-h-0">
-    <!-- List Scroll Container with Added Top Headroom (Request 1) -->
     <div
       bind:this={scrollContainer}
       class="space-y-1 overflow-y-auto pr-1 pt-2 flex-1 max-h-[calc(100vh-170px)]"
@@ -763,7 +753,6 @@
           {@const showLineAfter = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'after' && !isSource}
 
           <div class="relative flex flex-col">
-            <!-- High-Visibility Drop Indicator Line (Request 1) -->
             {#if showLineBefore}
               <div class="absolute {originalIndex === 0 ? '-top-1.5' : '-top-1'} left-0 right-0 h-[2.5px] bg-nvidia-accent z-30 shadow-[0_0_12px_var(--theme-accent)] flex items-center">
                 <div class="h-2.5 w-2.5 rounded-full bg-nvidia-accent -ml-1.5 shadow-[0_0_8px_var(--theme-accent)]"></div>
@@ -798,7 +787,7 @@
                 oncontextmenu={(e) => openContextMenu(e, archive, 'archive')}
                 class="rounded border transition-all duration-300 {isHighlighted ? 'border-[#76b900] ring-2 ring-[#76b900] bg-[#76b900]/20 shadow-[0_0_15px_rgba(118,185,0,0.35)] scale-[1.008]' : 'border-nvidia-border/70 bg-nvidia-surface hover:border-nvidia-border'} {archive.enabled ? 'opacity-100' : 'opacity-40'} {isSource ? 'opacity-20 border-dashed border-nvidia-accent/50' : ''}"
               >
-                <!-- Density-aware Row Container -->
+                <!-- Density-aware Row Container (28px) -->
                 <div class="flex items-center justify-between px-3 gap-2 density-row">
                   <div class="flex items-center gap-2.5 min-w-0 flex-1">
                     <div
@@ -813,12 +802,13 @@
                       <GripVertical class="h-3.5 w-3.5" />
                     </div>
 
+                    <!-- Subtle, Neutral Calmed Switch -->
                     <button
                       onclick={() => toggleMod(archive)}
                       aria-label={archive.enabled ? "Disable mod " + archive.file_name : "Enable mod " + archive.file_name}
-                      class="w-7 h-4 rounded-full transition relative p-0.5 shrink-0 {archive.enabled ? 'bg-nvidia-accent' : 'bg-nvidia-border'}"
+                      class="w-7 h-4 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer {archive.enabled ? 'bg-zinc-700/80 border border-zinc-600' : 'bg-zinc-900/90 border border-zinc-800'}"
                     >
-                      <div class="h-3 w-3 rounded-full bg-black transition transform {archive.enabled ? 'translate-x-3': 'translate-x-0'}"></div>
+                      <div class="h-2.5 w-2.5 rounded-full transition-transform transform {archive.enabled ? 'translate-x-3 bg-zinc-100 shadow-xs' : 'translate-x-0 bg-zinc-500'}"></div>
                     </button>
 
                     <span class="text-[10px] font-mono px-1 py-0.2 rounded bg-nvidia-card text-nvidia-text-muted border border-nvidia-border shrink-0">
@@ -842,50 +832,45 @@
                       </span>
                     {/if}
 
-                    <div class="flex items-center gap-1.5 text-[11px] text-nvidia-text-muted shrink-0">
+                    <div class="flex items-center gap-1.5 text-[11px] text-nvidia-text-muted shrink-0 opacity-80">
                       <span>({archive.file_count} assets)</span>
                       <span>•</span>
                       <span>{formatBytes(archive.size_bytes)}</span>
                     </div>
                   </div>
 
-                  <!-- High-Contrast Status Badges -->
-                  <div class="flex items-center gap-2 shrink-0">
-                    {#if archive.wins.length > 0}
-                      <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-nvidia-accent/15 border border-nvidia-accent/40 text-nvidia-accent text-[11px] font-semibold shadow-xs">
-                        <Crown class="h-3 w-3" />
-                        <span>Winning ({archive.wins.length})</span>
-                      </div>
-                    {/if}
+                  <!-- Fixed-Width Laser-Aligned Conflict Column -->
+                  <div class="flex items-center gap-2 shrink-0 w-24">
+                    <!-- Laser-Aligned Circle Anchor -->
+                    <div class="w-3 flex items-center justify-center shrink-0">
+                      {#if archive.loses.length > 0}
+                        <div class="h-2.5 w-2.5 rounded-full bg-[#ef4444] shadow-[0_0_6px_rgba(239,68,68,0.7)]" title="Overwritten by higher mod"></div>
+                      {:else if archive.wins.length > 0}
+                        <div class="h-2.5 w-2.5 rounded-full bg-[#22c55e] shadow-[0_0_6px_rgba(34,197,94,0.7)]" title="Winning overwrites"></div>
+                      {:else}
+                        <div class="h-2.5 w-2.5 rounded-full bg-[#22c55e]/90" title="Clean (No conflicts)"></div>
+                      {/if}
+                    </div>
 
-                    {#if archive.loses.length > 0}
-                      <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-red-500/15 border border-red-500/40 text-red-400 text-[11px] font-semibold shadow-xs">
-                        <ShieldAlert class="h-3 w-3" />
-                        <span>Overwritten ({archive.loses.length})</span>
-                      </div>
-                    {/if}
-
-                    {#if archive.wins.length === 0 && archive.loses.length === 0}
-                      <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-nvidia-surface border border-nvidia-border text-nvidia-text-muted text-[11px]">
-                        <CheckCircle2 class="h-3 w-3 text-nvidia-accent" />
-                        <span>Clean</span>
-                      </div>
-                    {/if}
-
-                    {#if archive.has_conflicts}
-                      <button
-                        onclick={() => { expandedRows[archive.file_name] = !expandedRows[archive.file_name]; }}
-                        class="p-1 rounded hover:bg-nvidia-card text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer"
-                      >
-                        {#if isExpanded}
-                          <ChevronDown class="h-3.5 w-3.5" />
-                        {:else}
-                          <ChevronRight class="h-3.5 w-3.5" />
-                        {/if}
-                      </button>
-                    {:else}
-                      <div class="w-5.5"></div>
-                    {/if}
+                    <!-- Streamlined "N >" Impacted Indicator (No Brackets, Matching Chevron Color) -->
+                    <div class="flex items-center min-w-0 flex-1">
+                      {#if archive.has_conflicts}
+                        {@const conflictCount = archive.loses.length > 0 ? archive.loses.length : archive.wins.length}
+                        <button
+                          type="button"
+                          onclick={() => { expandedRows[archive.file_name] = !expandedRows[archive.file_name]; }}
+                          class="flex items-center gap-1 px-1 py-0.5 rounded hover:bg-nvidia-card text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer font-mono text-[11px]"
+                          title="Toggle conflict details ({conflictCount} impacted)"
+                        >
+                          <span class="font-medium">{conflictCount}</span>
+                          {#if isExpanded}
+                            <ChevronDown class="h-3 w-3" />
+                          {:else}
+                            <ChevronRight class="h-3 w-3" />
+                          {/if}
+                        </button>
+                      {/if}
+                    </div>
                   </div>
                 </div>
 
@@ -893,7 +878,7 @@
                   <div class="px-4 py-2 border-t border-nvidia-border/60 bg-nvidia-card/30 space-y-2 text-xs">
                     {#if archive.wins.length > 0}
                       <div>
-                        <span class="text-[10px] font-semibold text-nvidia-accent uppercase tracking-wider">Overwrites Lower Mods:</span>
+                        <span class="text-[10px] font-semibold text-[#22c55e] uppercase tracking-wider">Overwrites Lower Mods:</span>
                         <div class="mt-1 flex flex-wrap gap-1">
                           {#each archive.wins as target}
                             <span class="px-1.5 py-0.2 rounded bg-nvidia-surface border border-nvidia-border text-[10px] font-mono text-nvidia-text-primary">
@@ -906,10 +891,10 @@
 
                     {#if archive.loses.length > 0}
                       <div>
-                        <span class="text-[10px] font-semibold text-red-400 uppercase tracking-wider">Loses To Higher Mods:</span>
+                        <span class="text-[10px] font-semibold text-[#ef4444] uppercase tracking-wider">Loses To Higher Mods:</span>
                         <div class="mt-1 flex flex-wrap gap-1">
                           {#each archive.loses as target}
-                            <span class="px-1.5 py-0.2 rounded bg-red-500/15 border border-red-500/40 text-[10px] font-mono text-red-300 font-semibold">
+                            <span class="px-1.5 py-0.2 rounded bg-[#ef4444]/15 border border-[#ef4444]/40 text-[10px] font-mono text-[#ef4444] font-semibold">
                               {target}
                             </span>
                           {/each}
@@ -1002,12 +987,12 @@
       {/if}
     </div>
 
-    <!-- Conflict Summary Drawer (Density-aware, High Saturation) -->
+    <!-- Conflict Summary Drawer -->
     {#if showConflictSummary}
       <aside class="w-80 rounded-lg border border-nvidia-border bg-nvidia-surface flex flex-col overflow-hidden shrink-0 shadow-xl transition-all duration-200">
         <div class="p-3 border-b border-nvidia-border bg-nvidia-card/50 flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <AlertTriangle class="h-4 w-4 text-red-400" />
+            <AlertTriangle class="h-4 w-4 text-[#ef4444]" />
             <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Conflicting Summary</span>
           </div>
           <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-nvidia-surface border border-nvidia-border text-nvidia-text-primary">
@@ -1026,11 +1011,11 @@
               <button
                 type="button"
                 onclick={() => focusModInMainList(archive.file_name)}
-                class="w-full text-left rounded px-2.5 flex items-center justify-between gap-2 border transition cursor-pointer density-row {isLosing ? 'border-red-500/35 bg-red-500/10 hover:bg-red-500/20 hover:border-red-400' : 'border-nvidia-accent/35 bg-nvidia-accent/10 hover:bg-nvidia-accent/20 hover:border-nvidia-accent'} group"
+                class="w-full text-left rounded px-2.5 flex items-center justify-between gap-2 border border-nvidia-border/70 bg-nvidia-surface/80 hover:bg-nvidia-surface hover:border-nvidia-border transition cursor-pointer density-row group"
                 title="Click to locate in main load order"
               >
                 <div class="flex items-center gap-2 min-w-0 flex-1">
-                  <div class="h-2 w-2 rounded-full shrink-0 {isLosing ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.7)]' : 'bg-nvidia-accent shadow-[0_0_8px_rgba(118,185,0,0.7)]'}"></div>
+                  <div class="h-2 w-2 rounded-full shrink-0 {isLosing ? 'bg-[#ef4444] shadow-[0_0_8px_rgba(239,68,68,0.7)]' : 'bg-[#22c55e] shadow-[0_0_8px_rgba(34,197,94,0.7)]'}"></div>
 
                   <span class="font-mono text-nvidia-text-primary truncate font-medium">
                     {archive.file_name}
@@ -1039,11 +1024,11 @@
 
                 <div class="shrink-0">
                   {#if isLosing}
-                    <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-red-500/20 text-red-400 border border-red-500/40">
+                    <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-[#ef4444]/15 text-[#ef4444] border border-[#ef4444]/30">
                       -{archive.loses.length}
                     </span>
                   {:else}
-                    <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-nvidia-accent/20 text-nvidia-accent border border-nvidia-accent/40">
+                    <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-[#22c55e]/15 text-[#22c55e] border border-[#22c55e]/30">
                       +{archive.wins.length}
                     </span>
                   {/if}
@@ -1061,7 +1046,6 @@
   </div>
 </div>
 
-<!-- Reusable In-App Themed Dialog Modal -->
 <DialogModal
   bind:isOpen={dialogState.isOpen}
   title={dialogState.title}
