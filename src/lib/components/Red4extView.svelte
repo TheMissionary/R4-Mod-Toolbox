@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Red4extPluginItem } from '$lib/types';
-  import { Search, X, FolderSearch, Power, Copy, Check } from 'lucide-svelte';
+  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
 
@@ -133,7 +133,11 @@
   >
     <div class="px-3 py-1.5 border-b border-nvidia-border/60 bg-nvidia-surface/40 flex items-center justify-between gap-2">
       <div class="flex items-center gap-1.5 min-w-0 flex-1">
-        <div class="h-2 w-2 rounded-full shrink-0 {contextMenu.plugin.enabled ? 'bg-nvidia-accent' : 'bg-red-500'}"></div>
+        {#if contextMenu.plugin.is_dir}
+          <Folder class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+        {:else}
+          <FileCode class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+        {/if}
         <span class="font-mono text-[11px] font-bold text-nvidia-text-primary truncate" title={contextMenu.plugin.name}>
           {contextMenu.plugin.name}
         </span>
@@ -221,13 +225,13 @@
           data-mod-name={plugin.name}
           data-mod-path={plugin.path}
           data-mod-type="red4ext"
-          data-is-file="false"
+          data-is-file={!plugin.is_dir}
           oncontextmenu={(e) => openContextMenu(e, plugin)}
           class="flex items-center justify-between px-3 rounded border border-nvidia-border/70 bg-nvidia-surface/40 hover:bg-nvidia-surface/70 transition density-row
             {plugin.enabled ? 'text-nvidia-text-primary' : 'opacity-50 text-nvidia-text-muted'}"
         >
           <div class="flex items-center gap-2.5 min-w-0">
-            <!-- Subtle, Neutral Calmed Switch (Refinement 1) -->
+            <!-- Subtle Calmed Switch -->
             <button
               type="button"
               onclick={() => handleToggle(plugin)}
@@ -236,6 +240,13 @@
             >
               <div class="h-2.5 w-2.5 rounded-full transition-transform transform {plugin.enabled ? 'translate-x-3 bg-zinc-100 shadow-xs' : 'translate-x-0 bg-zinc-500'}"></div>
             </button>
+
+            <!-- Folder vs Loose File Icon (Request 5) -->
+            {#if plugin.is_dir}
+              <Folder class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+            {:else}
+              <FileCode class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+            {/if}
 
             <span class="font-mono truncate {plugin.enabled ? 'text-nvidia-text-primary' : 'line-through text-nvidia-text-muted'}">
               {plugin.name}

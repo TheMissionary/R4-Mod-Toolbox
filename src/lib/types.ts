@@ -49,6 +49,7 @@ export interface CetPluginItem {
   has_init: boolean;
   size_bytes: number;
   enabled: boolean;
+  is_dir?: boolean;
 }
 
 export interface Red4extPluginItem {
@@ -56,6 +57,7 @@ export interface Red4extPluginItem {
   path: string;
   size_bytes: number;
   enabled: boolean;
+  is_dir?: boolean;
 }
 
 export interface RedScriptItem {
@@ -64,6 +66,7 @@ export interface RedScriptItem {
   reds_count: number;
   size_bytes: number;
   enabled: boolean;
+  is_dir?: boolean;
 }
 
 export interface ScanResult {
@@ -96,13 +99,17 @@ export interface ThemeSettings {
   lightColors: AppThemeColors;
   fontFamilyBase: string;
   fontFamilyMods: string;
-  fontFamily?: string; // backward-compatibility fallback
-  isCompact: boolean;
+  fontFamily?: string;
+  isCompact?: boolean;
 }
 
 export interface AppConfig {
   targetGamePath: string;
   activeTab: string;
   showConflictSummary: boolean;
+  windowWidth?: number;
+  windowHeight?: number;
+  windowX?: number;
+  windowY?: number;
   theme: ThemeSettings;
 }

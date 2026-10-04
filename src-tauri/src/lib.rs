@@ -3,6 +3,7 @@ mod archive;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use tauri::Manager;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -44,6 +45,7 @@ pub struct ThemeConfig {
     pub font_family_mods: String,
     #[serde(default)]
     pub font_family: String,
+    #[serde(default)]
     pub is_compact: bool,
 }
 
@@ -65,7 +67,7 @@ impl Default for ThemeConfig {
             font_family_base: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif".to_string(),
             font_family_mods: "\"Cascadia Code\", \"Consolas\", monospace".to_string(),
             font_family: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif".to_string(),
-            is_compact: false,
+            is_compact: true,
         }
     }
 }
@@ -76,6 +78,14 @@ pub struct AppConfig {
     pub target_game_path: String,
     pub active_tab: String,
     pub show_conflict_summary: bool,
+    #[serde(default)]
+    pub window_width: Option<f64>,
+    #[serde(default)]
+    pub window_height: Option<f64>,
+    #[serde(default)]
+    pub window_x: Option<i32>,
+    #[serde(default)]
+    pub window_y: Option<i32>,
     pub theme: ThemeConfig,
 }
 
@@ -85,6 +95,10 @@ impl Default for AppConfig {
             target_game_path: "G:\\SteamLibrary\\steamapps\\common\\Cyberpunk 2077".to_string(),
             active_tab: "home".to_string(),
             show_conflict_summary: true,
+            window_width: Some(1600.0),
+            window_height: Some(1000.0),
+            window_x: None,
+            window_y: None,
             theme: ThemeConfig::default(),
         }
     }
@@ -121,6 +135,8 @@ pub struct CetPluginItem {
     pub has_init: bool,
     pub size_bytes: u64,
     pub enabled: bool,
+    #[serde(default)]
+    pub is_dir: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -129,6 +145,8 @@ pub struct Red4extPluginItem {
     pub path: String,
     pub size_bytes: u64,
     pub enabled: bool,
+    #[serde(default)]
+    pub is_dir: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -138,6 +156,8 @@ pub struct RedScriptItem {
     pub reds_count: usize,
     pub size_bytes: u64,
     pub enabled: bool,
+    #[serde(default)]
+    pub is_dir: bool,
 }
 
 fn calculate_dir_size(path: &Path) -> u64 {
@@ -200,7 +220,6 @@ fn scan_game_directory(game_path: String) -> Result<ScanResult, String> {
     let exe_path = root.join("bin").join("x64").join("Cyberpunk2077.exe");
     let is_valid = exe_path.exists();
 
-    // Archive Counts
     let archive_dir = root.join("archive").join("pc").join("mod");
     let mut archive_active = 0;
     let mut archive_total = 0;
@@ -208,7 +227,7 @@ fn scan_game_directory(game_path: String) -> Result<ScanResult, String> {
         if let Ok(entries) = fs::read_dir(&archive_dir) {
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().to_string();
-                if name.starts_with("[CAT] ") { continue; } // Skip delimiters
+                if name.starts_with("[CAT] ") { continue; }
                 if name.ends_with(".archive") {
                     archive_active += 1;
                     archive_total += 1;
@@ -219,21 +238,18 @@ fn scan_game_directory(game_path: String) -> Result<ScanResult, String> {
         }
     }
 
-    // CET Counts
     let cet_dir = root.join("bin").join("x64").join("plugins").join("cyber_engine_tweaks").join("mods");
     let cet_disabled_dir = root.join("Disabled_Mods").join("cet");
     let cet_active = if cet_dir.exists() { fs::read_dir(&cet_dir).map(|e| e.flatten().filter(|e| e.path().is_dir()).count()).unwrap_or(0) } else { 0 };
     let cet_disabled = if cet_disabled_dir.exists() { fs::read_dir(&cet_disabled_dir).map(|e| e.flatten().filter(|e| e.path().is_dir()).count()).unwrap_or(0) } else { 0 };
     let cet_total = cet_active + cet_disabled;
 
-    // RED4ext Counts
     let red4ext_dir = root.join("red4ext").join("plugins");
     let red4ext_disabled_dir = root.join("Disabled_Mods").join("red4ext");
     let red4ext_active = if red4ext_dir.exists() { fs::read_dir(&red4ext_dir).map(|e| e.flatten().count()).unwrap_or(0) } else { 0 };
     let red4ext_disabled = if red4ext_disabled_dir.exists() { fs::read_dir(&red4ext_disabled_dir).map(|e| e.flatten().count()).unwrap_or(0) } else { 0 };
     let red4ext_total = red4ext_active + red4ext_disabled;
 
-    // Redscript Counts
     let redscript_dir = root.join("r6").join("scripts");
     let redscript_disabled_dir = root.join("Disabled_Mods").join("redscript");
     let redscript_active = if redscript_dir.exists() { fs::read_dir(&redscript_dir).map(|e| e.flatten().count()).unwrap_or(0) } else { 0 };
@@ -311,18 +327,18 @@ fn get_cet_details(game_path: String) -> Result<Vec<CetPluginItem>, String> {
         if let Ok(entries) = fs::read_dir(&active_dir) {
             for entry in entries.flatten() {
                 let p = entry.path();
-                if p.is_dir() {
-                    let name = entry.file_name().to_string_lossy().to_string();
-                    let has_init = p.join("init.lua").exists();
-                    let size_bytes = calculate_dir_size(&p);
-                    list.push(CetPluginItem {
-                        name,
-                        path: p.to_string_lossy().to_string(),
-                        has_init,
-                        size_bytes,
-                        enabled: true,
-                    });
-                }
+                let is_dir = p.is_dir();
+                let name = entry.file_name().to_string_lossy().to_string();
+                let has_init = p.join("init.lua").exists();
+                let size_bytes = if is_dir { calculate_dir_size(&p) } else { entry.metadata().map(|m| m.len()).unwrap_or(0) };
+                list.push(CetPluginItem {
+                    name,
+                    path: p.to_string_lossy().to_string(),
+                    has_init,
+                    size_bytes,
+                    enabled: true,
+                    is_dir,
+                });
             }
         }
     }
@@ -331,18 +347,18 @@ fn get_cet_details(game_path: String) -> Result<Vec<CetPluginItem>, String> {
         if let Ok(entries) = fs::read_dir(&disabled_dir) {
             for entry in entries.flatten() {
                 let p = entry.path();
-                if p.is_dir() {
-                    let name = entry.file_name().to_string_lossy().to_string();
-                    let has_init = p.join("init.lua").exists();
-                    let size_bytes = calculate_dir_size(&p);
-                    list.push(CetPluginItem {
-                        name,
-                        path: p.to_string_lossy().to_string(),
-                        has_init,
-                        size_bytes,
-                        enabled: false,
-                    });
-                }
+                let is_dir = p.is_dir();
+                let name = entry.file_name().to_string_lossy().to_string();
+                let has_init = p.join("init.lua").exists();
+                let size_bytes = if is_dir { calculate_dir_size(&p) } else { entry.metadata().map(|m| m.len()).unwrap_or(0) };
+                list.push(CetPluginItem {
+                    name,
+                    path: p.to_string_lossy().to_string(),
+                    has_init,
+                    size_bytes,
+                    enabled: false,
+                    is_dir,
+                });
             }
         }
     }
@@ -363,8 +379,9 @@ fn get_red4ext_details(game_path: String) -> Result<Vec<Red4extPluginItem>, Stri
         if let Ok(entries) = fs::read_dir(&active_dir) {
             for entry in entries.flatten() {
                 let p = entry.path();
+                let is_dir = p.is_dir();
                 let name = entry.file_name().to_string_lossy().to_string();
-                let size_bytes = if p.is_dir() {
+                let size_bytes = if is_dir {
                     calculate_dir_size(&p)
                 } else {
                     entry.metadata().map(|m| m.len()).unwrap_or(0)
@@ -374,6 +391,7 @@ fn get_red4ext_details(game_path: String) -> Result<Vec<Red4extPluginItem>, Stri
                     path: p.to_string_lossy().to_string(),
                     size_bytes,
                     enabled: true,
+                    is_dir,
                 });
             }
         }
@@ -383,8 +401,9 @@ fn get_red4ext_details(game_path: String) -> Result<Vec<Red4extPluginItem>, Stri
         if let Ok(entries) = fs::read_dir(&disabled_dir) {
             for entry in entries.flatten() {
                 let p = entry.path();
+                let is_dir = p.is_dir();
                 let name = entry.file_name().to_string_lossy().to_string();
-                let size_bytes = if p.is_dir() {
+                let size_bytes = if is_dir {
                     calculate_dir_size(&p)
                 } else {
                     entry.metadata().map(|m| m.len()).unwrap_or(0)
@@ -394,6 +413,7 @@ fn get_red4ext_details(game_path: String) -> Result<Vec<Red4extPluginItem>, Stri
                     path: p.to_string_lossy().to_string(),
                     size_bytes,
                     enabled: false,
+                    is_dir,
                 });
             }
         }
@@ -415,8 +435,9 @@ fn get_redscript_details(game_path: String) -> Result<Vec<RedScriptItem>, String
         if let Ok(entries) = fs::read_dir(&active_dir) {
             for entry in entries.flatten() {
                 let p = entry.path();
+                let is_dir = p.is_dir();
                 let name = entry.file_name().to_string_lossy().to_string();
-                let (reds_count, size_bytes) = if p.is_dir() {
+                let (reds_count, size_bytes) = if is_dir {
                     (count_reds_files(&p), calculate_dir_size(&p))
                 } else {
                     let is_reds = p.extension().map_or(false, |ext| ext == "reds");
@@ -431,6 +452,7 @@ fn get_redscript_details(game_path: String) -> Result<Vec<RedScriptItem>, String
                     reds_count,
                     size_bytes,
                     enabled: true,
+                    is_dir,
                 });
             }
         }
@@ -440,8 +462,9 @@ fn get_redscript_details(game_path: String) -> Result<Vec<RedScriptItem>, String
         if let Ok(entries) = fs::read_dir(&disabled_dir) {
             for entry in entries.flatten() {
                 let p = entry.path();
+                let is_dir = p.is_dir();
                 let name = entry.file_name().to_string_lossy().to_string();
-                let (reds_count, size_bytes) = if p.is_dir() {
+                let (reds_count, size_bytes) = if is_dir {
                     (count_reds_files(&p), calculate_dir_size(&p))
                 } else {
                     let is_reds = p.extension().map_or(false, |ext| ext == "reds");
@@ -456,6 +479,7 @@ fn get_redscript_details(game_path: String) -> Result<Vec<RedScriptItem>, String
                     reds_count,
                     size_bytes,
                     enabled: false,
+                    is_dir,
                 });
             }
         }
@@ -515,6 +539,36 @@ fn toggle_plugin_state(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                let config = load_app_config().unwrap_or_default();
+                let width = config.window_width.unwrap_or(1600.0);
+                let height = config.window_height.unwrap_or(1000.0);
+                let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }));
+                let _ = window.set_min_size(Some(tauri::Size::Logical(tauri::LogicalSize { width: 1200.0, height: 800.0 })));
+                if let (Some(x), Some(y)) = (config.window_x, config.window_y) {
+                    let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: x as f64, y: y as f64 }));
+                } else {
+                    let _ = window.center();
+                }
+            }
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                if let (Ok(size), Ok(pos)) = (window.inner_size(), window.outer_position()) {
+                    let scale = window.scale_factor().unwrap_or(1.0);
+                    let logical_size = size.to_logical::<f64>(scale);
+                    let logical_pos = pos.to_logical::<f64>(scale);
+                    let mut config = load_app_config().unwrap_or_default();
+                    config.window_width = Some(logical_size.width);
+                    config.window_height = Some(logical_size.height);
+                    config.window_x = Some(logical_pos.x as i32);
+                    config.window_y = Some(logical_pos.y as i32);
+                    let _ = save_app_config(config);
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             load_app_config,
             save_app_config,
