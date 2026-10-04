@@ -1,7 +1,22 @@
+# Dependencies
 node_modules/
-src-tauri/target/
-dist/
+
+# SvelteKit & Vite Build Outputs
 .svelte-kit/
-scripts/
+build/
+dist/
+
+# Rust / Tauri Build Outputs
+src-tauri/target/
+
+# Executables & Binaries
+*.exe
+*.dll
+
+# Logs & Temporary Files
 *.log
 _Terminal_Output.txt
+
+# OS Files
+.DS_Store
+Thumbs.db
