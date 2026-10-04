@@ -166,7 +166,7 @@
     dialogState = {
       isOpen: true,
       title: 'Create Category',
-      message: 'Enter a name for the new category delimiter:',
+      message: 'Enter a name for the new category delimiter (symbols like [], (), hyphens allowed):',
       mode: 'prompt',
       initialValue: 'New Category',
       confirmText: 'Create Category',
@@ -185,7 +185,6 @@
             if (onStateChanged) onStateChanged();
             if (onProfileDrift) onProfileDrift();
             
-            // Auto-scroll and highlight the newly created category
             const newFileName = `[CAT] ${name.trim()}.archive`;
             setTimeout(() => {
               focusModInMainList(newFileName);
@@ -203,7 +202,7 @@
     dialogState = {
       isOpen: true,
       title: 'Rename Category',
-      message: 'Enter a new name for this category delimiter:',
+      message: 'Enter a new name for this category delimiter (symbols like [], (), hyphens allowed):',
       mode: 'prompt',
       initialValue: currentName,
       confirmText: 'Rename',
@@ -532,6 +531,29 @@
     }
   }
 
+  // Reactive Derived Category Mod Counts
+  let categoryCounts = $derived.by(() => {
+    const counts = new Map<string, number>();
+    let currentCat: string | null = null;
+    let currentCount = 0;
+
+    for (const item of localArchives) {
+      if (item.is_delimiter) {
+        if (currentCat) {
+          counts.set(currentCat, currentCount);
+        }
+        currentCat = item.file_name;
+        currentCount = 0;
+      } else if (currentCat) {
+        currentCount++;
+      }
+    }
+    if (currentCat) {
+      counts.set(currentCat, currentCount);
+    }
+    return counts;
+  });
+
   // Real-time Drag Conflict Preview Engine
   let previewConflictState = $derived.by(() => {
     if (activeDragIndex === null || dropTargetIndex === null || dropPlacement === null) {
@@ -844,9 +866,7 @@
 
           <div class="relative flex flex-col {inCategory ? 'ml-3' : ''}">
             {#if inCategory}
-              <!-- Vertical line bridging the gap -->
               <div class="absolute -left-2 -top-1 bottom-0 w-[1px] bg-nvidia-border/45 z-0"></div>
-              <!-- Horizontal tick -->
               <div class="absolute -left-2 top-1/2 w-2 h-[1px] bg-nvidia-border/45 z-0"></div>
             {/if}
 
@@ -862,6 +882,7 @@
                 {originalIndex}
                 {isSource}
                 collapsed={!!collapsedCategories[archive.file_name]}
+                modCount={categoryCounts.get(archive.file_name) ?? 0}
                 onToggleCollapse={toggleCategoryCollapse}
                 isHighlighted={highlightedModName === archive.file_name}
                 onDragStart={startDrag}
@@ -939,7 +960,6 @@
 
                   <!-- Fixed-Width Laser-Aligned Conflict Column & Hover Menu -->
                   <div class="flex items-center gap-2 shrink-0 w-24">
-                    <!-- Laser-Aligned Circle Anchor -->
                     <div class="w-3 flex items-center justify-center shrink-0">
                       {#if activeConflicts.loses.length > 0}
                         <div class="h-2.5 w-2.5 rounded-full bg-[#ef4444] shadow-[0_0_6px_rgba(239,68,68,0.7)]" title="Overwritten by higher mod"></div>
@@ -950,7 +970,6 @@
                       {/if}
                     </div>
 
-                    <!-- Streamlined "N >" Impacted Indicator -->
                     <div class="flex items-center min-w-0 flex-1">
                       {#if archive.has_conflicts}
                         {@const conflictCount = activeConflicts.loses.length > 0 ? activeConflicts.loses.length : activeConflicts.wins.length}

@@ -195,7 +195,11 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
             }
         }
     }
-    ordered_paths.extend(all_archive_files);
+
+    // New/untracked files (not in modlist.txt) are introduced at the very TOP
+    let mut final_ordered_paths = all_archive_files;
+    final_ordered_paths.extend(ordered_paths);
+    let ordered_paths = final_ordered_paths;
 
     let mut xl_items: Vec<XlItem> = Vec::new();
     for p in xl_files {
@@ -227,10 +231,13 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
         let metadata = path.metadata().ok();
         let size_bytes = metadata.map(|m| m.len()).unwrap_or(0);
 
-        // Delimiter Detection
-        let is_delimiter = display_name.starts_with("[CAT] ");
+        // Delimiter Detection with exact prefix/suffix stripping
+        let is_delimiter = display_name.starts_with("[CAT] ") && display_name.ends_with(".archive");
         let category_name = if is_delimiter {
-            Some(display_name.trim_start_matches("[CAT] ").trim_end_matches(".archive").trim().to_string())
+            display_name
+                .strip_prefix("[CAT] ")
+                .and_then(|s| s.strip_suffix(".archive"))
+                .map(|s| s.trim().to_string())
         } else {
             None
         };
@@ -371,8 +378,8 @@ pub fn toggle_mod(base_game_path: &str, mod_name: &str, enable: bool) -> Result<
     if let Some((xl_name, _)) = associations.iter().find(|(_, target_arch)| target_arch.as_str() == clean_name) {
         candidate_xl_names.push(xl_name.clone());
     }
-    candidate_xl_names.push(format!("{}.xl", clean_name)); // Pattern 1: EquipmentEx.archive.xl
-    candidate_xl_names.push(format!("{}.xl", base_stem));   // Pattern 2: ja_short_platform_boots.xl
+    candidate_xl_names.push(format!("{}.xl", clean_name));
+    candidate_xl_names.push(format!("{}.xl", base_stem));
 
     for xl_name in candidate_xl_names {
         let clean_xl = clean_name_str(&xl_name);
@@ -408,7 +415,6 @@ pub fn save_modlist(base_game_path: &str, ordered_archives: Vec<String>) -> Resu
             let active_path = archive_dir.join(&clean_name);
             let disabled_path = archive_dir.join(format!("{}.disabled", clean_name));
             
-            // If either the active or disabled file exists, preserve its position in modlist.txt
             if active_path.exists() || disabled_path.exists() {
                 let line = format!("{}\r\n", clean_name);
                 file.write_all(line.as_bytes()).map_err(|e| e.to_string())?;
@@ -441,8 +447,19 @@ pub fn create_physical_category(base_game_path: &str, category_name: &str) -> Re
     let archive_dir = PathBuf::from(base_game_path).join("archive").join("pc").join("mod");
     fs::create_dir_all(&archive_dir).map_err(|e| e.to_string())?;
     
-    let safe_name = category_name.replace(|c: char| !c.is_ascii_alphanumeric() && c != ' ' && c != '-' && c != '_', "");
-    let file_name = format!("[CAT] {}.archive", safe_name.trim());
+    // Allow all standard Windows characters except < > : " / \ | ? * and control chars
+    let forbidden = ['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
+    let safe_name: String = category_name
+        .chars()
+        .filter(|c| !forbidden.contains(c) && !c.is_control())
+        .collect();
+    let safe_trimmed = safe_name.trim();
+
+    if safe_trimmed.is_empty() {
+        return Err("Category name cannot be empty".to_string());
+    }
+
+    let file_name = format!("[CAT] {}.archive", safe_trimmed);
     let file_path = archive_dir.join(&file_name);
     
     if !file_path.exists() {
@@ -478,7 +495,6 @@ pub fn delete_physical_category(base_game_path: &str, category_file_name: &str) 
     let active_path = archive_dir.join(&clean_name);
     let disabled_path = archive_dir.join(format!("{}.disabled", clean_name));
 
-    // Strictly remove only the 0-byte delimiter marker
     if active_path.exists() {
         fs::remove_file(&active_path).map_err(|e| e.to_string())?;
     }
@@ -486,7 +502,6 @@ pub fn delete_physical_category(base_game_path: &str, category_file_name: &str) 
         fs::remove_file(&disabled_path).map_err(|e| e.to_string())?;
     }
 
-    // Remove delimiter line from modlist.txt while preserving all mod lines and order
     let modlist_path = archive_dir.join("modlist.txt");
     if modlist_path.exists() {
         if let Ok(content) = fs::read_to_string(&modlist_path) {
@@ -515,8 +530,14 @@ pub fn rename_physical_category(base_game_path: &str, old_file_name: &str, new_c
         return Err("Safety check failed: Target is not a physical category delimiter".to_string());
     }
 
-    let safe_name = new_category_name.replace(|c: char| !c.is_ascii_alphanumeric() && c != ' ' && c != '-' && c != '_', "");
+    // Allow all standard Windows characters except < > : " / \ | ? * and control chars
+    let forbidden = ['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
+    let safe_name: String = new_category_name
+        .chars()
+        .filter(|c| !forbidden.contains(c) && !c.is_control())
+        .collect();
     let safe_trimmed = safe_name.trim();
+
     if safe_trimmed.is_empty() {
         return Err("Category name cannot be empty".to_string());
     }
@@ -529,14 +550,12 @@ pub fn rename_physical_category(base_game_path: &str, old_file_name: &str, new_c
     let new_active_path = archive_dir.join(&new_clean_name);
     let new_disabled_path = archive_dir.join(format!("{}.disabled", new_clean_name));
 
-    // Rename on disk preserving enabled/disabled status
     if old_active_path.exists() {
         fs::rename(&old_active_path, &new_active_path).map_err(|e| e.to_string())?;
     } else if old_disabled_path.exists() {
         fs::rename(&old_disabled_path, &new_disabled_path).map_err(|e| e.to_string())?;
     }
 
-    // In-place rewrite of modlist.txt swapping the old delimiter for the new delimiter
     let modlist_path = archive_dir.join("modlist.txt");
     if modlist_path.exists() {
         if let Ok(content) = fs::read_to_string(&modlist_path) {
@@ -623,7 +642,6 @@ pub fn apply_archive_profile(base_game_path: &str, slot: u8) -> Result<ArchiveSc
     // Phase B & C: Reconciliation & Safety Net
     for c_name in archive_stems {
         let should_be_enabled = profile.active_order.contains(&c_name);
-        // toggle_mod is idempotent and safely handles companion .xl files
         let _ = toggle_mod(base_game_path, &c_name, should_be_enabled);
     }
 

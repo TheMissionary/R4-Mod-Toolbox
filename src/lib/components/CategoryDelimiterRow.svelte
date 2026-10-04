@@ -8,6 +8,7 @@
     isSource,
     isHighlighted,
     collapsed = false,
+    modCount = 0,
     onToggleCollapse,
     onDragStart,
     onPointerMove,
@@ -22,6 +23,7 @@
     isSource: boolean;
     isHighlighted: boolean;
     collapsed?: boolean;
+    modCount?: number;
     onToggleCollapse?: (categoryFileName: string) => void;
     onDragStart: (e: PointerEvent, index: number) => void;
     onPointerMove: (e: PointerEvent, index: number) => void;
@@ -81,6 +83,11 @@
 
       <span class="font-bold text-nvidia-text-primary uppercase tracking-wider truncate">
         {archive.category_name || archive.file_name.replace('[CAT] ', '').replace('.archive', '')}
+      </span>
+
+      <!-- Dynamic Nested Mod Count Badge -->
+      <span class="text-[10px] font-mono text-nvidia-text-muted shrink-0 opacity-80">
+        ({modCount} {modCount === 1 ? 'mod' : 'mods'})
       </span>
     </div>
 

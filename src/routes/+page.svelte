@@ -78,7 +78,7 @@
   let red4extPlugins = $state<Red4extPluginItem[]>([]);
   let redscriptPackages = $state<RedScriptItem[]>([]);
 
-  // Archive Profiles State
+  // Custom Archive Presets State
   let profilesConfig = $state<ProfilesConfig | null>(null);
   let activeProfileSlot = $state<1 | 2 | null>(null);
   let isApplyingProfile = $state(false);
@@ -147,8 +147,8 @@
       isOpen: true,
       slot,
       title: `Save Preset ${slot}`,
-      message: 'Enter a name for this archive load order profile:',
-      initialValue: currentName || `Profile ${slot}`
+      message: 'Enter a name for this custom archive preset:',
+      initialValue: currentName || `Preset ${slot}`
     };
   }
 
@@ -182,7 +182,7 @@
       await refreshCountsOnly();
       await persistActiveProfileSlot(slot);
     } catch (err) {
-      console.error('Failed to load profile:', err);
+      console.error('Failed to load preset:', err);
     } finally {
       isApplyingProfile = false;
     }
@@ -385,12 +385,12 @@
           </button>
         </nav>
 
-        <!-- Archive Profiles Module (Visible only on Archive Tab) -->
+        <!-- Custom Archive Presets Module (Visible only on Archive Tab) -->
         {#if currentTab === 'archive'}
           <div class="px-4 py-3 border-t border-nvidia-border/50 bg-nvidia-surface/20">
             <div class="flex items-center gap-1.5 mb-3">
               <Radio class="h-3.5 w-3.5 text-nvidia-accent" />
-              <span class="text-[10px] font-bold text-nvidia-text-muted uppercase tracking-wider">Archive Profiles</span>
+              <span class="text-[10px] font-bold text-nvidia-text-muted uppercase tracking-wider">Custom Archive Presets</span>
             </div>
             <div class="space-y-2">
               <!-- Slot 1 -->
@@ -591,11 +591,11 @@
       </div>
     </main>
 
-    <!-- Full Screen Blocking Overlay for Profile Application -->
+    <!-- Full Screen Blocking Overlay for Preset Application -->
     {#if isApplyingProfile}
       <div class="absolute inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center select-none">
         <div class="h-12 w-12 rounded-full border-4 border-nvidia-surface border-t-nvidia-accent animate-spin mb-4"></div>
-        <h2 class="text-lg font-bold text-nvidia-text-primary tracking-wider uppercase mb-2">Applying Profile</h2>
+        <h2 class="text-lg font-bold text-nvidia-text-primary tracking-wider uppercase mb-2">Applying Preset</h2>
         <p class="text-xs text-nvidia-text-muted font-mono">Verifying integrity and rewriting load order...</p>
       </div>
     {/if}
@@ -608,6 +608,6 @@
   message={profileDialogState.message}
   mode="prompt"
   initialValue={profileDialogState.initialValue}
-  confirmText="Save Profile"
+  confirmText="Save Preset"
   onConfirm={confirmSaveProfile}
 />
