@@ -21,7 +21,8 @@
     Power,
     Check,
     Pencil,
-    Trash2
+    Trash2,
+    MoreVertical
   } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -180,10 +181,11 @@
           if (report && Array.isArray(report.archives)) {
             archives = report.archives;
             if (onStateChanged) onStateChanged();
+            
+            // Auto-scroll and highlight the newly created category
+            const newFileName = `[CAT] ${name.trim()}.archive`;
             setTimeout(() => {
-              if (scrollContainer) {
-                scrollContainer.scrollTop = 0;
-              }
+              focusModInMainList(newFileName);
             }, 100);
           }
         } catch (err) {
@@ -592,20 +594,23 @@
   });
 
   let visibleItems = $derived.by(() => {
-    const result: { archive: ArchiveItem; originalIndex: number; archiveRank: number }[] = [];
+    const result: { archive: ArchiveItem; originalIndex: number; archiveRank: number; inCategory: boolean }[] = [];
     let rank = 0;
     let currentCategoryCollapsed = false;
+    let inCategory = false;
 
     for (let i = 0; i < localArchives.length; i++) {
       const archive = localArchives[i];
 
       if (archive.is_delimiter) {
         currentCategoryCollapsed = !!collapsedCategories[archive.file_name];
+        inCategory = true;
         if (searchQuery === '' || archive.name.toLowerCase().includes(searchQuery.toLowerCase())) {
           result.push({ 
             archive, 
             originalIndex: i, 
-            archiveRank: 0 
+            archiveRank: 0,
+            inCategory: false
           });
         }
       } else {
@@ -615,7 +620,8 @@
             result.push({ 
               archive, 
               originalIndex: i, 
-              archiveRank: rank 
+              archiveRank: rank,
+              inCategory
             });
           }
         }
@@ -824,12 +830,19 @@
           No matches found.
         </div>
       {:else}
-        {#each visibleItems as { archive, originalIndex, archiveRank } (archive.file_name)}
+        {#each visibleItems as { archive, originalIndex, archiveRank, inCategory } (archive.file_name)}
           {@const isSource = activeDragIndex !== null && originalIndex >= activeDragIndex && originalIndex < activeDragIndex + dragBlockSize}
           {@const showLineBefore = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'before' && !isSource}
           {@const showLineAfter = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'after' && !isSource}
 
-          <div class="relative flex flex-col">
+          <div class="relative flex flex-col {inCategory ? 'ml-3' : ''}">
+            {#if inCategory}
+              <!-- Vertical line bridging the gap -->
+              <div class="absolute -left-2 -top-1 bottom-0 w-[1px] bg-nvidia-border/30 z-0"></div>
+              <!-- Horizontal tick -->
+              <div class="absolute -left-2 top-1/2 w-2 h-[1px] bg-nvidia-border/30 z-0"></div>
+            {/if}
+
             {#if showLineBefore}
               <div class="absolute {originalIndex === 0 ? '-top-1.5' : '-top-1'} left-0 right-0 h-[2.5px] bg-nvidia-accent z-30 shadow-[0_0_12px_var(--theme-accent)] flex items-center">
                 <div class="h-2.5 w-2.5 rounded-full bg-nvidia-accent -ml-1.5 shadow-[0_0_8px_var(--theme-accent)]"></div>
@@ -863,7 +876,7 @@
                 use:registerModNode={archive.file_name}
                 onpointermove={(e) => onRowPointerMove(e, originalIndex)}
                 oncontextmenu={(e) => openContextMenu(e, archive, 'archive')}
-                class="rounded border transition-all duration-300 {isHighlighted ? 'border-[#76b900] ring-2 ring-[#76b900] bg-[#76b900]/20 shadow-[0_0_15px_rgba(118,185,0,0.35)] scale-[1.008]' : 'border-nvidia-border/70 bg-nvidia-surface hover:border-nvidia-border'} {archive.enabled ? 'opacity-100' : 'opacity-40'} {isSource ? 'opacity-20 border-dashed border-nvidia-accent/50' : ''}"
+                class="group rounded border transition-all duration-300 z-10 {isHighlighted ? 'border-[#76b900] ring-2 ring-[#76b900] bg-[#76b900]/20 shadow-[0_0_15px_rgba(118,185,0,0.35)] scale-[1.008]' : 'border-nvidia-border/70 bg-nvidia-surface hover:border-nvidia-border'} {archive.enabled ? 'opacity-100' : 'opacity-40'} {isSource ? 'opacity-20 border-dashed border-nvidia-accent/50' : ''}"
               >
                 <!-- Density-aware Row Container (28px) -->
                 <div class="flex items-center justify-between px-3 gap-2 density-row">
@@ -917,7 +930,7 @@
                     </div>
                   </div>
 
-                  <!-- Fixed-Width Laser-Aligned Conflict Column -->
+                  <!-- Fixed-Width Laser-Aligned Conflict Column & Hover Menu -->
                   <div class="flex items-center gap-2 shrink-0 w-24">
                     <!-- Laser-Aligned Circle Anchor -->
                     <div class="w-3 flex items-center justify-center shrink-0">
@@ -930,7 +943,7 @@
                       {/if}
                     </div>
 
-                    <!-- Streamlined "N >" Impacted Indicator (No Brackets, Matching Chevron Color) -->
+                    <!-- Streamlined "N >" Impacted Indicator -->
                     <div class="flex items-center min-w-0 flex-1">
                       {#if archive.has_conflicts}
                         {@const conflictCount = activeConflicts.loses.length > 0 ? activeConflicts.loses.length : activeConflicts.wins.length}
@@ -949,6 +962,18 @@
                         </button>
                       {/if}
                     </div>
+                  </div>
+
+                  <!-- Hover Context Menu Button -->
+                  <div class="flex items-center justify-end shrink-0 w-6">
+                    <button
+                      type="button"
+                      onclick={(e) => { e.stopPropagation(); openContextMenu(e, archive, 'archive'); }}
+                      class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-text-primary hover:bg-nvidia-card transition cursor-pointer opacity-0 group-hover:opacity-100"
+                      title="More options"
+                    >
+                      <MoreVertical class="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
 

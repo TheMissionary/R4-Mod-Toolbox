@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ArchiveItem } from '$lib/types';
-  import { GripVertical, Folder, FolderOpen, Pencil, Trash2 } from 'lucide-svelte';
+  import { GripVertical, Folder, FolderOpen, Pencil, Trash2, MoreVertical } from 'lucide-svelte';
 
   let {
     archive,
@@ -39,7 +39,7 @@
   use:registerNode={archive.file_name}
   onpointermove={(e) => onPointerMove(e, originalIndex)}
   oncontextmenu={(e) => onContextMenu(e, archive, 'archive')}
-  class="rounded-lg border transition-all duration-300 {isHighlighted ? 'border-[#76b900] ring-2 ring-[#76b900] bg-[#76b900]/20 shadow-[0_0_15px_rgba(118,185,0,0.35)] scale-[1.008]' : 'border-nvidia-accent/35 bg-nvidia-accent/8 hover:bg-nvidia-accent/12 hover:border-nvidia-accent/65'} {archive.enabled ? 'opacity-100' : 'opacity-50'} {isSource ? 'opacity-20 border-dashed border-nvidia-accent/50' : ''} mt-3.5 mb-1.5 shadow-xs"
+  class="group rounded-lg border transition-all duration-300 {isHighlighted ? 'border-[#76b900] ring-2 ring-[#76b900] bg-[#76b900]/20 shadow-[0_0_15px_rgba(118,185,0,0.35)] scale-[1.008]' : 'border-nvidia-accent/35 bg-nvidia-accent/8 hover:bg-nvidia-accent/12 hover:border-nvidia-accent/65'} {archive.enabled ? 'opacity-100' : 'opacity-50'} {isSource ? 'opacity-20 border-dashed border-nvidia-accent/50' : ''} mt-3.5 mb-1.5 shadow-xs"
 >
   <div class="flex items-center justify-between px-3 gap-2 density-row relative overflow-hidden">
     <div class="absolute left-0 top-0 bottom-0 w-1 bg-nvidia-accent"></div>
@@ -57,7 +57,7 @@
         <GripVertical class="h-4 w-4" />
       </div>
 
-      <!-- Completely Neutral, De-Emphasized Switch (Refinement 1) -->
+      <!-- Completely Neutral, De-Emphasized Switch -->
       <button
         onclick={() => onToggle(archive)}
         aria-label={archive.enabled ? "Disable category marker" : "Enable category marker"}
@@ -84,7 +84,7 @@
       </span>
     </div>
 
-    <!-- Right Controls: In-line Rename and Delete (Category Marker Label Removed - Refinement 2) -->
+    <!-- Right Controls: In-line Rename, Delete, and Hover Context Menu -->
     <div class="flex items-center gap-1.5 shrink-0">
       <button
         type="button"
@@ -102,6 +102,17 @@
         title="Delete category (mods remain preserved)"
       >
         <Trash2 class="h-3.5 w-3.5" />
+      </button>
+
+      <div class="w-[1px] h-3 bg-nvidia-border/60 mx-0.5"></div>
+
+      <button
+        type="button"
+        onclick={(e) => { e.stopPropagation(); onContextMenu(e, archive, 'archive'); }}
+        class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-text-primary hover:bg-nvidia-surface/80 transition cursor-pointer opacity-0 group-hover:opacity-100"
+        title="More options"
+      >
+        <MoreVertical class="h-3.5 w-3.5" />
       </button>
     </div>
   </div>
