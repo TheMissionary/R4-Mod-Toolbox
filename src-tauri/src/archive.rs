@@ -47,57 +47,12 @@ pub struct ArchiveScanReport {
     pub unassociated_xl: Vec<XlItem>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ArchiveProfile {
-    pub name: String,
-    pub active_order: Vec<String>,
-    pub disabled_list: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct ProfilesConfig {
-    pub preset_1: Option<ArchiveProfile>,
-    pub preset_2: Option<ArchiveProfile>,
-}
-
 fn get_categories_config_path(base_game_path: &str) -> PathBuf {
     PathBuf::from(base_game_path).join("archive").join("pc").join("mod").join("modcategories.json")
 }
 
 fn get_xl_associations_path(base_game_path: &str) -> PathBuf {
     PathBuf::from(base_game_path).join("archive").join("pc").join("mod").join("modxl_associations.json")
-}
-
-fn get_profiles_config_path() -> PathBuf {
-    if let Ok(appdata) = std::env::var("APPDATA") {
-        PathBuf::from(appdata).join("r4-mod-toolbox").join("profiles.json")
-    } else if let Ok(userprofile) = std::env::var("USERPROFILE") {
-        PathBuf::from(userprofile).join("AppData").join("Roaming").join("r4-mod-toolbox").join("profiles.json")
-    } else {
-        PathBuf::from("profiles.json")
-    }
-}
-
-pub fn load_profiles_config() -> ProfilesConfig {
-    let path = get_profiles_config_path();
-    if path.exists() {
-        if let Ok(content) = fs::read_to_string(&path) {
-            if let Ok(config) = serde_json::from_str::<ProfilesConfig>(&content) {
-                return config;
-            }
-        }
-    }
-    ProfilesConfig::default()
-}
-
-pub fn save_profiles_config(config: &ProfilesConfig) -> Result<(), String> {
-    let path = get_profiles_config_path();
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    let serialized = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
-    fs::write(&path, serialized).map_err(|e| e.to_string())?;
-    Ok(())
 }
 
 fn load_xl_associations_map(base_game_path: &str) -> HashMap<String, String> {
@@ -648,83 +603,6 @@ pub fn rename_physical_category(base_game_path: &str, old_file_name: &str, new_c
         }
     }
 
-    scan_archives(base_game_path)
-}
-
-pub fn save_archive_profile(base_game_path: &str, slot: u8, name: &str) -> Result<ProfilesConfig, String> {
-    let report = scan_archives(base_game_path)?;
-    let mut active_order = Vec::new();
-    let mut disabled_list = Vec::new();
-
-    for item in report.archives {
-        if item.enabled {
-            active_order.push(item.file_name);
-        } else {
-            disabled_list.push(item.file_name);
-        }
-    }
-
-    let profile = ArchiveProfile {
-        name: name.to_string(),
-        active_order,
-        disabled_list,
-    };
-
-    let mut config = load_profiles_config();
-    if slot == 1 {
-        config.preset_1 = Some(profile);
-    } else if slot == 2 {
-        config.preset_2 = Some(profile);
-    } else {
-        return Err("Invalid slot".to_string());
-    }
-
-    save_profiles_config(&config)?;
-    Ok(config)
-}
-
-pub fn apply_archive_profile(base_game_path: &str, slot: u8) -> Result<ArchiveScanReport, String> {
-    let config = load_profiles_config();
-    let profile = match slot {
-        1 => config.preset_1.ok_or("Preset 1 is empty")?,
-        2 => config.preset_2.ok_or("Preset 2 is empty")?,
-        _ => return Err("Invalid slot".to_string()),
-    };
-
-    let archive_dir = PathBuf::from(base_game_path).join("archive").join("pc").join("mod");
-    if !archive_dir.exists() {
-        return Err("Mod directory does not exist".to_string());
-    }
-
-    // Phase A: Discovery
-    let mut archive_stems = HashSet::new();
-    if let Ok(entries) = fs::read_dir(&archive_dir) {
-        for entry in entries.flatten() {
-            let p = entry.path();
-            if p.is_file() {
-                let name = p.file_name().unwrap_or_default().to_string_lossy().to_string();
-                if name.ends_with(".archive") || name.ends_with(".archive.disabled") {
-                    archive_stems.insert(clean_name_str(&name));
-                }
-            }
-        }
-    }
-
-    // Phase B & C: Reconciliation & Safety Net
-    for c_name in archive_stems {
-        let should_be_enabled = profile.active_order.contains(&c_name);
-        let _ = toggle_mod(base_game_path, &c_name, should_be_enabled);
-    }
-
-    // Phase D: Load Order (modlist.txt)
-    let modlist_path = archive_dir.join("modlist.txt");
-    let mut modlist_content = String::new();
-    for item in &profile.active_order {
-        modlist_content.push_str(&format!("{}\r\n", item));
-    }
-    let _ = fs::write(&modlist_path, modlist_content);
-
-    // Phase E: Validation
     scan_archives(base_game_path)
 }
 

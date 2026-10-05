@@ -15,8 +15,7 @@
     ArchiveScanReport,
     CetPluginItem,
     Red4extPluginItem,
-    RedScriptItem,
-    ProfilesConfig
+    RedScriptItem
   } from '$lib/types';
 
   import HeaderBar from '$lib/components/HeaderBar.svelte';
@@ -24,7 +23,6 @@
   import CetView from '$lib/components/CetView.svelte';
   import Red4extView from '$lib/components/Red4extView.svelte';
   import RedscriptView from '$lib/components/RedscriptView.svelte';
-  import DialogModal from '$lib/components/DialogModal.svelte';
 
   import {
     Home,
@@ -34,9 +32,7 @@
     FileCode2,
     Play,
     CheckCircle2,
-    ArrowUpRight,
-    Save,
-    Radio
+    ArrowUpRight
   } from 'lucide-svelte';
 
   type TabType = 'home' | 'archive' | 'cet' | 'red4ext' | 'redscript';
@@ -66,19 +62,6 @@
   let red4extPlugins = $state<Red4extPluginItem[]>([]);
   let redscriptPackages = $state<RedScriptItem[]>([]);
 
-  // Custom Archive Presets State
-  let profilesConfig = $state<ProfilesConfig | null>(null);
-  let activeProfileSlot = $state<1 | 2 | null>(null);
-  let isApplyingProfile = $state(false);
-
-  let profileDialogState = $state({
-    isOpen: false,
-    slot: 1 as 1 | 2,
-    title: '',
-    message: '',
-    initialValue: '',
-  });
-
   async function openExternalLink(url: string) {
     if (!url) return;
     try {
@@ -97,78 +80,6 @@
       console.error('Failed to launch game:', err);
     } finally {
       setTimeout(() => { isLaunching = false; }, 2500);
-    }
-  }
-
-  async function loadProfiles() {
-    try {
-      profilesConfig = await invoke<ProfilesConfig>('get_archive_profiles');
-    } catch (err) {
-      console.error('Failed to load profiles:', err);
-    }
-  }
-
-  async function persistActiveProfileSlot(slot: 1 | 2 | null) {
-    activeProfileSlot = slot;
-    try {
-      const config = await loadConfigFromDisk();
-      config.activeProfileSlot = slot;
-      await saveConfigToDisk(config);
-    } catch (err) {
-      console.error('Failed to persist active profile slot:', err);
-    }
-  }
-
-  function promptSaveProfile(slot: 1 | 2) {
-    const currentName = slot === 1 ? profilesConfig?.preset_1?.name : profilesConfig?.preset_2?.name;
-    profileDialogState = {
-      isOpen: true,
-      slot,
-      title: `Save Preset ${slot}`,
-      message: 'Enter a name for this custom archive preset:',
-      initialValue: currentName || `Preset ${slot}`
-    };
-  }
-
-  async function confirmSaveProfile(name: string) {
-    profileDialogState.isOpen = false;
-    if (!name.trim()) return;
-    try {
-      profilesConfig = await invoke<ProfilesConfig>('save_archive_profile', {
-        gamePath,
-        slot: profileDialogState.slot,
-        name: name.trim()
-      });
-      await persistActiveProfileSlot(profileDialogState.slot);
-    } catch (err) {
-      console.error('Failed to save profile:', err);
-    }
-  }
-
-  async function handleLoadProfile(slot: 1 | 2) {
-    const preset = slot === 1 ? profilesConfig?.preset_1 : profilesConfig?.preset_2;
-    if (!preset) return;
-
-    isApplyingProfile = true;
-    try {
-      const report = await invoke<ArchiveScanReport>('load_archive_profile', {
-        gamePath,
-        slot
-      });
-      archiveReport = report;
-      archives = report.archives;
-      await refreshCountsOnly();
-      await persistActiveProfileSlot(slot);
-    } catch (err) {
-      console.error('Failed to load preset:', err);
-    } finally {
-      isApplyingProfile = false;
-    }
-  }
-
-  function handleProfileDrift() {
-    if (activeProfileSlot !== null) {
-      persistActiveProfileSlot(null);
     }
   }
 
@@ -240,9 +151,6 @@
       if (config.targetGamePath) {
         gamePath = config.targetGamePath;
       }
-      if (config.activeProfileSlot !== undefined) {
-        activeProfileSlot = config.activeProfileSlot as 1 | 2 | null;
-      }
     }).catch(err => {
       console.error('Config hydration error:', err);
     }).finally(() => {
@@ -250,8 +158,6 @@
         dismissSplash();
       });
     });
-
-    loadProfiles();
 
     invoke('start_directory_watcher', { gamePath }).catch(() => {});
     const unlisten = listen('directory-changed', () => {
@@ -357,58 +263,6 @@
             {/if}
           </button>
         </nav>
-
-        <!-- Custom Archive Presets Module (Visible only on Archive Tab) -->
-        {#if currentTab === 'archive'}
-          <div class="px-4 py-3 border-t border-nvidia-border/50 bg-nvidia-surface/20">
-            <div class="flex items-center gap-1.5 mb-3">
-              <Radio class="h-3.5 w-3.5 text-nvidia-accent" />
-              <span class="text-[10px] font-bold text-nvidia-text-muted uppercase tracking-wider">Custom Archive Presets</span>
-            </div>
-            <div class="space-y-2">
-              <!-- Slot 1 -->
-              <div class="flex items-center gap-1">
-                <button
-                  type="button"
-                  onclick={() => handleLoadProfile(1)}
-                  disabled={!profilesConfig?.preset_1 || isApplyingProfile}
-                  class="flex-1 text-left px-2.5 py-1.5 rounded text-xs font-medium transition truncate border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed {activeProfileSlot === 1 ? 'bg-nvidia-accent/15 text-nvidia-accent border-nvidia-accent/50 shadow-[0_0_10px_var(--theme-accent)]' : 'bg-nvidia-surface text-nvidia-text-muted hover:text-nvidia-text-primary border-nvidia-border hover:border-nvidia-border/80'}"
-                >
-                  {profilesConfig?.preset_1?.name || 'Empty Slot'}
-                </button>
-                <button
-                  type="button"
-                  onclick={() => promptSaveProfile(1)}
-                  disabled={isApplyingProfile}
-                  class="p-1.5 rounded bg-nvidia-surface border border-nvidia-border text-nvidia-text-muted hover:text-nvidia-accent hover:border-nvidia-accent/50 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-                  title="Save current load order to Preset 1"
-                >
-                  <Save class="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <!-- Slot 2 -->
-              <div class="flex items-center gap-1">
-                <button
-                  type="button"
-                  onclick={() => handleLoadProfile(2)}
-                  disabled={!profilesConfig?.preset_2 || isApplyingProfile}
-                  class="flex-1 text-left px-2.5 py-1.5 rounded text-xs font-medium transition truncate border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed {activeProfileSlot === 2 ? 'bg-nvidia-accent/15 text-nvidia-accent border-nvidia-accent/50 shadow-[0_0_10px_var(--theme-accent)]' : 'bg-nvidia-surface text-nvidia-text-muted hover:text-nvidia-text-primary border-nvidia-border hover:border-nvidia-border/80'}"
-                >
-                  {profilesConfig?.preset_2?.name || 'Empty Slot'}
-                </button>
-                <button
-                  type="button"
-                  onclick={() => promptSaveProfile(2)}
-                  disabled={isApplyingProfile}
-                  class="p-1.5 rounded bg-nvidia-surface border border-nvidia-border text-nvidia-text-muted hover:text-nvidia-accent hover:border-nvidia-accent/50 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-                  title="Save current load order to Preset 2"
-                >
-                  <Save class="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        {/if}
       </div>
     </div>
 
@@ -575,7 +429,7 @@
 
       <!-- Persistent Tab Views -->
       <div class={currentTab === 'archive' ? 'h-full' : 'hidden'}>
-        <ArchiveView bind:archives {gamePath} scanReport={archiveReport} onScanRequested={refreshAll} onStateChanged={refreshCountsOnly} onProfileDrift={handleProfileDrift} />
+        <ArchiveView bind:archives {gamePath} scanReport={archiveReport} onScanRequested={refreshAll} onStateChanged={refreshCountsOnly} />
       </div>
 
       <div class={currentTab === 'cet' ? 'h-full' : 'hidden'}>
@@ -590,24 +444,5 @@
         <RedscriptView bind:packages={redscriptPackages} {gamePath} onStateChanged={refreshCountsOnly} />
       </div>
     </main>
-
-    <!-- Full Screen Blocking Overlay for Preset Application -->
-    {#if isApplyingProfile}
-      <div class="absolute inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center select-none">
-        <div class="h-12 w-12 rounded-full border-4 border-nvidia-surface border-t-nvidia-accent animate-spin mb-4"></div>
-        <h2 class="text-lg font-bold text-nvidia-text-primary tracking-wider uppercase mb-2">Applying Preset</h2>
-        <p class="text-xs text-nvidia-text-muted font-mono">Verifying integrity and rewriting load order...</p>
-      </div>
-    {/if}
   </div>
 </div>
-
-<DialogModal
-  bind:isOpen={profileDialogState.isOpen}
-  title={profileDialogState.title}
-  message={profileDialogState.message}
-  mode="prompt"
-  initialValue={profileDialogState.initialValue}
-  confirmText="Save Preset"
-  onConfirm={confirmSaveProfile}
-/>

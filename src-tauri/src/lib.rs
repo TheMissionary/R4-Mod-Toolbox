@@ -86,8 +86,6 @@ pub struct AppConfig {
     pub window_x: Option<i32>,
     #[serde(default)]
     pub window_y: Option<i32>,
-    #[serde(default)]
-    pub active_profile_slot: Option<u8>,
     pub theme: ThemeConfig,
 }
 
@@ -101,7 +99,6 @@ impl Default for AppConfig {
             window_height: Some(1000.0),
             window_x: None,
             window_y: None,
-            active_profile_slot: None,
             theme: ThemeConfig::default(),
         }
     }
@@ -311,21 +308,6 @@ fn delete_physical_category(game_path: String, category_file_name: String) -> Re
 #[tauri::command]
 fn rename_physical_category(game_path: String, old_file_name: String, new_category_name: String) -> Result<archive::ArchiveScanReport, String> {
     archive::rename_physical_category(&game_path, &old_file_name, &new_category_name)
-}
-
-#[tauri::command]
-fn get_archive_profiles() -> Result<archive::ProfilesConfig, String> {
-    Ok(archive::load_profiles_config())
-}
-
-#[tauri::command]
-fn save_archive_profile(game_path: String, slot: u8, name: String) -> Result<archive::ProfilesConfig, String> {
-    archive::save_archive_profile(&game_path, slot, &name)
-}
-
-#[tauri::command]
-fn load_archive_profile(game_path: String, slot: u8) -> Result<archive::ArchiveScanReport, String> {
-    archive::apply_archive_profile(&game_path, slot)
 }
 
 #[tauri::command]
@@ -630,9 +612,6 @@ pub fn run() {
             create_physical_category,
             delete_physical_category,
             rename_physical_category,
-            get_archive_profiles,
-            save_archive_profile,
-            load_archive_profile,
             link_xl_to_archive,
             unlink_xl_from_archive,
             start_directory_watcher,

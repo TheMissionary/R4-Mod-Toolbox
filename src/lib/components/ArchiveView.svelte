@@ -38,15 +38,13 @@
     gamePath = '',
     scanReport = $bindable(null),
     onScanRequested,
-    onStateChanged,
-    onProfileDrift
+    onStateChanged
   }: {
     archives: ArchiveItem[];
     gamePath: string;
     scanReport?: ArchiveScanReport | null;
     onScanRequested?: () => void;
     onStateChanged?: () => void;
-    onProfileDrift?: () => void;
   } = $props();
 
   let searchQuery = $state('');
@@ -199,7 +197,6 @@
           if (report && Array.isArray(report.archives)) {
             archives = report.archives;
             if (onStateChanged) onStateChanged();
-            if (onProfileDrift) onProfileDrift();
             
             const newFileName = `[CAT] ${name.trim()}.archive`;
             setTimeout(() => {
@@ -243,7 +240,6 @@
 
             archives = report.archives;
             if (onStateChanged) onStateChanged();
-            if (onProfileDrift) onProfileDrift();
           }
         } catch (err) {
           console.error("Failed to rename physical category:", err);
@@ -272,7 +268,6 @@
             delete collapsedCategories[archive.file_name];
             archives = report.archives;
             if (onStateChanged) onStateChanged();
-            if (onProfileDrift) onProfileDrift();
           }
         } catch (err) {
           console.error("Failed to delete physical category:", err);
@@ -313,7 +308,6 @@
 
       persistState();
       if (onStateChanged) onStateChanged();
-      if (onProfileDrift) onProfileDrift();
     } catch (err) {
       console.error('Failed to toggle mod/category:', err);
     }
@@ -461,7 +455,6 @@
         
         localArchives = updated;
         persistState();
-        if (onProfileDrift) onProfileDrift();
       }
     }
     
@@ -537,7 +530,6 @@
     updated.splice(insertIndex, 0, ...extracted);
     localArchives = updated;
     persistState();
-    if (onProfileDrift) onProfileDrift();
     
     selectedMods.clear();
     selectedMods = new Set();
@@ -555,7 +547,6 @@
       archives = report.archives;
       scanReport = report;
       if (onStateChanged) onStateChanged();
-      if (onProfileDrift) onProfileDrift();
     } catch (err) {
       console.error('Failed to link XL:', err);
     }
@@ -576,7 +567,6 @@
         archives = report.archives;
         scanReport = report;
         if (onStateChanged) onStateChanged();
-        if (onProfileDrift) onProfileDrift();
       }
     } catch (err) {
       console.error('Failed to unlink XL:', err);
