@@ -25,7 +25,7 @@ pub struct ArchiveItem {
     pub conflicts_with: Vec<String>,
     pub wins: Vec<String>,
     pub loses: Vec<String>,
-    pub associated_xl: Option<XlItem>,
+    pub associated_xls: Vec<XlItem>,
     pub is_delimiter: bool,
     pub category_name: Option<String>,
 }
@@ -110,6 +110,16 @@ fn load_xl_associations_map(base_game_path: &str) -> HashMap<String, String> {
         }
     }
     HashMap::new()
+}
+
+fn save_xl_associations_map(base_game_path: &str, map: &HashMap<String, String>) -> Result<(), String> {
+    let path = get_xl_associations_path(base_game_path);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let serialized = serde_json::to_string_pretty(map).map_err(|e| e.to_string())?;
+    fs::write(&path, serialized).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 fn clean_path_name(p: &Path) -> String {
@@ -255,37 +265,69 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
 
         archive_to_hashes.insert(display_name.clone(), hashes.clone());
 
-        let mut matched_xl: Option<XlItem> = None;
+        let mut matched_xls: Vec<XlItem> = Vec::new();
         let base_stem = get_archive_stem(&display_name);
 
-        // 1. Explicit pairing match from sidecar JSON
-        if let Some((xl_name, _)) = explicit_associations.iter().find(|(_, arch)| arch.as_str() == display_name) {
-            if let Some(pos) = xl_items.iter().position(|x| &x.file_name == xl_name) {
+        // 1. Explicit pairing match from sidecar JSON (Case-Insensitive Safety)
+        let mut to_remove = Vec::new();
+        for (i, xl) in xl_items.iter().enumerate() {
+            let mut matched_target = None;
+            for (k, v) in &explicit_associations {
+                if k.eq_ignore_ascii_case(&xl.file_name) {
+                    matched_target = Some(v.clone());
+                    break;
+                }
+            }
+            if let Some(target_arch) = matched_target {
+                if target_arch.eq_ignore_ascii_case(&display_name) {
+                    to_remove.push(i);
+                }
+            }
+        }
+        to_remove.sort_unstable_by(|a, b| b.cmp(a));
+        for i in to_remove {
+            let mut item = xl_items.remove(i);
+            item.associated_archive = Some(display_name.clone());
+            matched_xls.push(item);
+        }
+
+        // 2. Exact match: <stem>.archive.xl (Pattern 1) - Respects [UNLINKED] flag
+        let candidate_archive_xl = format!("{}.xl", display_name);
+        if let Some(pos) = xl_items.iter().position(|x| x.file_name.eq_ignore_ascii_case(&candidate_archive_xl)) {
+            let actual_name = xl_items[pos].file_name.clone();
+            let mut is_unlinked = false;
+            for (k, v) in &explicit_associations {
+                if k.eq_ignore_ascii_case(&actual_name) && v == "[UNLINKED]" {
+                    is_unlinked = true;
+                    break;
+                }
+            }
+            if !is_unlinked {
                 let mut item = xl_items.remove(pos);
                 item.associated_archive = Some(display_name.clone());
-                matched_xl = Some(item);
+                matched_xls.push(item);
             }
         }
 
-        // 2. Exact match: <stem>.archive.xl (Pattern 1)
-        if matched_xl.is_none() {
-            let candidate_archive_xl = format!("{}.xl", display_name);
-            if let Some(pos) = xl_items.iter().position(|x| x.file_name.eq_ignore_ascii_case(&candidate_archive_xl)) {
+        // 3. Stem match: <stem>.xl (Pattern 2) - Respects [UNLINKED] flag
+        let candidate_stem_xl = format!("{}.xl", base_stem);
+        if let Some(pos) = xl_items.iter().position(|x| x.file_name.eq_ignore_ascii_case(&candidate_stem_xl)) {
+            let actual_name = xl_items[pos].file_name.clone();
+            let mut is_unlinked = false;
+            for (k, v) in &explicit_associations {
+                if k.eq_ignore_ascii_case(&actual_name) && v == "[UNLINKED]" {
+                    is_unlinked = true;
+                    break;
+                }
+            }
+            if !is_unlinked {
                 let mut item = xl_items.remove(pos);
                 item.associated_archive = Some(display_name.clone());
-                matched_xl = Some(item);
+                matched_xls.push(item);
             }
         }
 
-        // 3. Stem match: <stem>.xl (Pattern 2)
-        if matched_xl.is_none() {
-            let candidate_stem_xl = format!("{}.xl", base_stem);
-            if let Some(pos) = xl_items.iter().position(|x| x.file_name.eq_ignore_ascii_case(&candidate_stem_xl)) {
-                let mut item = xl_items.remove(pos);
-                item.associated_archive = Some(display_name.clone());
-                matched_xl = Some(item);
-            }
-        }
+        matched_xls.truncate(3);
 
         raw_items.push(ArchiveItem {
             name: display_name.clone(),
@@ -298,7 +340,7 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
             conflicts_with: Vec::new(),
             wins: Vec::new(),
             loses: Vec::new(),
-            associated_xl: matched_xl,
+            associated_xls: matched_xls,
             is_delimiter,
             category_name,
         });
@@ -370,16 +412,47 @@ pub fn toggle_mod(base_game_path: &str, mod_name: &str, enable: bool) -> Result<
         }
     }
 
-    // 2. Discover companion XL candidate
+    // 2. Discover companion XL candidates
     let associations = load_xl_associations_map(base_game_path);
     let base_stem = get_archive_stem(&clean_name);
 
     let mut candidate_xl_names: Vec<String> = Vec::new();
-    if let Some((xl_name, _)) = associations.iter().find(|(_, target_arch)| target_arch.as_str() == clean_name) {
-        candidate_xl_names.push(xl_name.clone());
+    
+    for (xl_name, target_arch) in &associations {
+        if target_arch.eq_ignore_ascii_case(&clean_name) {
+            candidate_xl_names.push(xl_name.clone());
+        }
     }
-    candidate_xl_names.push(format!("{}.xl", clean_name));
-    candidate_xl_names.push(format!("{}.xl", base_stem));
+    
+    let candidate_archive_xl = format!("{}.xl", clean_name);
+    let mut is_unlinked_arch = false;
+    let mut actual_arch_xl = candidate_archive_xl.clone();
+    for (k, v) in &associations {
+        if k.eq_ignore_ascii_case(&candidate_archive_xl) {
+            actual_arch_xl = k.clone();
+            if v == "[UNLINKED]" {
+                is_unlinked_arch = true;
+            }
+        }
+    }
+    if !is_unlinked_arch && !candidate_xl_names.contains(&actual_arch_xl) {
+        candidate_xl_names.push(actual_arch_xl);
+    }
+    
+    let candidate_stem_xl = format!("{}.xl", base_stem);
+    let mut is_unlinked_stem = false;
+    let mut actual_stem_xl = candidate_stem_xl.clone();
+    for (k, v) in &associations {
+        if k.eq_ignore_ascii_case(&candidate_stem_xl) {
+            actual_stem_xl = k.clone();
+            if v == "[UNLINKED]" {
+                is_unlinked_stem = true;
+            }
+        }
+    }
+    if !is_unlinked_stem && !candidate_xl_names.contains(&actual_stem_xl) {
+        candidate_xl_names.push(actual_stem_xl);
+    }
 
     for xl_name in candidate_xl_names {
         let clean_xl = clean_name_str(&xl_name);
@@ -389,12 +462,10 @@ pub fn toggle_mod(base_game_path: &str, mod_name: &str, enable: bool) -> Result<
         if enable {
             if disabled_xl_path.exists() {
                 let _ = fs::rename(&disabled_xl_path, &enabled_xl_path);
-                break;
             }
         } else {
             if enabled_xl_path.exists() {
                 let _ = fs::rename(&enabled_xl_path, &disabled_xl_path);
-                break;
             }
         }
     }
@@ -654,5 +725,19 @@ pub fn apply_archive_profile(base_game_path: &str, slot: u8) -> Result<ArchiveSc
     let _ = fs::write(&modlist_path, modlist_content);
 
     // Phase E: Validation
+    scan_archives(base_game_path)
+}
+
+pub fn link_xl_to_archive(base_game_path: &str, xl_name: &str, archive_name: &str) -> Result<ArchiveScanReport, String> {
+    let mut map = load_xl_associations_map(base_game_path);
+    map.insert(xl_name.to_string(), archive_name.to_string());
+    save_xl_associations_map(base_game_path, &map)?;
+    scan_archives(base_game_path)
+}
+
+pub fn unlink_xl_from_archive(base_game_path: &str, xl_name: &str) -> Result<ArchiveScanReport, String> {
+    let mut map = load_xl_associations_map(base_game_path);
+    map.insert(xl_name.to_string(), "[UNLINKED]".to_string());
+    save_xl_associations_map(base_game_path, &map)?;
     scan_archives(base_game_path)
 }

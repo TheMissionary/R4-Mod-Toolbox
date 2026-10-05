@@ -19,7 +19,7 @@ export interface ArchiveItem {
   conflicts_with: string[];
   wins: string[];
   loses: string[];
-  associated_xl?: XlItem | null;
+  associated_xls?: XlItem[];
   is_delimiter?: boolean;
   category_name?: string | null;
 }

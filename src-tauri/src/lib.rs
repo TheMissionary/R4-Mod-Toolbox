@@ -329,6 +329,16 @@ fn load_archive_profile(game_path: String, slot: u8) -> Result<archive::ArchiveS
 }
 
 #[tauri::command]
+fn link_xl_to_archive(game_path: String, xl_name: String, archive_name: String) -> Result<archive::ArchiveScanReport, String> {
+    archive::link_xl_to_archive(&game_path, &xl_name, &archive_name)
+}
+
+#[tauri::command]
+fn unlink_xl_from_archive(game_path: String, xl_name: String) -> Result<archive::ArchiveScanReport, String> {
+    archive::unlink_xl_from_archive(&game_path, &xl_name)
+}
+
+#[tauri::command]
 fn start_directory_watcher(_game_path: String) -> Result<(), String> {
     Ok(())
 }
@@ -595,12 +605,16 @@ pub fn run() {
                     let scale = window.scale_factor().unwrap_or(1.0);
                     let logical_size = size.to_logical::<f64>(scale);
                     let logical_pos = pos.to_logical::<f64>(scale);
-                    let mut config = load_app_config().unwrap_or_default();
-                    config.window_width = Some(logical_size.width);
-                    config.window_height = Some(logical_size.height);
-                    config.window_x = Some(logical_pos.x as i32);
-                    config.window_y = Some(logical_pos.y as i32);
-                    let _ = save_app_config(config);
+                    
+                    // Defensive window guard: ignore coordinates < -1000
+                    if logical_pos.x >= -1000.0 && logical_pos.y >= -1000.0 {
+                        let mut config = load_app_config().unwrap_or_default();
+                        config.window_width = Some(logical_size.width);
+                        config.window_height = Some(logical_size.height);
+                        config.window_x = Some(logical_pos.x as i32);
+                        config.window_y = Some(logical_pos.y as i32);
+                        let _ = save_app_config(config);
+                    }
                 }
             }
         })
@@ -619,6 +633,8 @@ pub fn run() {
             get_archive_profiles,
             save_archive_profile,
             load_archive_profile,
+            link_xl_to_archive,
+            unlink_xl_from_archive,
             start_directory_watcher,
             get_cet_details,
             get_red4ext_details,

@@ -2,6 +2,8 @@
   import type { ArchiveItem, ArchiveScanReport, XlItem } from '$lib/types';
   import CategoryDelimiterRow from '$lib/components/CategoryDelimiterRow.svelte';
   import DialogModal from '$lib/components/DialogModal.svelte';
+  import MoveCategoryModal from '$lib/components/MoveCategoryModal.svelte';
+  import LinkXlModal from '$lib/components/LinkXlModal.svelte';
   import {
     GripVertical,
     ChevronDown,
@@ -22,7 +24,10 @@
     Check,
     Pencil,
     Trash2,
-    MoreVertical
+    MoreVertical,
+    FolderInput,
+    Link2,
+    Unlink
   } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -31,7 +36,7 @@
   let {
     archives = $bindable([]),
     gamePath = '',
-    scanReport = null,
+    scanReport = $bindable(null),
     onScanRequested,
     onStateChanged,
     onProfileDrift
@@ -50,6 +55,15 @@
   let localArchives = $state<ArchiveItem[]>([]);
   let scrollContainer = $state<HTMLElement | null>(null);
   let showXlHelp = $state(false);
+
+  // Multi-Select State
+  let selectedMods = $state<Set<string>>(new Set());
+  let lastSelectedFileName = $state<string | null>(null);
+  let isMoveModalOpen = $state(false);
+
+  // XL Link State
+  let isLinkModalOpen = $state(false);
+  let targetXlToLink = $state<string | null>(null);
 
   let dialogState = $state<{
     isOpen: boolean;
@@ -83,12 +97,14 @@
     x: number;
     y: number;
     archive: ArchiveItem | null;
-    targetType: 'archive' | 'xl';
+    unassociatedXl: XlItem | null;
+    targetType: 'archive' | 'xl' | 'unassociated_xl';
   }>({
     visible: false,
     x: 0,
     y: 0,
     archive: null,
+    unassociatedXl: null,
     targetType: 'archive'
   });
 
@@ -460,29 +476,155 @@
     dropPlacement = null;
   }
 
-  function openContextMenu(event: MouseEvent, archive: ArchiveItem, targetType: 'archive' | 'xl' = 'archive') {
+  function handleModClick(event: MouseEvent, archive: ArchiveItem) {
+    if (archive.is_delimiter) return;
+
+    const isCtrl = event.ctrlKey || event.metaKey;
+    const isShift = event.shiftKey;
+
+    if (isShift && lastSelectedFileName) {
+      const visibleMods = visibleItems.filter(v => !v.archive.is_delimiter);
+      const startIdx = visibleMods.findIndex(v => v.archive.file_name === lastSelectedFileName);
+      const endIdx = visibleMods.findIndex(v => v.archive.file_name === archive.file_name);
+
+      if (startIdx !== -1 && endIdx !== -1) {
+        const min = Math.min(startIdx, endIdx);
+        const max = Math.max(startIdx, endIdx);
+        if (!isCtrl) selectedMods.clear();
+        for (let i = min; i <= max; i++) {
+          selectedMods.add(visibleMods[i].archive.file_name);
+        }
+      }
+    } else if (isCtrl) {
+      if (selectedMods.has(archive.file_name)) {
+        selectedMods.delete(archive.file_name);
+      } else {
+        selectedMods.add(archive.file_name);
+      }
+      lastSelectedFileName = archive.file_name;
+    } else {
+      selectedMods.clear();
+      selectedMods.add(archive.file_name);
+      lastSelectedFileName = archive.file_name;
+    }
+    selectedMods = new Set(selectedMods);
+  }
+
+  function handleMoveToCategory(targetCategoryFileName: string) {
+    isMoveModalOpen = false;
+    if (selectedMods.size === 0) return;
+
+    const updated = [...localArchives];
+    const extracted: ArchiveItem[] = [];
+    
+    for (let i = updated.length - 1; i >= 0; i--) {
+      if (selectedMods.has(updated[i].file_name)) {
+        extracted.unshift(updated.splice(i, 1)[0]);
+      }
+    }
+
+    let insertIndex = 0;
+    if (targetCategoryFileName !== '[TOP]') {
+      const catIndex = updated.findIndex(a => a.file_name === targetCategoryFileName);
+      if (catIndex !== -1) {
+        insertIndex = catIndex + 1;
+        while (insertIndex < updated.length && !updated[insertIndex].is_delimiter) {
+          insertIndex++;
+        }
+      }
+    }
+
+    updated.splice(insertIndex, 0, ...extracted);
+    localArchives = updated;
+    persistState();
+    if (onProfileDrift) onProfileDrift();
+    
+    selectedMods.clear();
+    selectedMods = new Set();
+  }
+
+  async function handleLinkXl(archiveFileName: string) {
+    isLinkModalOpen = false;
+    if (!targetXlToLink) return;
+    try {
+      const report = await invoke<ArchiveScanReport>('link_xl_to_archive', {
+        gamePath,
+        xlName: targetXlToLink,
+        archiveName: archiveFileName
+      });
+      archives = report.archives;
+      scanReport = report;
+      if (onStateChanged) onStateChanged();
+      if (onProfileDrift) onProfileDrift();
+    } catch (err) {
+      console.error('Failed to link XL:', err);
+    }
+    targetXlToLink = null;
+  }
+
+  async function handleUnlinkXl() {
+    if (!contextMenu.archive || !contextMenu.archive.associated_xls) return;
+    try {
+      let report: ArchiveScanReport | null = null;
+      for (const xl of contextMenu.archive.associated_xls) {
+        report = await invoke<ArchiveScanReport>('unlink_xl_from_archive', {
+          gamePath,
+          xlName: xl.file_name
+        });
+      }
+      if (report) {
+        archives = report.archives;
+        scanReport = report;
+        if (onStateChanged) onStateChanged();
+        if (onProfileDrift) onProfileDrift();
+      }
+    } catch (err) {
+      console.error('Failed to unlink XL:', err);
+    }
+    closeContextMenu();
+  }
+
+  function openContextMenu(event: MouseEvent, target: ArchiveItem | XlItem, targetType: 'archive' | 'xl' | 'unassociated_xl' = 'archive') {
     event.preventDefault();
     event.stopPropagation();
     copiedFeedback = false;
 
+    if (targetType === 'archive' && !('size_bytes' in target && !('file_count' in target))) {
+      const archive = target as ArchiveItem;
+      if (!archive.is_delimiter) {
+        if (!selectedMods.has(archive.file_name)) {
+          selectedMods.clear();
+          selectedMods.add(archive.file_name);
+          selectedMods = new Set(selectedMods);
+          lastSelectedFileName = archive.file_name;
+        }
+      }
+    }
+
     const menuWidth = 230;
-    const menuHeight = archive.is_delimiter ? 190 : 145;
+    let menuHeight = 145;
+    if (targetType === 'unassociated_xl') menuHeight = 145;
+    else if (targetType === 'xl') menuHeight = 180;
+    else if (targetType === 'archive') {
+      const archive = target as ArchiveItem;
+      menuHeight = archive.is_delimiter ? 190 : (selectedMods.size > 0 ? 180 : 145);
+    }
+
     const posX = (event.clientX + menuWidth > window.innerWidth) ? (window.innerWidth - menuWidth - 10) : event.clientX;
     const posY = (event.clientY + menuHeight > window.innerHeight) ? (window.innerHeight - menuHeight - 10) : event.clientY;
 
-    contextMenu = {
-      visible: true,
-      x: posX,
-      y: posY,
-      archive,
-      targetType
-    };
+    if (targetType === 'unassociated_xl') {
+      contextMenu = { visible: true, x: posX, y: posY, archive: null, unassociatedXl: target as XlItem, targetType };
+    } else {
+      contextMenu = { visible: true, x: posX, y: posY, archive: target as ArchiveItem, unassociatedXl: null, targetType };
+    }
   }
 
   function closeContextMenu() {
     if (contextMenu.visible) {
       contextMenu.visible = false;
       contextMenu.archive = null;
+      contextMenu.unassociatedXl = null;
       copiedFeedback = false;
     }
   }
@@ -495,12 +637,17 @@
   }
 
   async function handleContextMenuShowInExplorer() {
-    if (!contextMenu.archive || !gamePath) return;
-
-    let targetFilename = contextMenu.archive.file_name;
-    if (contextMenu.targetType === 'xl' && contextMenu.archive.associated_xl) {
-      targetFilename = contextMenu.archive.associated_xl.file_name;
+    if (!gamePath) return;
+    let targetFilename = '';
+    if (contextMenu.targetType === 'unassociated_xl' && contextMenu.unassociatedXl) {
+      targetFilename = contextMenu.unassociatedXl.file_name;
+    } else if (contextMenu.archive) {
+      targetFilename = contextMenu.archive.file_name;
+      if (contextMenu.targetType === 'xl' && contextMenu.archive.associated_xls?.length) {
+        targetFilename = contextMenu.archive.associated_xls[0].file_name;
+      }
     }
+    if (!targetFilename) return;
 
     const fullPath = `${gamePath}\\archive\\pc\\mod\\${targetFilename}`;
     try {
@@ -512,12 +659,16 @@
   }
 
   async function handleContextMenuCopyName() {
-    if (!contextMenu.archive) return;
-
-    let targetFilename = contextMenu.archive.file_name;
-    if (contextMenu.targetType === 'xl' && contextMenu.archive.associated_xl) {
-      targetFilename = contextMenu.archive.associated_xl.file_name;
+    let targetFilename = '';
+    if (contextMenu.targetType === 'unassociated_xl' && contextMenu.unassociatedXl) {
+      targetFilename = contextMenu.unassociatedXl.file_name;
+    } else if (contextMenu.archive) {
+      targetFilename = contextMenu.archive.file_name;
+      if (contextMenu.targetType === 'xl' && contextMenu.archive.associated_xls?.length) {
+        targetFilename = contextMenu.archive.associated_xls.map(x => x.file_name).join(', ');
+      }
     }
+    if (!targetFilename) return;
 
     try {
       await navigator.clipboard.writeText(targetFilename);
@@ -531,7 +682,21 @@
     }
   }
 
-  // Reactive Derived Category Mod Counts
+  let availableCategories = $derived.by(() => {
+    const cats = localArchives.filter(a => a.is_delimiter).map(a => ({
+      name: a.category_name || a.file_name.replace('[CAT] ', '').replace('.archive', ''),
+      file_name: a.file_name
+    }));
+    return [{ name: 'Top (Uncategorized)', file_name: '[TOP]' }, ...cats];
+  });
+
+  let availableArchivesForLink = $derived.by(() => {
+    return localArchives.filter(a => !a.is_delimiter).map(a => ({
+      name: a.name,
+      file_name: a.file_name
+    }));
+  });
+
   let categoryCounts = $derived.by(() => {
     const counts = new Map<string, number>();
     let currentCat: string | null = null;
@@ -554,7 +719,6 @@
     return counts;
   });
 
-  // Real-time Drag Conflict Preview Engine
   let previewConflictState = $derived.by(() => {
     if (activeDragIndex === null || dropTargetIndex === null || dropPlacement === null) {
       return null;
@@ -714,8 +878,14 @@
 {/if}
 
 <!-- Custom Context Menu -->
-{#if contextMenu.visible && contextMenu.archive}
-  {@const activeTargetName = (contextMenu.targetType === 'xl' && contextMenu.archive.associated_xl) ? contextMenu.archive.associated_xl.file_name : contextMenu.archive.file_name}
+{#if contextMenu.visible && (contextMenu.archive || contextMenu.unassociatedXl)}
+  {@const activeTargetName = contextMenu.targetType === 'unassociated_xl' 
+    ? contextMenu.unassociatedXl!.file_name 
+    : (contextMenu.targetType === 'xl' && contextMenu.archive!.associated_xls?.length)
+      ? (contextMenu.archive!.associated_xls.length === 1 ? contextMenu.archive!.associated_xls[0].file_name : `${contextMenu.archive!.associated_xls.length} Companion Files`)
+      : contextMenu.archive!.file_name}
+  {@const isActive = contextMenu.targetType === 'unassociated_xl' ? contextMenu.unassociatedXl!.enabled : contextMenu.archive!.enabled}
+  
   <div
     class="fixed z-50 w-56 rounded-md border border-nvidia-border bg-nvidia-card py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
     style="left: {contextMenu.x}px; top: {contextMenu.y}px;"
@@ -724,19 +894,19 @@
   >
     <div class="px-3 py-1.5 border-b border-nvidia-border/60 bg-nvidia-surface/40 flex items-center justify-between gap-2">
       <div class="flex items-center gap-1.5 min-w-0 flex-1">
-        {#if contextMenu.targetType === 'xl'}
+        {#if contextMenu.targetType === 'xl' || contextMenu.targetType === 'unassociated_xl'}
           <FileCode class="h-3.5 w-3.5 text-cyan-400 shrink-0" />
-        {:else if contextMenu.archive.is_delimiter}
+        {:else if contextMenu.archive!.is_delimiter}
           <Folder class="h-3.5 w-3.5 text-nvidia-accent shrink-0" />
         {:else}
-          <div class="h-2 w-2 rounded-full shrink-0 {contextMenu.archive.enabled ? 'bg-nvidia-accent' : 'bg-red-500'}"></div>
+          <div class="h-2 w-2 rounded-full shrink-0 {isActive ? 'bg-nvidia-accent' : 'bg-red-500'}"></div>
         {/if}
         <span class="font-mono text-[11px] font-bold text-nvidia-text-primary truncate" title={activeTargetName}>
           {activeTargetName}
         </span>
       </div>
-      <span class="text-[9px] font-mono uppercase px-1 py-0.2 rounded border {contextMenu.archive.enabled ? 'bg-nvidia-accent/15 border-nvidia-accent/40 text-nvidia-accent' : 'bg-red-500/15 border-red-500/40 text-red-400'} shrink-0">
-        {contextMenu.archive.enabled ? 'Active' : 'Disabled'}
+      <span class="text-[9px] font-mono uppercase px-1 py-0.2 rounded border {isActive ? 'bg-nvidia-accent/15 border-nvidia-accent/40 text-nvidia-accent' : 'bg-red-500/15 border-red-500/40 text-red-400'} shrink-0">
+        {isActive ? 'Active' : 'Disabled'}
       </span>
     </div>
 
@@ -750,16 +920,27 @@
         <span>Show in Explorer</span>
       </button>
 
-      <button
-        type="button"
-        onclick={handleContextMenuToggle}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
-      >
-        <Power class="h-3.5 w-3.5 {contextMenu.archive.enabled ? 'text-amber-400' : 'text-nvidia-accent'}" />
-        <span>{contextMenu.archive.enabled ? (contextMenu.archive.is_delimiter ? 'Disable Category' : 'Disable Mod') : (contextMenu.archive.is_delimiter ? 'Enable Category' : 'Enable Mod')}</span>
-      </button>
+      {#if contextMenu.targetType === 'unassociated_xl'}
+        <button
+          type="button"
+          onclick={() => { targetXlToLink = contextMenu.unassociatedXl!.file_name; isLinkModalOpen = true; closeContextMenu(); }}
+          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        >
+          <Link2 class="h-3.5 w-3.5 text-cyan-400" />
+          <span>Link to Archive...</span>
+        </button>
+      {:else}
+        <button
+          type="button"
+          onclick={handleContextMenuToggle}
+          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        >
+          <Power class="h-3.5 w-3.5 {isActive ? 'text-amber-400' : 'text-nvidia-accent'}" />
+          <span>{isActive ? (contextMenu.archive!.is_delimiter ? 'Disable Category' : 'Disable Mod') : (contextMenu.archive!.is_delimiter ? 'Enable Category' : 'Enable Mod')}</span>
+        </button>
+      {/if}
 
-      {#if contextMenu.archive.is_delimiter}
+      {#if contextMenu.targetType === 'archive' && contextMenu.archive!.is_delimiter}
         <button
           type="button"
           onclick={() => { const item = contextMenu.archive; closeContextMenu(); if (item) handleRenameCategory(item); }}
@@ -776,6 +957,28 @@
         >
           <Trash2 class="h-3.5 w-3.5 text-red-400" />
           <span>Delete Category</span>
+        </button>
+      {/if}
+
+      {#if contextMenu.targetType === 'archive' && !contextMenu.archive!.is_delimiter && selectedMods.size > 0}
+        <button
+          type="button"
+          onclick={() => { closeContextMenu(); isMoveModalOpen = true; }}
+          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        >
+          <FolderInput class="h-3.5 w-3.5 text-nvidia-accent" />
+          <span>Move {selectedMods.size} Mods to Category...</span>
+        </button>
+      {/if}
+
+      {#if contextMenu.targetType === 'xl'}
+        <button
+          type="button"
+          onclick={handleUnlinkXl}
+          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        >
+          <Unlink class="h-3.5 w-3.5 text-amber-400" />
+          <span>Unlink .xl</span>
         </button>
       {/if}
 
@@ -896,15 +1099,17 @@
             {:else}
               {@const isExpanded = !!expandedRows[archive.file_name]}
               {@const isHighlighted = highlightedModName === archive.file_name}
+              {@const isSelected = selectedMods.has(archive.file_name)}
               {@const activeConflicts = previewConflictState?.get(archive.file_name) || { wins: archive.wins, loses: archive.loses }}
 
               <div
                 role="group"
                 aria-label="Archive mod item: {archive.file_name}"
                 use:registerModNode={archive.file_name}
+                onclick={(e) => handleModClick(e, archive)}
                 onpointermove={(e) => onRowPointerMove(e, originalIndex)}
                 oncontextmenu={(e) => openContextMenu(e, archive, 'archive')}
-                class="group rounded border transition-all duration-300 z-10 {isHighlighted ? 'border-[#76b900] ring-2 ring-[#76b900] bg-[#76b900]/20 shadow-[0_0_15px_rgba(118,185,0,0.35)] scale-[1.008]' : 'border-nvidia-border/70 bg-nvidia-surface hover:border-nvidia-border'} {archive.enabled ? 'opacity-100' : 'opacity-40'} {isSource ? 'opacity-20 border-dashed border-nvidia-accent/50' : ''}"
+                class="group rounded border transition-all duration-300 z-10 {isHighlighted ? 'border-[#76b900] ring-2 ring-[#76b900] bg-[#76b900]/20 shadow-[0_0_15px_rgba(118,185,0,0.35)] scale-[1.008]' : (isSelected ? 'border-nvidia-accent/60 bg-nvidia-accent/10' : 'border-nvidia-border/70 bg-nvidia-surface hover:border-nvidia-border')} {archive.enabled ? 'opacity-100' : 'opacity-40'} {isSource ? 'opacity-20 border-dashed border-nvidia-accent/50' : ''}"
               >
                 <!-- Density-aware Row Container (28px) -->
                 <div class="flex items-center justify-between px-3 gap-2 density-row">
@@ -923,7 +1128,7 @@
 
                     <!-- Subtle, Neutral Calmed Switch -->
                     <button
-                      onclick={() => toggleMod(archive)}
+                      onclick={(e) => { e.stopPropagation(); toggleMod(archive); }}
                       aria-label={archive.enabled ? "Disable mod " + archive.file_name : "Enable mod " + archive.file_name}
                       class="w-7 h-4 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer {archive.enabled ? 'bg-zinc-700/80 border border-zinc-600' : 'bg-zinc-900/90 border border-zinc-800'}"
                     >
@@ -938,16 +1143,16 @@
                       {archive.file_name}
                     </span>
 
-                    {#if archive.associated_xl}
+                    {#if archive.associated_xls && archive.associated_xls.length > 0}
                       <span
                         role="button"
                         tabindex="0"
-                        oncontextmenu={(e) => openContextMenu(e, archive, 'xl')}
+                        oncontextmenu={(e) => { e.stopPropagation(); openContextMenu(e, archive, 'xl'); }}
                         onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
                         class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded border transition-colors shrink-0 cursor-context-menu {archive.enabled ? 'bg-cyan-950/80 text-cyan-400 border-cyan-700/60 hover:border-cyan-500' : 'bg-nvidia-card text-nvidia-text-muted border-nvidia-border opacity-50'}"
-                        title="Companion: {archive.associated_xl.file_name} ({formatBytes(archive.associated_xl.size_bytes)}) - Right-click for options"
+                        title="Companions: {archive.associated_xls.map(x => x.file_name).join(', ')} - Right-click for options"
                       >
-                        XL
+                        XL {#if archive.associated_xls.length > 1}({archive.associated_xls.length}){/if}
                       </span>
                     {/if}
 
@@ -975,7 +1180,7 @@
                         {@const conflictCount = activeConflicts.loses.length > 0 ? activeConflicts.loses.length : activeConflicts.wins.length}
                         <button
                           type="button"
-                          onclick={() => { expandedRows[archive.file_name] = !expandedRows[archive.file_name]; }}
+                          onclick={(e) => { e.stopPropagation(); expandedRows[archive.file_name] = !expandedRows[archive.file_name]; }}
                           class="flex items-center gap-1 px-1 py-0.5 rounded hover:bg-nvidia-card text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer font-mono text-[11px]"
                           title="Toggle conflict details ({conflictCount} impacted)"
                         >
@@ -1065,8 +1270,8 @@
                 class="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border transition-colors {showXlHelp ? 'bg-cyan-950 text-cyan-300 border-cyan-600' : 'bg-nvidia-surface hover:bg-nvidia-card text-cyan-400 border-cyan-500/40'}"
                 title="Click for association instructions"
               >
-                <HelpCircle class="h-3.5 w-3.5" />
-                <span>Help</span>
+                <Info class="h-3.5 w-3.5" />
+                <span>Info</span>
               </button>
 
               <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-nvidia-surface border border-nvidia-border text-cyan-400">
@@ -1077,25 +1282,25 @@
 
           {#if showXlHelp}
             <div class="p-3 rounded-lg border border-cyan-500/30 bg-cyan-500/5 text-xs text-nvidia-text-primary space-y-1.5">
-              <div class="flex items-center gap-2 text-cyan-400 font-semibold">
-                <Info class="h-4 w-4 shrink-0" />
-                <span>How to link an unassociated .xl file to its parent .archive mod:</span>
-              </div>
               <p class="text-[11px] text-nvidia-text-muted pl-6 leading-relaxed">
-                1. Open your mod folder in Windows Explorer: <span class="font-mono text-nvidia-text-primary">{gamePath ? gamePath + '\\archive\\pc\\mod' : '\\archive\\pc\\mod'}</span>.
-                <br />
-                2. Rename the <span class="font-mono text-cyan-400 font-bold">.xl</span> file to match its parent archive name exactly:
-                <br />
-                &nbsp;&nbsp;&nbsp;• Standard: <span class="font-mono text-nvidia-text-primary">&lt;ModName&gt;.archive.xl</span> or <span class="font-mono text-nvidia-text-primary">&lt;ModName&gt;.xl</span>
-                <br />
-                3. Click <span class="font-semibold text-nvidia-text-primary">Run Conflict Scan</span> at the top of the app. The file will automatically link to the archive, display the <span class="font-mono text-cyan-400 font-bold">[XL]</span> badge, and synchronize its toggle state.
+                <span class="text-nvidia-text-primary font-medium">Not required for the game to function. An organizational quality-of-life feature only. ArchiveXL will load untethered .xl files regardless.</span>
+                <br /><br />
+                <span class="text-cyan-400 font-semibold">What is Linking?</span><br />
+                Linking bonds a loose <span class="font-mono text-nvidia-text-primary">.xl</span> file to a parent <span class="font-mono text-nvidia-text-primary">.archive</span> mod. Once linked, the parent mod will display a blue <span class="font-mono text-cyan-400 font-bold">[XL]</span> badge, and toggling the parent mod will automatically toggle the companion file.
+                <br /><br />
+                <span class="text-cyan-400 font-semibold">How to Link / Unlink:</span><br />
+                • <span class="font-semibold text-nvidia-text-primary">Link:</span> Click the "Active / Click to Link" button on any loose file below, or right-click it and select "Link to Archive...".<br />
+                • <span class="font-semibold text-nvidia-text-primary">Unlink:</span> Right-click the blue <span class="font-mono text-cyan-400 font-bold">[XL]</span> badge on a parent mod and select "Unlink .xl".
               </p>
             </div>
           {/if}
 
           <div class="space-y-1">
             {#each unassociatedXlFiles as xl (xl.file_name)}
-              <div class="rounded border border-nvidia-border bg-nvidia-surface/80 hover:bg-nvidia-surface px-3 flex items-center justify-between density-row">
+              <div
+                oncontextmenu={(e) => openContextMenu(e, xl, 'unassociated_xl')}
+                class="rounded border border-nvidia-border bg-nvidia-surface/80 hover:bg-nvidia-surface px-3 flex items-center justify-between density-row cursor-context-menu"
+              >
                 <div class="flex items-center gap-2.5 min-w-0">
                   <FileCode class="h-3.5 w-3.5 text-cyan-400 shrink-0" />
                   <span class="font-mono text-nvidia-text-primary font-medium truncate">{xl.file_name}</span>
@@ -1105,9 +1310,13 @@
                 </div>
 
                 <div class="flex items-center gap-2 shrink-0">
-                  <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 font-semibold">
-                    Active / Untethered
-                  </span>
+                  <button
+                    type="button"
+                    onclick={(e) => { e.stopPropagation(); targetXlToLink = xl.file_name; isLinkModalOpen = true; }}
+                    class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 hover:border-cyan-400 text-cyan-400 font-semibold transition cursor-pointer"
+                  >
+                    Active / Click to Link
+                  </button>
                 </div>
               </div>
             {/each}
@@ -1190,4 +1399,19 @@
   confirmText={dialogState.confirmText}
   isDanger={dialogState.isDanger}
   onConfirm={dialogState.onConfirm}
+/>
+
+<MoveCategoryModal
+  bind:isOpen={isMoveModalOpen}
+  categories={availableCategories}
+  onConfirm={handleMoveToCategory}
+  onCancel={() => isMoveModalOpen = false}
+/>
+
+<LinkXlModal
+  bind:isOpen={isLinkModalOpen}
+  xlName={targetXlToLink || ''}
+  archives={availableArchivesForLink}
+  onConfirm={handleLinkXl}
+  onCancel={() => isLinkModalOpen = false}
 />
