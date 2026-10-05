@@ -41,23 +41,11 @@
 
   type TabType = 'home' | 'archive' | 'cet' | 'red4ext' | 'redscript';
 
-  function getInitialTab(): TabType {
-    if (typeof sessionStorage !== 'undefined') {
-      const saved = sessionStorage.getItem('cp2077_active_tab');
-      if (saved === 'home' || saved === 'archive' || saved === 'cet' || saved === 'red4ext' || saved === 'redscript') {
-        return saved as TabType;
-      }
-    }
-    return 'home';
-  }
-
-  let currentTab = $state<TabType>(getInitialTab());
+  // Always boot cleanly to the Home dashboard
+  let currentTab = $state<TabType>('home');
 
   async function setTab(tab: TabType) {
     currentTab = tab;
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.setItem('cp2077_active_tab', tab);
-    }
     try {
       const config = await loadConfigFromDisk();
       config.activeTab = tab;
@@ -91,22 +79,12 @@
     initialValue: '',
   });
 
-  const coreUrls: Record<string, string> = {
-    CP77: 'https://support.cdprojektred.com/en/cyberpunk/pc/sp-technical/issue/2734/patch-2-31-download-now',
-    CET: 'https://www.nexusmods.com/cyberpunk2077/mods/107',
-    RED4ext: 'https://www.nexusmods.com/cyberpunk2077/mods/2380',
-    ArchiveXL: 'https://www.nexusmods.com/cyberpunk2077/mods/4198',
-    Codeware: 'https://www.nexusmods.com/cyberpunk2077/mods/7780',
-    TweakXL: 'https://www.nexusmods.com/cyberpunk2077/mods/4197'
-  };
-
-  async function openDependencyLink(key: string) {
-    const url = coreUrls[key];
+  async function openExternalLink(url: string) {
     if (!url) return;
     try {
       await openUrl(url);
     } catch (err) {
-      console.error(`Failed to open URL for ${key}:`, err);
+      console.error(`Failed to open URL ${url}:`, err);
     }
   }
 
@@ -261,11 +239,6 @@
       }
       if (config.targetGamePath) {
         gamePath = config.targetGamePath;
-      }
-      if (typeof sessionStorage !== 'undefined' && !sessionStorage.getItem('cp2077_active_tab')) {
-        if (config.activeTab) {
-          currentTab = config.activeTab as TabType;
-        }
       }
       if (config.activeProfileSlot !== undefined) {
         activeProfileSlot = config.activeProfileSlot as 1 | 2 | null;
@@ -439,8 +412,8 @@
       </div>
     </div>
 
-    <!-- Lower Left Launch Game & Status -->
-    <div class="p-3 border-t border-nvidia-border bg-nvidia-surface/30 space-y-3 shrink-0">
+    <!-- Lower Left Launch Game & Developer Tile -->
+    <div class="p-3 border-t border-nvidia-border bg-nvidia-surface/30 space-y-2.5 shrink-0">
       <button
         type="button"
         onclick={handleLaunchGame}
@@ -451,15 +424,42 @@
         <span>{isLaunching ? 'Starting Game...' : 'Launch Game'}</span>
       </button>
 
-      <div class="space-y-1 text-xs font-mono select-none">
-        <button
-          type="button"
-          onclick={() => openDependencyLink('CP77')}
-          class="w-full flex items-center justify-between py-0.5 px-1 rounded hover:bg-nvidia-surface/80 group transition text-left cursor-pointer"
-        >
-          <span class="text-nvidia-text-muted group-hover:text-nvidia-text-primary transition">CP77</span>
-          <span class="text-nvidia-accent font-semibold">{scanResult?.game_version || '2.31'}</span>
-        </button>
+      <!-- Mi55ionary Developer Tile -->
+      <div class="rounded-lg border border-nvidia-border/70 bg-nvidia-surface/70 p-2 flex items-center justify-between gap-2 shadow-xs select-none">
+        <div class="flex items-center gap-2 min-w-0">
+          <!-- Stylized Hand-Drawn Heart Avatar -->
+          <div class="h-6 w-6 rounded bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
+            <svg viewBox="0 0 100 100" class="h-4 w-4 drop-shadow-sm" fill="none" stroke="#e08528" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M 48 34 C 44 20 22 10 13 26 C 3 44 18 68 49 92 C 80 68 97 44 87 22 C 77 0 54 8 48 34 Z" />
+            </svg>
+          </div>
+          <div class="min-w-0 flex flex-col">
+            <span class="text-[9px] text-nvidia-text-muted uppercase tracking-wider font-semibold leading-tight">Dev</span>
+            <span class="text-[11px] font-mono font-bold text-nvidia-text-primary truncate leading-tight" title="Mi55ionary">
+              Mi55ionary
+            </span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onclick={() => openExternalLink('https://www.nexusmods.com/profile/Mi55ionary')}
+            class="px-1.5 py-0.5 rounded bg-nvidia-card hover:bg-amber-500/20 text-[10px] font-mono font-bold text-amber-400 border border-nvidia-border hover:border-amber-500/50 transition cursor-pointer"
+            title="View Mi55ionary on Nexus Mods"
+          >
+            Nexus
+          </button>
+
+          <button
+            type="button"
+            onclick={() => openExternalLink('https://github.com/TheMissionary/R4-Mod-Toolbox')}
+            class="px-1.5 py-0.5 rounded bg-nvidia-card hover:bg-nvidia-surface text-[10px] font-mono text-nvidia-text-muted hover:text-nvidia-text-primary border border-nvidia-border transition cursor-pointer"
+            title="View GitHub Repository"
+          >
+            GitHub
+          </button>
+        </div>
       </div>
     </div>
   </aside>
