@@ -12,6 +12,7 @@
     X,
     FolderPlus,
     Folder,
+    FolderOpen,
     Eye,
     EyeOff,
     AlertTriangle,
@@ -85,6 +86,24 @@
 
   let collapsedCategories = $state<Record<string, boolean>>({});
   let preDragCollapseState = $state<Record<string, boolean> | null>(null);
+
+  let totalCategories = $derived(localArchives.filter(a => a.is_delimiter).length);
+  let collapsedCount = $derived(Object.keys(collapsedCategories).filter(k => collapsedCategories[k]).length);
+  let isAllCollapsed = $derived(totalCategories > 0 && collapsedCount === totalCategories);
+
+  function toggleAllCategories() {
+    if (isAllCollapsed) {
+      collapsedCategories = {};
+    } else {
+      const newState: Record<string, boolean> = {};
+      for (const a of localArchives) {
+        if (a.is_delimiter) {
+          newState[a.file_name] = true;
+        }
+      }
+      collapsedCategories = newState;
+    }
+  }
 
   function toggleCategoryCollapse(categoryFileName: string) {
     collapsedCategories[categoryFileName] = !collapsedCategories[categoryFileName];
@@ -1019,6 +1038,20 @@
     </div>
 
     <div class="flex items-center gap-2.5">
+      <button
+        onclick={toggleAllCategories}
+        disabled={totalCategories === 0}
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {#if isAllCollapsed}
+          <FolderOpen class="h-3.5 w-3.5 text-nvidia-accent" />
+          <span>Expand All</span>
+        {:else}
+          <Folder class="h-3.5 w-3.5 text-nvidia-accent" />
+          <span>Collapse All</span>
+        {/if}
+      </button>
+
       <button
         onclick={addCategory}
         class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary font-medium transition cursor-pointer"
