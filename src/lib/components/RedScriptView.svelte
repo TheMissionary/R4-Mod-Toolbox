@@ -3,19 +3,26 @@
   import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
+  import { tick } from 'svelte';
 
   let {
     packages = $bindable([]),
     gamePath = '',
-    onStateChanged
+    onStateChanged,
+    targetHighlightMod = null
   }: {
     packages: RedScriptItem[];
     gamePath: string;
     onStateChanged?: () => void;
+    targetHighlightMod?: string | null;
   } = $props();
 
   let searchQuery = $state('');
   let copiedFeedback = $state(false);
+
+  let highlightedModName = $state<string | null>(null);
+  let highlightTimeoutId: number | null = null;
+  const modNodeMap = new Map<string, HTMLElement>();
 
   let contextMenu = $state<{
     visible: boolean;
@@ -27,6 +34,53 @@
     x: 0,
     y: 0,
     pkg: null
+  });
+
+  function registerModNode(node: HTMLElement, modName: string) {
+    modNodeMap.set(modName, node);
+    return {
+      update(newName: string) {
+        if (newName !== modName) {
+          modNodeMap.delete(modName);
+          modName = newName;
+          modNodeMap.set(modName, node);
+        }
+      },
+      destroy() {
+        modNodeMap.delete(modName);
+      }
+    };
+  }
+
+  async function focusModInMainList(modName: string) {
+    if (searchQuery !== '') {
+      searchQuery = '';
+    }
+
+    await tick();
+
+    let targetElement = modNodeMap.get(modName);
+
+    if (!targetElement) {
+      await new Promise(r => setTimeout(r, 60));
+      targetElement = modNodeMap.get(modName);
+    }
+
+    if (targetElement) {
+      targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      highlightedModName = modName;
+      if (highlightTimeoutId) clearTimeout(highlightTimeoutId);
+      highlightTimeoutId = window.setTimeout(() => {
+        highlightedModName = null;
+      }, 2500);
+    }
+  }
+
+  $effect(() => {
+    if (targetHighlightMod) {
+      focusModInMainList(targetHighlightMod);
+    }
   });
 
   function formatBytes(bytes: number): string {
@@ -220,14 +274,17 @@
       </div>
     {:else}
       {#each filteredPackages as pkg (pkg.name)}
+        {@const isHighlighted = highlightedModName === pkg.name}
         <div
+          use:registerModNode={pkg.name}
           data-mod-item="true"
           data-mod-name={pkg.name}
           data-mod-path={pkg.path}
           data-mod-type="redscript"
           data-is-file={!pkg.is_dir}
           oncontextmenu={(e) => openContextMenu(e, pkg)}
-          class="flex items-center justify-between px-3 rounded border border-nvidia-border/70 bg-nvidia-surface/40 hover:bg-nvidia-surface/70 transition density-row
+          class="flex items-center justify-between px-3 rounded border transition-all duration-300 density-row
+            {isHighlighted ? 'border-[#76b900] ring-2 ring-[#76b900] bg-[#76b900]/20 shadow-[0_0_15px_rgba(118,185,0,0.35)] scale-[1.008] z-10 relative' : 'border-nvidia-border/70 bg-nvidia-surface/40 hover:bg-nvidia-surface/70'}
             {pkg.enabled ? 'text-nvidia-text-primary' : 'opacity-50 text-nvidia-text-muted'}"
         >
           <div class="flex items-center gap-2.5 min-w-0">
@@ -241,7 +298,7 @@
               <div class="h-2.5 w-2.5 rounded-full transition-transform transform {pkg.enabled ? 'translate-x-3 bg-zinc-100 shadow-xs' : 'translate-x-0 bg-zinc-500'}"></div>
             </button>
 
-            <!-- Folder vs Loose File Icon (Request 5) -->
+            <!-- Folder vs Loose File Icon -->
             {#if pkg.is_dir}
               <Folder class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
             {:else}

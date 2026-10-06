@@ -3,6 +3,7 @@ mod archive;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -86,6 +87,8 @@ pub struct AppConfig {
     pub window_x: Option<i32>,
     #[serde(default)]
     pub window_y: Option<i32>,
+    #[serde(default)]
+    pub recent_days_threshold: Option<u32>,
     pub theme: ThemeConfig,
 }
 
@@ -99,6 +102,7 @@ impl Default for AppConfig {
             window_height: Some(1000.0),
             window_x: None,
             window_y: None,
+            recent_days_threshold: Some(30),
             theme: ThemeConfig::default(),
         }
     }
@@ -114,6 +118,24 @@ fn get_app_config_path() -> PathBuf {
     }
 }
 
+fn get_ledger_path() -> PathBuf {
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        PathBuf::from(appdata).join("r4-mod-toolbox").join("mod_history.json")
+    } else if let Ok(userprofile) = std::env::var("USERPROFILE") {
+        PathBuf::from(userprofile).join("AppData").join("Roaming").join("r4-mod-toolbox").join("mod_history.json")
+    } else {
+        PathBuf::from("mod_history.json")
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct LedgerEntry {
+    pub name: String,
+    pub mod_type: String,
+    pub path: String,
+    pub first_seen: u64,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ScanResult {
     pub is_valid_game_path: bool,
@@ -126,6 +148,8 @@ pub struct ScanResult {
     pub red4ext_total: usize,
     pub redscript_active: usize,
     pub redscript_total: usize,
+    pub r6tweaks_active: usize,
+    pub r6tweaks_total: usize,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -160,6 +184,17 @@ pub struct RedScriptItem {
     pub is_dir: bool,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct R6TweaksItem {
+    pub name: String,
+    pub path: String,
+    pub tweaks_count: usize,
+    pub size_bytes: u64,
+    pub enabled: bool,
+    #[serde(default)]
+    pub is_dir: bool,
+}
+
 fn calculate_dir_size(path: &Path) -> u64 {
     let mut total: u64 = 0;
     if let Ok(entries) = fs::read_dir(path) {
@@ -184,6 +219,23 @@ fn count_reds_files(path: &Path) -> usize {
                 count += count_reds_files(&p);
             } else if p.extension().map_or(false, |ext| ext == "reds") {
                 count += 1;
+            }
+        }
+    }
+    count
+}
+
+fn count_tweak_files(path: &Path) -> usize {
+    let mut count = 0;
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                count += count_tweak_files(&p);
+            } else if let Some(ext) = p.extension() {
+                if ext == "yaml" || ext == "tweak" {
+                    count += 1;
+                }
             }
         }
     }
@@ -256,6 +308,12 @@ fn scan_game_directory(game_path: String) -> Result<ScanResult, String> {
     let redscript_disabled = if redscript_disabled_dir.exists() { fs::read_dir(&redscript_disabled_dir).map(|e| e.flatten().count()).unwrap_or(0) } else { 0 };
     let redscript_total = redscript_active + redscript_disabled;
 
+    let r6tweaks_dir = root.join("r6").join("tweaks");
+    let r6tweaks_disabled_dir = root.join("Disabled_Mods").join("r6tweaks");
+    let r6tweaks_active = if r6tweaks_dir.exists() { fs::read_dir(&r6tweaks_dir).map(|e| e.flatten().count()).unwrap_or(0) } else { 0 };
+    let r6tweaks_disabled = if r6tweaks_disabled_dir.exists() { fs::read_dir(&r6tweaks_disabled_dir).map(|e| e.flatten().count()).unwrap_or(0) } else { 0 };
+    let r6tweaks_total = r6tweaks_active + r6tweaks_disabled;
+
     Ok(ScanResult {
         is_valid_game_path: is_valid,
         game_version: "2.31".to_string(),
@@ -267,6 +325,8 @@ fn scan_game_directory(game_path: String) -> Result<ScanResult, String> {
         red4ext_total,
         redscript_active,
         redscript_total,
+        r6tweaks_active,
+        r6tweaks_total,
     })
 }
 
@@ -500,6 +560,184 @@ fn get_redscript_details(game_path: String) -> Result<Vec<RedScriptItem>, String
 }
 
 #[tauri::command]
+fn get_r6tweaks_details(game_path: String) -> Result<Vec<R6TweaksItem>, String> {
+    let root = PathBuf::from(&game_path);
+    let active_dir = root.join("r6").join("tweaks");
+    let disabled_dir = root.join("Disabled_Mods").join("r6tweaks");
+
+    let mut list = Vec::new();
+
+    if active_dir.exists() && active_dir.is_dir() {
+        if let Ok(entries) = fs::read_dir(&active_dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                let is_dir = p.is_dir();
+                let name = entry.file_name().to_string_lossy().to_string();
+                let (tweaks_count, size_bytes) = if is_dir {
+                    (count_tweak_files(&p), calculate_dir_size(&p))
+                } else {
+                    let is_tweak = p.extension().map_or(false, |ext| ext == "yaml" || ext == "tweak");
+                    (
+                        if is_tweak { 1 } else { 0 },
+                        entry.metadata().map(|m| m.len()).unwrap_or(0),
+                    )
+                };
+                list.push(R6TweaksItem {
+                    name,
+                    path: p.to_string_lossy().to_string(),
+                    tweaks_count,
+                    size_bytes,
+                    enabled: true,
+                    is_dir,
+                });
+            }
+        }
+    }
+
+    if disabled_dir.exists() && disabled_dir.is_dir() {
+        if let Ok(entries) = fs::read_dir(&disabled_dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                let is_dir = p.is_dir();
+                let name = entry.file_name().to_string_lossy().to_string();
+                let (tweaks_count, size_bytes) = if is_dir {
+                    (count_tweak_files(&p), calculate_dir_size(&p))
+                } else {
+                    let is_tweak = p.extension().map_or(false, |ext| ext == "yaml" || ext == "tweak");
+                    (
+                        if is_tweak { 1 } else { 0 },
+                        entry.metadata().map(|m| m.len()).unwrap_or(0),
+                    )
+                };
+                list.push(R6TweaksItem {
+                    name,
+                    path: p.to_string_lossy().to_string(),
+                    tweaks_count,
+                    size_bytes,
+                    enabled: false,
+                    is_dir,
+                });
+            }
+        }
+    }
+
+    list.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(list)
+}
+
+#[tauri::command]
+fn get_recent_mods(game_path: String, days: u32) -> Result<Vec<LedgerEntry>, String> {
+    let mut current_mods: Vec<LedgerEntry> = Vec::new();
+
+    // 1. Archive Mods
+    if let Ok(report) = archive::scan_archives(&game_path) {
+        for item in report.archives {
+            if !item.is_delimiter {
+                current_mods.push(LedgerEntry {
+                    name: item.file_name,
+                    mod_type: "archive".to_string(),
+                    path: item.path,
+                    first_seen: 0,
+                });
+            }
+        }
+    }
+
+    // 2. CET Mods
+    if let Ok(cet_list) = get_cet_details(game_path.clone()) {
+        for item in cet_list {
+            current_mods.push(LedgerEntry {
+                name: item.name,
+                mod_type: "cet".to_string(),
+                path: item.path,
+                first_seen: 0,
+            });
+        }
+    }
+
+    // 3. RED4ext Mods
+    if let Ok(r4e_list) = get_red4ext_details(game_path.clone()) {
+        for item in r4e_list {
+            current_mods.push(LedgerEntry {
+                name: item.name,
+                mod_type: "red4ext".to_string(),
+                path: item.path,
+                first_seen: 0,
+            });
+        }
+    }
+
+    // 4. Redscript Mods
+    if let Ok(rs_list) = get_redscript_details(game_path.clone()) {
+        for item in rs_list {
+            current_mods.push(LedgerEntry {
+                name: item.name,
+                mod_type: "redscript".to_string(),
+                path: item.path,
+                first_seen: 0,
+            });
+        }
+    }
+
+    // 5. R6 Tweaks
+    if let Ok(tw_list) = get_r6tweaks_details(game_path.clone()) {
+        for item in tw_list {
+            current_mods.push(LedgerEntry {
+                name: item.name,
+                mod_type: "r6tweaks".to_string(),
+                path: item.path,
+                first_seen: 0,
+            });
+        }
+    }
+
+    let old_ledger = get_ledger_data();
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
+    let mut new_ledger = Vec::new();
+
+    for mut cmod in current_mods {
+        if let Some(existing) = old_ledger.iter().find(|e| e.name == cmod.name && e.mod_type == cmod.mod_type) {
+            cmod.first_seen = existing.first_seen;
+        } else {
+            cmod.first_seen = now;
+        }
+        new_ledger.push(cmod);
+    }
+
+    let _ = save_ledger_data(&new_ledger);
+
+    let cutoff_ms = days as u64 * 24 * 60 * 60 * 1000;
+    let mut recent_mods: Vec<LedgerEntry> = new_ledger.into_iter().filter(|e| now.saturating_sub(e.first_seen) <= cutoff_ms).collect();
+    
+    // Sort newest first
+    recent_mods.sort_by(|a, b| b.first_seen.cmp(&a.first_seen));
+
+    Ok(recent_mods)
+}
+
+fn get_ledger_data() -> Vec<LedgerEntry> {
+    let path = get_ledger_path();
+    if path.exists() {
+        if let Ok(content) = fs::read_to_string(&path) {
+            if let Ok(ledger) = serde_json::from_str::<Vec<LedgerEntry>>(&content) {
+                return ledger;
+            }
+        }
+    }
+    Vec::new()
+}
+
+fn save_ledger_data(ledger: &Vec<LedgerEntry>) -> Result<(), String> {
+    let path = get_ledger_path();
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let serialized = serde_json::to_string_pretty(ledger).map_err(|e| e.to_string())?;
+    fs::write(&path, serialized).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 fn toggle_plugin_state(
     game_path: String,
     mod_type: String,
@@ -520,6 +758,10 @@ fn toggle_plugin_state(
         "redscript" => (
             root.join("r6").join("scripts"),
             root.join("Disabled_Mods").join("redscript"),
+        ),
+        "r6tweaks" => (
+            root.join("r6").join("tweaks"),
+            root.join("Disabled_Mods").join("r6tweaks"),
         ),
         _ => return Err(format!("Unsupported mod type: {}", mod_type)),
     };
@@ -618,6 +860,8 @@ pub fn run() {
             get_cet_details,
             get_red4ext_details,
             get_redscript_details,
+            get_r6tweaks_details,
+            get_recent_mods,
             toggle_plugin_state,
             open_log_folder
         ])

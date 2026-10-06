@@ -1,4 +1,4 @@
-export type ActiveView = 'home' | 'archive' | 'cet' | 'red4ext' | 'redscript';
+export type ActiveView = 'home' | 'archive' | 'cet' | 'red4ext' | 'redscript' | 'r6tweaks';
 
 export interface XlItem {
   file_name: string;
@@ -69,6 +69,15 @@ export interface RedScriptItem {
   is_dir?: boolean;
 }
 
+export interface R6TweaksItem {
+  name: string;
+  path: string;
+  tweaks_count: number;
+  size_bytes: number;
+  enabled: boolean;
+  is_dir?: boolean;
+}
+
 export interface ScanResult {
   is_valid_game_path: boolean;
   game_version: string;
@@ -80,6 +89,15 @@ export interface ScanResult {
   red4ext_total: number;
   redscript_active: number;
   redscript_total: number;
+  r6tweaks_active: number;
+  r6tweaks_total: number;
+}
+
+export interface LedgerEntry {
+  name: string;
+  mod_type: string;
+  path: string;
+  first_seen: number;
 }
 
 export interface AppThemeColors {
@@ -111,5 +129,6 @@ export interface AppConfig {
   windowHeight?: number;
   windowX?: number;
   windowY?: number;
+  recentDaysThreshold?: number;
   theme: ThemeSettings;
 }

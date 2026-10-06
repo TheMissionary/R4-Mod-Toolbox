@@ -122,6 +122,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   showConflictSummary: true,
   windowWidth: 1600,
   windowHeight: 1000,
+  recentDaysThreshold: 30,
   theme: { ...DEFAULT_THEME_SETTINGS },
 };
 
@@ -203,6 +204,10 @@ export async function loadConfigFromDisk(): Promise<AppConfig> {
 
       config.theme.darkColors = generateThemeColors('dark', config.theme.darkColors?.accent || ACCENT_PRESETS[0].hex);
       config.theme.lightColors = generateThemeColors('light', config.theme.lightColors?.accent || '#5A8F00');
+
+      if (config.recentDaysThreshold === undefined) {
+        config.recentDaysThreshold = 30;
+      }
 
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(config.theme));

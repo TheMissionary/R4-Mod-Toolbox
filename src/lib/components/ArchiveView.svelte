@@ -39,13 +39,15 @@
     gamePath = '',
     scanReport = $bindable(null),
     onScanRequested,
-    onStateChanged
+    onStateChanged,
+    targetHighlightMod = null
   }: {
     archives: ArchiveItem[];
     gamePath: string;
     scanReport?: ArchiveScanReport | null;
     onScanRequested?: () => void;
     onStateChanged?: () => void;
+    targetHighlightMod?: string | null;
   } = $props();
 
   let searchQuery = $state('');
@@ -177,6 +179,12 @@
   $effect(() => {
     if (archives && archives.length >= 0) {
       localArchives = [...archives];
+    }
+  });
+
+  $effect(() => {
+    if (targetHighlightMod) {
+      focusModInMainList(targetHighlightMod);
     }
   });
 
