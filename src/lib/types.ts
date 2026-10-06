@@ -100,6 +100,14 @@ export interface LedgerEntry {
   first_seen: number;
 }
 
+export interface FileNode {
+  name: string;
+  path: string;
+  size_bytes: number;
+  is_dir: boolean;
+  extension: string;
+}
+
 export interface AppThemeColors {
   accent: string;
   accentHover: string;
@@ -130,5 +138,6 @@ export interface AppConfig {
   windowX?: number;
   windowY?: number;
   recentDaysThreshold?: number;
+  customTextEditorPath?: string;
   theme: ThemeSettings;
 }

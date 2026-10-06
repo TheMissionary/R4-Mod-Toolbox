@@ -1,12 +1,15 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
+  import { open } from '@tauri-apps/plugin-dialog';
   import {
     APP_FONT_PRESETS,
     MOD_FONT_PRESETS,
     generateThemeColors,
     loadThemeSettings,
-    applyAndPersistTheme,
+    applyThemeSettings,
+    loadConfigFromDisk,
+    saveConfigToDisk,
     type ThemeSettings
   } from '$lib/theme';
   import {
@@ -21,7 +24,8 @@
     Type,
     Sparkles,
     FileText,
-    FolderOpen
+    FolderOpen,
+    FileCode
   } from 'lucide-svelte';
 
   let {
@@ -39,6 +43,8 @@
 
   let selectedModsPreset = $state<string>(MOD_FONT_PRESETS[0].value);
   let customModsInput = $state('');
+
+  let customEditorPath = $state('');
 
   let activeColors = $derived(draft.mode === 'light' ? draft.lightColors : draft.darkColors);
 
@@ -68,6 +74,10 @@
           selectedModsPreset = 'custom';
           customModsInput = currentMods.replace(/^"|"$/g, '').replace(/, monospace$/, '');
         }
+
+        loadConfigFromDisk().then(config => {
+          customEditorPath = config.customTextEditorPath || '';
+        });
       });
     }
   });
@@ -134,6 +144,22 @@
     draft.fontFamilyMods = raw ? `"${raw}", monospace` : MOD_FONT_PRESETS[0].value;
   }
 
+  async function handleBrowseEditor() {
+    try {
+      const selected = await open({
+        multiple: false,
+        directory: false,
+        filters: [{ name: 'Executables', extensions: ['exe'] }],
+        title: 'Select Custom Text Editor'
+      });
+      if (typeof selected === 'string') {
+        customEditorPath = selected;
+      }
+    } catch (err) {
+      console.error('Failed to select editor:', err);
+    }
+  }
+
   function handleResetDefault() {
     if (draft.mode === 'light') {
       draft.lightColors = generateThemeColors('light', '#5A8F00');
@@ -148,6 +174,7 @@
     selectedModsPreset = MOD_FONT_PRESETS[0].value;
     customBaseInput = '';
     customModsInput = '';
+    customEditorPath = '';
   }
 
   async function handleApply() {
@@ -160,7 +187,20 @@
     draft.fontFamily = draft.fontFamilyBase;
 
     const plainPayload: ThemeSettings = JSON.parse(JSON.stringify(draft));
-    await applyAndPersistTheme(plainPayload);
+    
+    // Apply CSS variables immediately
+    applyThemeSettings(plainPayload);
+    
+    // Save to disk including the new editor path
+    try {
+      let config = await loadConfigFromDisk();
+      config.theme = plainPayload;
+      config.customTextEditorPath = customEditorPath.trim();
+      await saveConfigToDisk(config);
+    } catch (err) {
+      console.error('Failed to save config:', err);
+    }
+    
     isOpen = false;
   }
 
@@ -184,7 +224,7 @@
     role="presentation"
   >
     <div
-      class="w-full max-w-xl rounded-xl border border-nvidia-border bg-nvidia-card shadow-2xl overflow-hidden flex flex-col"
+      class="w-full max-w-xl rounded-xl border border-nvidia-border bg-nvidia-card shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
       onclick={(e) => e.stopPropagation()}
       role="dialog"
       aria-modal="true"
@@ -418,6 +458,36 @@
                   class="w-full px-2.5 py-1 bg-nvidia-surface border border-cyan-500/60 rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/60 focus:outline-none focus:border-cyan-400 mt-1"
                 />
               {/if}
+            </div>
+          </div>
+        </div>
+
+        <!-- ----------------------------------------------------------------- -->
+        <!-- TEXT EDITOR CONFIGURATION                                         -->
+        <!-- ----------------------------------------------------------------- -->
+        <div class="pt-1">
+          <div class="p-3 rounded-xl border border-nvidia-border bg-nvidia-surface/50 space-y-2.5">
+            <div class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-nvidia-text-muted">
+              <FileCode class="h-3.5 w-3.5 text-nvidia-accent" />
+              <span>Custom Text Editor</span>
+            </div>
+            <p class="text-[10px] text-nvidia-text-muted leading-tight">
+              Select an executable (e.g., VS Code, Notepad++) to open configuration files. Leave blank to use Windows Notepad.
+            </p>
+            <div class="flex items-center gap-2">
+              <input
+                type="text"
+                bind:value={customEditorPath}
+                placeholder="C:\Program Files\Notepad++\notepad++.exe"
+                class="flex-1 px-2.5 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/50 focus:outline-none focus:border-nvidia-accent font-mono"
+              />
+              <button
+                type="button"
+                onclick={handleBrowseEditor}
+                class="px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0"
+              >
+                Browse...
+              </button>
             </div>
           </div>
         </div>

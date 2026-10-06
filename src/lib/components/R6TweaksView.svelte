@@ -1,9 +1,11 @@
 <script lang="ts">
-  import type { R6TweaksItem } from '$lib/types';
-  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode } from 'lucide-svelte';
+  import { onMount } from 'svelte';
+  import type { R6TweaksItem, FileNode } from '$lib/types';
+  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { tick } from 'svelte';
+  import { loadConfigFromDisk } from '$lib/theme';
 
   let {
     tweaks = $bindable([]),
@@ -19,21 +21,50 @@
 
   let searchQuery = $state('');
   let copiedFeedback = $state(false);
+  let customEditorPath = $state('');
 
   let highlightedModName = $state<string | null>(null);
   let highlightTimeoutId: number | null = null;
   const modNodeMap = new Map<string, HTMLElement>();
+
+  // Lazy Loading State
+  let expandedFolders = $state<Record<string, boolean>>({});
+  let folderContents = $state<Record<string, FileNode[]>>({});
+  let loadingFolders = $state<Record<string, boolean>>({});
 
   let contextMenu = $state<{
     visible: boolean;
     x: number;
     y: number;
     tweak: R6TweaksItem | null;
+    fileNode: FileNode | null;
+    targetType: 'tweak' | 'file';
   }>({
     visible: false,
     x: 0,
     y: 0,
-    tweak: null
+    tweak: null,
+    fileNode: null,
+    targetType: 'tweak'
+  });
+
+  const EDITABLE_EXTS = ['ini', 'reds', 'yaml', 'tweak', 'xl', 'log', 'txt', 'md', 'lua', 'preset', 'json'];
+  
+  let isEditable = $derived.by(() => {
+    if (contextMenu.targetType === 'file' && contextMenu.fileNode && !contextMenu.fileNode.is_dir) {
+      return EDITABLE_EXTS.includes(contextMenu.fileNode.extension);
+    }
+    if (contextMenu.targetType === 'tweak' && contextMenu.tweak && !contextMenu.tweak.is_dir) {
+      const ext = contextMenu.tweak.name.split('.').pop()?.toLowerCase() || '';
+      return EDITABLE_EXTS.includes(ext);
+    }
+    return false;
+  });
+
+  onMount(() => {
+    loadConfigFromDisk().then(config => {
+      customEditorPath = config.customTextEditorPath || '';
+    });
   });
 
   function registerModNode(node: HTMLElement, modName: string) {
@@ -109,28 +140,42 @@
     }
   }
 
-  function openContextMenu(event: MouseEvent, tweak: R6TweaksItem) {
+  async function toggleFolder(path: string) {
+    expandedFolders[path] = !expandedFolders[path];
+    if (expandedFolders[path] && !folderContents[path]) {
+      loadingFolders[path] = true;
+      try {
+        folderContents[path] = await invoke<FileNode[]>('get_folder_contents', { folderPath: path });
+      } catch (err) {
+        console.error('Failed to load folder contents:', err);
+      } finally {
+        loadingFolders[path] = false;
+      }
+    }
+  }
+
+  function openContextMenu(event: MouseEvent, target: R6TweaksItem | FileNode, type: 'tweak' | 'file') {
     event.preventDefault();
     event.stopPropagation();
     copiedFeedback = false;
 
     const menuWidth = 230;
-    const menuHeight = 145;
+    const menuHeight = 160;
     const posX = (event.clientX + menuWidth > window.innerWidth) ? (window.innerWidth - menuWidth - 10) : event.clientX;
     const posY = (event.clientY + menuHeight > window.innerHeight) ? (window.innerHeight - menuHeight - 10) : event.clientY;
 
-    contextMenu = {
-      visible: true,
-      x: posX,
-      y: posY,
-      tweak
-    };
+    if (type === 'tweak') {
+      contextMenu = { visible: true, x: posX, y: posY, tweak: target as R6TweaksItem, fileNode: null, targetType: 'tweak' };
+    } else {
+      contextMenu = { visible: true, x: posX, y: posY, tweak: null, fileNode: target as FileNode, targetType: 'file' };
+    }
   }
 
   function closeContextMenu() {
     if (contextMenu.visible) {
       contextMenu.visible = false;
       contextMenu.tweak = null;
+      contextMenu.fileNode = null;
       copiedFeedback = false;
     }
   }
@@ -143,25 +188,48 @@
   }
 
   async function handleContextMenuShowInExplorer() {
-    if (!contextMenu.tweak) return;
+    const path = contextMenu.targetType === 'tweak' ? contextMenu.tweak?.path : contextMenu.fileNode?.path;
+    if (!path) return;
     try {
-      await revealItemInDir(contextMenu.tweak.path);
+      await revealItemInDir(path);
     } catch (err) {
       console.error('Failed to reveal file in explorer:', err);
     }
     closeContextMenu();
   }
 
+  async function handleOpenInEditor() {
+    let filePath = '';
+    if (contextMenu.targetType === 'file' && contextMenu.fileNode) {
+      filePath = contextMenu.fileNode.path;
+    } else if (contextMenu.targetType === 'tweak' && contextMenu.tweak && !contextMenu.tweak.is_dir) {
+      filePath = contextMenu.tweak.path;
+    }
+    
+    if (filePath) {
+      try {
+        await invoke('open_in_text_editor', { 
+          filePath, 
+          editorPath: customEditorPath 
+        });
+      } catch (err) {
+        console.error('Failed to open editor:', err);
+      }
+    }
+    closeContextMenu();
+  }
+
   async function handleContextMenuCopyName() {
-    if (!contextMenu.tweak) return;
+    const name = contextMenu.targetType === 'tweak' ? contextMenu.tweak?.name : contextMenu.fileNode?.name;
+    if (!name) return;
     try {
-      await navigator.clipboard.writeText(contextMenu.tweak.name);
+      await navigator.clipboard.writeText(name);
       copiedFeedback = true;
       setTimeout(() => {
         closeContextMenu();
       }, 400);
     } catch (err) {
-      console.error('Failed to copy tweak name:', err);
+      console.error('Failed to copy name:', err);
       closeContextMenu();
     }
   }
@@ -178,7 +246,7 @@
 <svelte:window onclick={closeContextMenu} />
 
 <!-- Custom Context Menu -->
-{#if contextMenu.visible && contextMenu.tweak}
+{#if contextMenu.visible && (contextMenu.tweak || contextMenu.fileNode)}
   <div
     class="fixed z-50 w-56 rounded-md border border-nvidia-border bg-nvidia-card py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
     style="left: {contextMenu.x}px; top: {contextMenu.y}px;"
@@ -187,18 +255,31 @@
   >
     <div class="px-3 py-1.5 border-b border-nvidia-border/60 bg-nvidia-surface/40 flex items-center justify-between gap-2">
       <div class="flex items-center gap-1.5 min-w-0 flex-1">
-        {#if contextMenu.tweak.is_dir}
-          <Folder class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+        {#if contextMenu.targetType === 'tweak'}
+          {#if contextMenu.tweak!.is_dir}
+            <Folder class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+          {:else}
+            <FileCode class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+          {/if}
+          <span class="font-mono text-[11px] font-bold text-nvidia-text-primary truncate" title={contextMenu.tweak!.name}>
+            {contextMenu.tweak!.name}
+          </span>
         {:else}
-          <FileCode class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+          {#if contextMenu.fileNode!.is_dir}
+            <Folder class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+          {:else}
+            <FileCode class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+          {/if}
+          <span class="font-mono text-[11px] font-bold text-nvidia-text-primary truncate" title={contextMenu.fileNode!.name}>
+            {contextMenu.fileNode!.name}
+          </span>
         {/if}
-        <span class="font-mono text-[11px] font-bold text-nvidia-text-primary truncate" title={contextMenu.tweak.name}>
-          {contextMenu.tweak.name}
-        </span>
       </div>
-      <span class="text-[9px] font-mono uppercase px-1 py-0.2 rounded border {contextMenu.tweak.enabled ? 'bg-nvidia-accent/15 border-nvidia-accent/40 text-nvidia-accent' : 'bg-red-500/15 border-red-500/40 text-red-400'} shrink-0">
-        {contextMenu.tweak.enabled ? 'Active' : 'Disabled'}
-      </span>
+      {#if contextMenu.targetType === 'tweak'}
+        <span class="text-[9px] font-mono uppercase px-1 py-0.2 rounded border {contextMenu.tweak!.enabled ? 'bg-nvidia-accent/15 border-nvidia-accent/40 text-nvidia-accent' : 'bg-red-500/15 border-red-500/40 text-red-400'} shrink-0">
+          {contextMenu.tweak!.enabled ? 'Active' : 'Disabled'}
+        </span>
+      {/if}
     </div>
 
     <div class="p-1 space-y-0.5">
@@ -211,14 +292,27 @@
         <span>Show in Explorer</span>
       </button>
 
-      <button
-        type="button"
-        onclick={handleContextMenuToggle}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
-      >
-        <Power class="h-3.5 w-3.5 {contextMenu.tweak.enabled ? 'text-amber-400' : 'text-nvidia-accent'}" />
-        <span>{contextMenu.tweak.enabled ? 'Disable Mod' : 'Enable Mod'}</span>
-      </button>
+      {#if contextMenu.targetType === 'tweak'}
+        <button
+          type="button"
+          onclick={handleContextMenuToggle}
+          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        >
+          <Power class="h-3.5 w-3.5 {contextMenu.tweak!.enabled ? 'text-amber-400' : 'text-nvidia-accent'}" />
+          <span>{contextMenu.tweak!.enabled ? 'Disable Mod' : 'Enable Mod'}</span>
+        </button>
+      {/if}
+
+      {#if isEditable}
+        <button
+          type="button"
+          onclick={handleOpenInEditor}
+          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        >
+          <FileEdit class="h-3.5 w-3.5 text-cyan-400 group-hover:brightness-110" />
+          <span>Open in Editor</span>
+        </button>
+      {/if}
 
       <button
         type="button"
@@ -238,6 +332,51 @@
     </div>
   </div>
 {/if}
+
+<!-- Recursive Folder Snippet -->
+{#snippet folderTree(parentPath: string, depth: number)}
+  {#if loadingFolders[parentPath]}
+    <div class="flex items-center px-3 py-1 text-[10px] font-mono text-nvidia-text-muted" style="padding-left: {depth * 1.25 + 1}rem">
+      <div class="h-3 w-3 rounded-full border-2 border-nvidia-surface border-t-nvidia-accent animate-spin mr-2"></div>
+      Loading contents...
+    </div>
+  {:else if folderContents[parentPath]}
+    {#each folderContents[parentPath] as node}
+      <div
+        oncontextmenu={(e) => openContextMenu(e, node, 'file')}
+        class="flex items-center justify-between px-3 rounded border-b border-nvidia-border/30 hover:bg-nvidia-surface/70 transition density-row cursor-context-menu"
+        style="padding-left: {depth * 1.25 + 1}rem"
+      >
+        <div class="flex items-center gap-2.5 min-w-0">
+          {#if node.is_dir}
+            <button
+              type="button"
+              onclick={(e) => { e.stopPropagation(); toggleFolder(node.path); }}
+              class="p-0.5 hover:bg-nvidia-card rounded text-nvidia-text-muted transition cursor-pointer"
+            >
+              {#if expandedFolders[node.path]}
+                <ChevronDown class="h-3.5 w-3.5" />
+              {:else}
+                <ChevronRight class="h-3.5 w-3.5" />
+              {/if}
+            </button>
+            <Folder class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+          {:else}
+            <div class="w-[18px] shrink-0"></div>
+            <FileCode class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+          {/if}
+          <span class="font-mono text-nvidia-text-primary truncate text-[11px]">{node.name}</span>
+        </div>
+        <div class="text-[10px] font-mono text-nvidia-text-muted shrink-0">
+          {#if !node.is_dir}{formatBytes(node.size_bytes)}{/if}
+        </div>
+      </div>
+      {#if node.is_dir && expandedFolders[node.path]}
+        {@render folderTree(node.path, depth + 1)}
+      {/if}
+    {/each}
+  {/if}
+{/snippet}
 
 <div class="flex flex-col h-full select-none" oncontextmenu={(e) => e.preventDefault()}>
   <div class="flex items-center justify-between gap-3 mb-3 shrink-0">
@@ -275,47 +414,66 @@
     {:else}
       {#each filteredTweaks as tweak (tweak.name)}
         {@const isHighlighted = highlightedModName === tweak.name}
-        <div
-          use:registerModNode={tweak.name}
-          data-mod-item="true"
-          data-mod-name={tweak.name}
-          data-mod-path={tweak.path}
-          data-mod-type="r6tweaks"
-          data-is-file={!tweak.is_dir}
-          oncontextmenu={(e) => openContextMenu(e, tweak)}
-          class="flex items-center justify-between px-3 rounded border transition-all duration-300 density-row
-            {isHighlighted ? 'border-[#76b900] ring-2 ring-[#76b900] bg-[#76b900]/20 shadow-[0_0_15px_rgba(118,185,0,0.35)] scale-[1.008] z-10 relative' : 'border-nvidia-border/70 bg-nvidia-surface/40 hover:bg-nvidia-surface/70'}
-            {tweak.enabled ? 'text-nvidia-text-primary' : 'opacity-50 text-nvidia-text-muted'}"
-        >
-          <div class="flex items-center gap-2.5 min-w-0">
-            <!-- Subtle Calmed Switch -->
-            <button
-              type="button"
-              onclick={() => handleToggle(tweak)}
-              aria-label={tweak.enabled ? "Disable tweak " + tweak.name : "Enable tweak " + tweak.name}
-              class="w-7 h-4 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer {tweak.enabled ? 'bg-zinc-700/80 border border-zinc-600' : 'bg-zinc-900/90 border border-zinc-800'}"
-            >
-              <div class="h-2.5 w-2.5 rounded-full transition-transform transform {tweak.enabled ? 'translate-x-3 bg-zinc-100 shadow-xs' : 'translate-x-0 bg-zinc-500'}"></div>
-            </button>
+        <div class="flex flex-col">
+          <div
+            use:registerModNode={tweak.name}
+            data-mod-item="true"
+            data-mod-name={tweak.name}
+            data-mod-path={tweak.path}
+            data-mod-type="r6tweaks"
+            data-is-file={!tweak.is_dir}
+            oncontextmenu={(e) => openContextMenu(e, tweak, 'tweak')}
+            class="flex items-center justify-between px-3 rounded border transition-all duration-300 density-row cursor-context-menu
+              {isHighlighted ? 'border-[#76b900] ring-2 ring-[#76b900] bg-[#76b900]/20 shadow-[0_0_15px_rgba(118,185,0,0.35)] scale-[1.008] z-10 relative' : 'border-nvidia-border/70 bg-nvidia-surface/40 hover:bg-nvidia-surface/70'}
+              {tweak.enabled ? 'text-nvidia-text-primary' : 'opacity-50 text-nvidia-text-muted'}"
+          >
+            <div class="flex items-center gap-2.5 min-w-0">
+              <!-- Subtle Calmed Switch -->
+              <button
+                type="button"
+                onclick={() => handleToggle(tweak)}
+                aria-label={tweak.enabled ? "Disable tweak " + tweak.name : "Enable tweak " + tweak.name}
+                class="w-7 h-4 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer {tweak.enabled ? 'bg-zinc-700/80 border border-zinc-600' : 'bg-zinc-900/90 border border-zinc-800'}"
+              >
+                <div class="h-2.5 w-2.5 rounded-full transition-transform transform {tweak.enabled ? 'translate-x-3 bg-zinc-100 shadow-xs' : 'translate-x-0 bg-zinc-500'}"></div>
+              </button>
 
-            <!-- Folder vs Loose File Icon -->
-            {#if tweak.is_dir}
-              <Folder class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
-            {:else}
-              <FileCode class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
-            {/if}
+              <!-- Folder vs Loose File Icon with Chevron -->
+              {#if tweak.is_dir}
+                <button
+                  type="button"
+                  onclick={(e) => { e.stopPropagation(); toggleFolder(tweak.path); }}
+                  class="p-0.5 hover:bg-nvidia-card rounded text-nvidia-text-muted transition cursor-pointer"
+                >
+                  {#if expandedFolders[tweak.path]}
+                    <ChevronDown class="h-3.5 w-3.5" />
+                  {:else}
+                    <ChevronRight class="h-3.5 w-3.5" />
+                  {/if}
+                </button>
+                <Folder class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+              {:else}
+                <div class="w-[18px] shrink-0"></div>
+                <FileCode class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+              {/if}
 
-            <span class="font-mono truncate {tweak.enabled ? 'text-nvidia-text-primary' : 'line-through text-nvidia-text-muted'}">
-              {tweak.name}
-            </span>
+              <span class="font-mono truncate {tweak.enabled ? 'text-nvidia-text-primary' : 'line-through text-nvidia-text-muted'}">
+                {tweak.name}
+              </span>
+            </div>
+
+            <div class="flex items-center gap-3 text-[11px] font-mono text-nvidia-text-muted shrink-0">
+              <span class="px-1.5 py-0.2 rounded bg-nvidia-surface border border-nvidia-border/60 text-[10px] text-nvidia-text-muted">
+                {tweak.tweaks_count} files
+              </span>
+              <span>{formatBytes(tweak.size_bytes)}</span>
+            </div>
           </div>
 
-          <div class="flex items-center gap-3 text-[11px] font-mono text-nvidia-text-muted shrink-0">
-            <span class="px-1.5 py-0.2 rounded bg-nvidia-surface border border-nvidia-border/60 text-[10px] text-nvidia-text-muted">
-              {tweak.tweaks_count} files
-            </span>
-            <span>{formatBytes(tweak.size_bytes)}</span>
-          </div>
+          <!-- Render Lazy Loaded Children -->
+          {#if tweak.is_dir && expandedFolders[tweak.path]}
+            {@render folderTree(tweak.path, 1)}
+          {/if}
         </div>
       {/each}
     {/if}

@@ -89,6 +89,8 @@ pub struct AppConfig {
     pub window_y: Option<i32>,
     #[serde(default)]
     pub recent_days_threshold: Option<u32>,
+    #[serde(default)]
+    pub custom_text_editor_path: Option<String>,
     pub theme: ThemeConfig,
 }
 
@@ -103,6 +105,7 @@ impl Default for AppConfig {
             window_x: None,
             window_y: None,
             recent_days_threshold: Some(30),
+            custom_text_editor_path: None,
             theme: ThemeConfig::default(),
         }
     }
@@ -134,6 +137,15 @@ pub struct LedgerEntry {
     pub mod_type: String,
     pub path: String,
     pub first_seen: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct FileNode {
+    pub name: String,
+    pub path: String,
+    pub size_bytes: u64,
+    pub is_dir: bool,
+    pub extension: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -788,6 +800,62 @@ fn toggle_plugin_state(
 }
 
 #[tauri::command]
+fn get_folder_contents(folder_path: String) -> Result<Vec<FileNode>, String> {
+    let path = PathBuf::from(&folder_path);
+    if !path.exists() || !path.is_dir() {
+        return Err("Invalid folder path".to_string());
+    }
+
+    let mut list = Vec::new();
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            let is_dir = p.is_dir();
+            let name = entry.file_name().to_string_lossy().to_string();
+            let size_bytes = if is_dir { 0 } else { entry.metadata().map(|m| m.len()).unwrap_or(0) };
+            let extension = p.extension().unwrap_or_default().to_string_lossy().to_lowercase();
+
+            list.push(FileNode {
+                name,
+                path: p.to_string_lossy().to_string(),
+                size_bytes,
+                is_dir,
+                extension,
+            });
+        }
+    }
+    
+    // Sort: folders first, then alphabetical
+    list.sort_by(|a, b| {
+        b.is_dir.cmp(&a.is_dir).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
+    
+    Ok(list)
+}
+
+#[tauri::command]
+fn open_in_text_editor(file_path: String, editor_path: Option<String>) -> Result<(), String> {
+    let path = PathBuf::from(&file_path);
+    if !path.exists() || path.is_dir() {
+        return Err("Invalid file path".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let mut cmd = if let Some(ep) = editor_path.filter(|s| !s.trim().is_empty()) {
+            std::process::Command::new(ep)
+        } else {
+            std::process::Command::new("notepad.exe")
+        };
+
+        cmd.arg(&file_path)
+           .spawn()
+           .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn open_log_folder(app: tauri::AppHandle) -> Result<(), String> {
     let log_dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
     if !log_dir.exists() {
@@ -806,6 +874,7 @@ fn open_log_folder(app: tauri::AppHandle) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
@@ -863,6 +932,8 @@ pub fn run() {
             get_r6tweaks_details,
             get_recent_mods,
             toggle_plugin_state,
+            get_folder_contents,
+            open_in_text_editor,
             open_log_folder
         ])
         .run(tauri::generate_context!())
