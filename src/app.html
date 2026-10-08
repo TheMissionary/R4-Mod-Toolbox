@@ -6,7 +6,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>R4 Mod Toolbox</title>
     
+    <script>
+      // Synchronously load the user's accent color before the DOM renders to prevent color flashing
+      try {
+        const settings = localStorage.getItem('cp2077_theme_settings_v2');
+        if (settings) {
+          const parsed = JSON.parse(settings);
+          const mode = parsed.mode || 'dark';
+          const colors = mode === 'light' ? parsed.lightColors : parsed.darkColors;
+          if (colors && colors.accent) {
+            document.documentElement.style.setProperty('--splash-accent', colors.accent);
+          }
+        }
+      } catch (e) {}
+    </script>
+
     <style>
+      :root {
+        --splash-accent: #76b900; /* Fallback default */
+      }
+
       /* Ensure window body starts dark instantly to eliminate white flashes */
       body {
         background-color: #101418;
@@ -36,23 +55,25 @@
       .splash-lockup {
         display: flex;
         align-items: center;
-        gap: 1.25rem;
+        justify-content: center;
+        width: 60vw;
+        gap: 4vw;
       }
 
       .splash-badge {
-        height: 3.6rem;
-        width: 3.6rem;
-        background-color: #76b900;
-        border-radius: 0.65rem;
+        height: 15vw;
+        width: 15vw;
+        background-color: var(--splash-accent);
+        border-radius: 2.5vw;
         display: flex;
         align-items: center;
         justify-content: center;
         color: #000000;
         font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         font-weight: 900;
-        font-size: 1.95rem;
+        font-size: 8vw;
         letter-spacing: -0.03em;
-        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.7);
+        box-shadow: 0 1vw 4vw rgba(0, 0, 0, 0.7);
         flex-shrink: 0;
       }
 
@@ -60,7 +81,7 @@
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        height: 3.6rem;
+        height: 13vw;
         font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         font-weight: 800;
         text-transform: uppercase;
@@ -70,12 +91,12 @@
       }
 
       .splash-text .line-1 {
-        font-size: 1.55rem;
+        font-size: 6vw;
         letter-spacing: 0.07em;
       }
 
       .splash-text .line-2 {
-        font-size: 1.55rem;
+        font-size: 6vw;
         letter-spacing: 0.07em;
       }
     </style>

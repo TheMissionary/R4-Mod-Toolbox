@@ -49,6 +49,14 @@
 
   type TabType = 'home' | 'archive' | 'cet' | 'red4ext' | 'redscript' | 'r6tweaks';
 
+  const MOD_TYPE_LABELS: Record<string, string> = {
+    'archive': 'Archive',
+    'cet': 'CET',
+    'red4ext': 'RED4ext',
+    'redscript': 'R6\\Scripts',
+    'r6tweaks': 'R6\\Tweaks'
+  };
+
   // Always boot cleanly to the Home dashboard
   let currentTab = $state<TabType>('home');
 
@@ -78,7 +86,7 @@
   // Recently Added Mods State
   let recentMods = $state<LedgerEntry[]>([]);
   let showRecentMods = $state(false);
-  let recentDaysThreshold = $state(30);
+  let recentDaysThreshold = $state<number | null>(30);
   let sortColumn = $state<'date' | 'name' | 'type'>('date');
   let sortAscending = $state(false);
   
@@ -131,23 +139,29 @@
   async function loadRecentMods() {
     if (!gamePath) return;
     try {
-      recentMods = await invoke<LedgerEntry[]>('get_recent_mods', { gamePath, days: recentDaysThreshold });
+      recentMods = await invoke<LedgerEntry[]>('get_recent_mods', { gamePath, days: recentDaysThreshold || 30 });
     } catch (err) {
       console.error('Failed to load recent mods:', err);
     }
   }
 
-  async function handleThresholdChange() {
-    if (recentDaysThreshold < 1) recentDaysThreshold = 1;
-    if (recentDaysThreshold > 365) recentDaysThreshold = 365;
-    await loadRecentMods();
-    try {
-      const config = await loadConfigFromDisk();
-      config.recentDaysThreshold = recentDaysThreshold;
-      await saveConfigToDisk(config);
-    } catch (err) {
-      console.error('Failed to save threshold:', err);
-    }
+  let thresholdTimeout: ReturnType<typeof setTimeout>;
+  function handleThresholdChange() {
+    clearTimeout(thresholdTimeout);
+    thresholdTimeout = setTimeout(async () => {
+      if (recentDaysThreshold === null || recentDaysThreshold === undefined) return;
+      if (recentDaysThreshold < 1) recentDaysThreshold = 1;
+      if (recentDaysThreshold > 365) recentDaysThreshold = 365;
+      
+      await loadRecentMods();
+      try {
+        const config = await loadConfigFromDisk();
+        config.recentDaysThreshold = recentDaysThreshold;
+        await saveConfigToDisk(config);
+      } catch (err) {
+        console.error('Failed to save threshold:', err);
+      }
+    }, 400);
   }
 
   function openRecentContextMenu(event: MouseEvent, entry: LedgerEntry) {
@@ -438,7 +452,7 @@
           >
             <div class="flex items-center gap-3">
               <Cpu class="h-4 w-4" />
-              <span>CET Mods</span>
+              <span>CET</span>
             </div>
             {#if scanResult}
               <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
@@ -577,7 +591,7 @@
             class="col-span-1 md:col-span-2 p-4 rounded border border-nvidia-border bg-nvidia-surface/60 hover:bg-nvidia-surface/90 hover:border-nvidia-accent/70 transition-all duration-150 flex flex-col justify-between h-28 text-left cursor-pointer group shadow-xs"
           >
             <div class="flex justify-between items-start w-full">
-              <span class="text-xs font-bold uppercase tracking-wider text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">ARCHIVE MODS</span>
+              <span class="text-xs font-bold uppercase tracking-wider text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">ARCHIVE</span>
               <div class="flex items-center gap-1 text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">
                 <Archive class="h-4 w-4" />
                 <ArrowUpRight class="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -599,7 +613,7 @@
             class="col-span-1 md:col-span-2 p-4 rounded border border-nvidia-border bg-nvidia-surface/60 hover:bg-nvidia-surface/90 hover:border-nvidia-accent/70 transition-all duration-150 flex flex-col justify-between h-28 text-left cursor-pointer group shadow-xs"
           >
             <div class="flex justify-between items-start w-full">
-              <span class="text-xs font-bold uppercase tracking-wider text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">CET PLUGINS</span>
+              <span class="text-xs font-bold uppercase tracking-wider text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">CET</span>
               <div class="flex items-center gap-1 text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">
                 <Cpu class="h-4 w-4" />
                 <ArrowUpRight class="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -621,7 +635,7 @@
             class="col-span-1 md:col-span-2 p-4 rounded border border-nvidia-border bg-nvidia-surface/60 hover:bg-nvidia-surface/90 hover:border-nvidia-accent/70 transition-all duration-150 flex flex-col justify-between h-28 text-left cursor-pointer group shadow-xs"
           >
             <div class="flex justify-between items-start w-full">
-              <span class="text-xs font-bold uppercase tracking-wider text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">RED4EXT PLUGINS</span>
+              <span class="text-xs font-bold uppercase tracking-wider text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">RED4EXT</span>
               <div class="flex items-center gap-1 text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">
                 <Puzzle class="h-4 w-4" />
                 <ArrowUpRight class="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -705,7 +719,7 @@
                   min="1"
                   max="365"
                   bind:value={recentDaysThreshold}
-                  onchange={handleThresholdChange}
+                  oninput={handleThresholdChange}
                   class="w-16 px-2 py-1 bg-nvidia-bg border border-nvidia-border rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent text-center font-mono"
                   title="Number of days to track"
                 />
@@ -746,7 +760,7 @@
               <div class="overflow-y-auto flex-1 p-1 space-y-0.5">
                 {#if sortedRecentMods.length === 0}
                   <div class="p-6 text-center text-xs text-nvidia-text-muted font-mono">
-                    No new mods detected in the last {recentDaysThreshold} days.
+                    No new mods detected in the last {recentDaysThreshold || 30} days.
                   </div>
                 {:else}
                   {#each sortedRecentMods as entry (entry.path)}
@@ -758,8 +772,8 @@
                         {formatTimestamp(entry.first_seen)}
                       </div>
                       <div>
-                        <span class="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border bg-nvidia-surface border-nvidia-border text-nvidia-text-primary">
-                          {entry.mod_type}
+                        <span class="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border bg-nvidia-accent/15 border-nvidia-accent/30 text-nvidia-accent">
+                          {MOD_TYPE_LABELS[entry.mod_type] || entry.mod_type}
                         </span>
                       </div>
                       <div class="text-xs font-mono text-nvidia-text-primary truncate" title={entry.name}>
