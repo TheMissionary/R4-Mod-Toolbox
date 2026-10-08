@@ -345,6 +345,20 @@
       searchQuery = '';
     }
 
+    // Expand parent category if it is collapsed
+    const targetIndex = localArchives.findIndex(a => a.file_name === modName);
+    if (targetIndex !== -1) {
+      for (let i = targetIndex - 1; i >= 0; i--) {
+        const item = localArchives[i];
+        if (item.is_delimiter) {
+          if (collapsedCategories[item.file_name]) {
+            collapsedCategories[item.file_name] = false;
+          }
+          break;
+        }
+      }
+    }
+
     await tick();
 
     let targetElement = modNodeMap.get(modName);
@@ -1140,7 +1154,8 @@
                 onclick={(e) => handleModClick(e, archive)}
                 onpointermove={(e) => onRowPointerMove(e, originalIndex)}
                 oncontextmenu={(e) => openContextMenu(e, archive, 'archive')}
-                class="group rounded border transition-all duration-300 z-10 {isHighlighted ? 'border-[#76b900] ring-2 ring-[#76b900] bg-[#76b900]/20 shadow-[0_0_15px_rgba(118,185,0,0.35)] scale-[1.008]' : (isSelected ? 'border-nvidia-accent/60 bg-nvidia-accent/10' : 'border-nvidia-border/70 bg-nvidia-surface hover:border-nvidia-border')} {archive.enabled ? 'opacity-100' : 'opacity-40'} {isSource ? 'opacity-20 border-dashed border-nvidia-accent/50' : ''}"
+                class="group rounded border transition-all duration-300 z-10 {isHighlighted ? 'border-nvidia-accent ring-2 ring-nvidia-accent bg-nvidia-accent/20 scale-[1.008]' : (isSelected ? 'border-nvidia-accent/60 bg-nvidia-accent/10' : 'border-nvidia-border/70 bg-nvidia-surface hover:border-nvidia-border')} {archive.enabled ? 'opacity-100' : 'opacity-40'} {isSource ? 'opacity-20 border-dashed border-nvidia-accent/50' : ''}"
+                style={isHighlighted ? 'box-shadow: 0 0 15px color-mix(in srgb, var(--theme-accent) 35%, transparent);' : ''}
               >
                 <!-- Density-aware Row Container (28px) -->
                 <div class="flex items-center justify-between px-3 gap-2 density-row">
@@ -1420,29 +1435,3 @@
     {/if}
   </div>
 </div>
-
-<DialogModal
-  bind:isOpen={dialogState.isOpen}
-  title={dialogState.title}
-  message={dialogState.message}
-  mode={dialogState.mode}
-  initialValue={dialogState.initialValue}
-  confirmText={dialogState.confirmText}
-  isDanger={dialogState.isDanger}
-  onConfirm={dialogState.onConfirm}
-/>
-
-<MoveCategoryModal
-  bind:isOpen={isMoveModalOpen}
-  categories={availableCategories}
-  onConfirm={handleMoveToCategory}
-  onCancel={() => isMoveModalOpen = false}
-/>
-
-<LinkXlModal
-  bind:isOpen={isLinkModalOpen}
-  xlName={targetXlToLink || ''}
-  archives={availableArchivesForLink}
-  onConfirm={handleLinkXl}
-  onCancel={() => isLinkModalOpen = false}
-/>

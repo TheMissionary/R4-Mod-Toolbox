@@ -424,8 +424,9 @@
             data-is-file={!pkg.is_dir}
             oncontextmenu={(e) => openContextMenu(e, pkg, 'pkg')}
             class="flex items-center justify-between px-3 rounded border transition-all duration-300 density-row cursor-context-menu
-              {isHighlighted ? 'border-[#76b900] ring-2 ring-[#76b900] bg-[#76b900]/20 shadow-[0_0_15px_rgba(118,185,0,0.35)] scale-[1.008] z-10 relative' : 'border-nvidia-border/70 bg-nvidia-surface/40 hover:bg-nvidia-surface/70'}
+              {isHighlighted ? 'border-nvidia-accent ring-2 ring-nvidia-accent bg-nvidia-accent/20 scale-[1.008] z-10 relative' : 'border-nvidia-border/70 bg-nvidia-surface/40 hover:bg-nvidia-surface/70'}
               {pkg.enabled ? 'text-nvidia-text-primary' : 'opacity-50 text-nvidia-text-muted'}"
+            style={isHighlighted ? 'box-shadow: 0 0 15px color-mix(in srgb, var(--theme-accent) 35%, transparent);' : ''}
           >
             <div class="flex items-center gap-2.5 min-w-0">
               <!-- Subtle Calmed Switch -->
