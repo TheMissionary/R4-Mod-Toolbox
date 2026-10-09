@@ -26,6 +26,9 @@
   import Red4extView from '$lib/components/Red4extView.svelte';
   import RedscriptView from '$lib/components/RedscriptView.svelte';
   import R6TweaksView from '$lib/components/R6TweaksView.svelte';
+  import SettingsView from '$lib/components/SettingsView.svelte';
+  import HelpView from '$lib/components/HelpView.svelte';
+  import AboutView from '$lib/components/AboutView.svelte';
 
   import {
     Home,
@@ -44,10 +47,14 @@
     FolderSearch,
     ExternalLink,
     Copy,
-    Check
+    Check,
+    HelpCircle,
+    Settings,
+    Info,
+    Coffee
   } from 'lucide-svelte';
 
-  type TabType = 'home' | 'archive' | 'cet' | 'red4ext' | 'redscript' | 'r6tweaks';
+  type TabType = 'home' | 'archive' | 'cet' | 'red4ext' | 'redscript' | 'r6tweaks' | 'settings' | 'help' | 'about';
 
   const MOD_TYPE_LABELS: Record<string, string> = {
     'archive': 'Archive',
@@ -349,7 +356,6 @@
     };
   });
 </script>
-
 <svelte:window onclick={closeRecentContextMenu} oncontextmenu={(e) => e.preventDefault()} />
 
 <!-- Recent Mods Context Menu -->
@@ -405,7 +411,7 @@
 <div class="flex h-screen w-screen overflow-hidden bg-nvidia-bg text-nvidia-text-primary font-sans">
   <!-- Left Navigation Sidebar -->
   <aside class="w-64 border-r border-nvidia-border flex flex-col justify-between bg-nvidia-surface/40 select-none shrink-0">
-    <div class="flex flex-col h-full">
+    <div class="flex flex-col h-full overflow-hidden">
       <div class="h-14 border-b border-nvidia-border px-5 flex items-center gap-3 shrink-0">
         <div class="h-6 w-6 rounded bg-nvidia-accent flex items-center justify-center text-black font-black text-sm shadow-sm">
           R4
@@ -510,6 +516,34 @@
           </button>
         </nav>
       </div>
+
+      <!-- Secondary Navigation Cluster -->
+      <div class="p-3 space-y-1 border-t border-nvidia-border/50 bg-nvidia-surface/20 shrink-0">
+        <button
+          type="button"
+          onclick={() => setTab('help')}
+          class="w-full flex items-center gap-3 px-3 py-1.5 rounded text-xs font-medium transition cursor-pointer {currentTab === 'help' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
+        >
+          <HelpCircle class="h-4 w-4" />
+          <span>Help</span>
+        </button>
+        <button
+          type="button"
+          onclick={() => setTab('settings')}
+          class="w-full flex items-center gap-3 px-3 py-1.5 rounded text-xs font-medium transition cursor-pointer {currentTab === 'settings' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
+        >
+          <Settings class="h-4 w-4" />
+          <span>Settings</span>
+        </button>
+        <button
+          type="button"
+          onclick={() => setTab('about')}
+          class="w-full flex items-center gap-3 px-3 py-1.5 rounded text-xs font-medium transition cursor-pointer {currentTab === 'about' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
+        >
+          <Info class="h-4 w-4" />
+          <span>About</span>
+        </button>
+      </div>
     </div>
 
     <!-- Lower Left Launch Game & Developer Tile -->
@@ -559,6 +593,15 @@
           >
             GitHub
           </button>
+
+          <button
+            type="button"
+            onclick={() => openExternalLink('https://ko-fi.com/mi55ionary')}
+            class="px-1.5 py-0.5 rounded bg-nvidia-card hover:bg-cyan-500/10 text-[10px] font-mono text-nvidia-text-muted hover:text-cyan-400 border border-nvidia-border hover:border-cyan-500/30 transition cursor-pointer flex items-center justify-center"
+            title="Support on Ko-fi"
+          >
+            <Coffee class="h-3 w-3" />
+          </button>
         </div>
       </div>
     </div>
@@ -568,7 +611,7 @@
   <div class="flex-1 flex flex-col h-full overflow-hidden relative">
     <HeaderBar bind:gamePath onRefresh={refreshAll} {isLoading} />
 
-    <main class="flex-1 p-6 overflow-y-auto">
+    <main class="flex-1 overflow-y-auto {['settings', 'help', 'about'].includes(currentTab) ? 'p-0' : 'p-6'}">
       <!-- Persistent Tab: Home -->
       <div class={currentTab === 'home' ? 'space-y-6' : 'hidden'}>
         <div class="p-6 rounded-lg border border-nvidia-border bg-nvidia-card relative overflow-hidden">
@@ -807,6 +850,19 @@
 
       <div class={currentTab === 'r6tweaks' ? 'h-full' : 'hidden'}>
         <R6TweaksView bind:tweaks={r6tweaks} {gamePath} onStateChanged={refreshCountsOnly} {targetHighlightMod} />
+      </div>
+
+      <!-- New Full-Screen Views -->
+      <div class={currentTab === 'settings' ? 'h-full' : 'hidden'}>
+        <SettingsView />
+      </div>
+
+      <div class={currentTab === 'help' ? 'h-full' : 'hidden'}>
+        <HelpView />
+      </div>
+
+      <div class={currentTab === 'about' ? 'h-full' : 'hidden'}>
+        <AboutView />
       </div>
     </main>
   </div>

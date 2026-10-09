@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { RefreshCw, FolderSearch, Settings } from 'lucide-svelte';
+  import { RefreshCw, FolderSearch } from 'lucide-svelte';
   import { open } from '@tauri-apps/plugin-dialog';
-  import ThemeModal from '$lib/components/ThemeModal.svelte';
 
   let { 
     gamePath = $bindable(''), 
@@ -12,8 +11,6 @@
     isLoading: boolean;
     onRefresh: () => void;
   } = $props();
-
-  let isThemeModalOpen = $state(false);
 
   async function chooseDirectory() {
     try {
@@ -50,16 +47,6 @@
   <div class="flex items-center gap-2.5 shrink-0">
     <button 
       type="button"
-      onclick={() => isThemeModalOpen = true}
-      class="flex items-center gap-2 px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0 whitespace-nowrap shadow-xs"
-      title="Application Settings & Logs"
-    >
-      <Settings class="h-3.5 w-3.5 text-nvidia-accent" />
-      <span>Settings</span>
-    </button>
-
-    <button 
-      type="button"
       onclick={chooseDirectory}
       class="flex items-center gap-2 px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0 whitespace-nowrap shadow-xs"
     >
@@ -78,5 +65,3 @@
     </button>
   </div>
 </header>
-
-<ThemeModal bind:isOpen={isThemeModalOpen} />
