@@ -660,10 +660,38 @@
     }
   }
 
-  function handleContextMenuToggle() {
-    if (contextMenu.archive) {
-      toggleMod(contextMenu.archive);
+  async function handleContextMenuToggle() {
+    if (!contextMenu.archive) {
+      closeContextMenu();
+      return;
     }
+
+    const targetState = !contextMenu.archive.enabled;
+
+    // Bulk toggle condition: target is an archive (not category), multiple items selected, and clicked item is part of selection
+    if (!contextMenu.archive.is_delimiter && selectedMods.size > 1 && selectedMods.has(contextMenu.archive.file_name)) {
+      const itemsToToggle = localArchives.filter(a => selectedMods.has(a.file_name) && a.enabled !== targetState);
+      
+      for (const item of itemsToToggle) {
+        item.enabled = targetState;
+        try {
+          await invoke('toggle_mod_state', {
+            gamePath,
+            modName: item.file_name,
+            enable: targetState
+          });
+        } catch (err) {
+          console.error(`Failed to toggle ${item.file_name}:`, err);
+        }
+      }
+      
+      await persistState();
+      if (onStateChanged) onStateChanged();
+    } else {
+      // Standard single toggle
+      await toggleMod(contextMenu.archive);
+    }
+    
     closeContextMenu();
   }
 
@@ -671,10 +699,10 @@
     if (!gamePath) return;
     let targetFilename = '';
     if (contextMenu.targetType === 'unassociated_xl' && contextMenu.unassociatedXl) {
-      targetFilename = contextMenu.unassociatedXl.file_name;
+      targetFilename = contextMenu.unassociatedXl?.file_name;
     } else if (contextMenu.archive) {
-      targetFilename = contextMenu.archive.file_name;
-      if (contextMenu.targetType === 'xl' && contextMenu.archive.associated_xls?.length) {
+      targetFilename = contextMenu.archive?.file_name;
+      if (contextMenu.targetType === 'xl' && contextMenu.archive?.associated_xls?.length) {
         targetFilename = contextMenu.archive.associated_xls[0].file_name;
       }
     }
@@ -692,10 +720,10 @@
   async function handleContextMenuCopyName() {
     let targetFilename = '';
     if (contextMenu.targetType === 'unassociated_xl' && contextMenu.unassociatedXl) {
-      targetFilename = contextMenu.unassociatedXl.file_name;
+      targetFilename = contextMenu.unassociatedXl?.file_name;
     } else if (contextMenu.archive) {
-      targetFilename = contextMenu.archive.file_name;
-      if (contextMenu.targetType === 'xl' && contextMenu.archive.associated_xls?.length) {
+      targetFilename = contextMenu.archive?.file_name;
+      if (contextMenu.targetType === 'xl' && contextMenu.archive?.associated_xls?.length) {
         targetFilename = contextMenu.archive.associated_xls.map(x => x.file_name).join(', ');
       }
     }
@@ -911,11 +939,11 @@
 <!-- Custom Context Menu -->
 {#if contextMenu.visible && (contextMenu.archive || contextMenu.unassociatedXl)}
   {@const activeTargetName = contextMenu.targetType === 'unassociated_xl' 
-    ? contextMenu.unassociatedXl!.file_name 
-    : (contextMenu.targetType === 'xl' && contextMenu.archive!.associated_xls?.length)
-      ? (contextMenu.archive!.associated_xls.length === 1 ? contextMenu.archive!.associated_xls[0].file_name : `${contextMenu.archive!.associated_xls.length} Companion Files`)
-      : contextMenu.archive!.file_name}
-  {@const isActive = contextMenu.targetType === 'unassociated_xl' ? contextMenu.unassociatedXl!.enabled : contextMenu.archive!.enabled}
+    ? contextMenu.unassociatedXl?.file_name 
+    : (contextMenu.targetType === 'xl' && contextMenu.archive?.associated_xls?.length)
+      ? (contextMenu.archive.associated_xls.length === 1 ? contextMenu.archive.associated_xls[0].file_name : contextMenu.archive.associated_xls.length + ' Companion Files')
+      : contextMenu.archive?.file_name}
+  {@const isActive = contextMenu.targetType === 'unassociated_xl' ? contextMenu.unassociatedXl?.enabled : contextMenu.archive?.enabled}
   
   <div
     class="fixed z-50 w-56 rounded-md border border-nvidia-border bg-nvidia-card py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
@@ -927,7 +955,7 @@
       <div class="flex items-center gap-1.5 min-w-0 flex-1">
         {#if contextMenu.targetType === 'xl' || contextMenu.targetType === 'unassociated_xl'}
           <FileCode class="h-3.5 w-3.5 text-cyan-400 shrink-0" />
-        {:else if contextMenu.archive!.is_delimiter}
+        {:else if contextMenu.archive?.is_delimiter}
           <Folder class="h-3.5 w-3.5 text-nvidia-accent shrink-0" />
         {:else}
           <div class="h-2 w-2 rounded-full shrink-0 {isActive ? 'bg-nvidia-accent' : 'bg-red-500'}"></div>
@@ -954,7 +982,7 @@
       {#if contextMenu.targetType === 'unassociated_xl'}
         <button
           type="button"
-          onclick={() => { targetXlToLink = contextMenu.unassociatedXl!.file_name; isLinkModalOpen = true; closeContextMenu(); }}
+          onclick={() => { if(contextMenu.unassociatedXl) { targetXlToLink = contextMenu.unassociatedXl.file_name; isLinkModalOpen = true; closeContextMenu(); } }}
           class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
         >
           <Link2 class="h-3.5 w-3.5 text-cyan-400" />
@@ -967,11 +995,15 @@
           class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
         >
           <Power class="h-3.5 w-3.5 {isActive ? 'text-amber-400' : 'text-nvidia-accent'}" />
-          <span>{isActive ? (contextMenu.archive!.is_delimiter ? 'Disable Category' : 'Disable Mod') : (contextMenu.archive!.is_delimiter ? 'Enable Category' : 'Enable Mod')}</span>
+          {#if contextMenu.targetType === 'archive' && !contextMenu.archive?.is_delimiter && selectedMods.size > 1 && contextMenu.archive?.file_name && selectedMods.has(contextMenu.archive.file_name)}
+            <span>{isActive ? 'Disable ' + selectedMods.size + ' Mods' : 'Enable ' + selectedMods.size + ' Mods'}</span>
+          {:else}
+            <span>{isActive ? (contextMenu.archive?.is_delimiter ? 'Disable Category' : 'Disable Mod') : (contextMenu.archive?.is_delimiter ? 'Enable Category' : 'Enable Mod')}</span>
+          {/if}
         </button>
       {/if}
 
-      {#if contextMenu.targetType === 'archive' && contextMenu.archive!.is_delimiter}
+      {#if contextMenu.targetType === 'archive' && contextMenu.archive?.is_delimiter}
         <button
           type="button"
           onclick={() => { const item = contextMenu.archive; closeContextMenu(); if (item) handleRenameCategory(item); }}
@@ -991,7 +1023,7 @@
         </button>
       {/if}
 
-      {#if contextMenu.targetType === 'archive' && !contextMenu.archive!.is_delimiter && selectedMods.size > 0}
+      {#if contextMenu.targetType === 'archive' && !contextMenu.archive?.is_delimiter && selectedMods.size > 0}
         <button
           type="button"
           onclick={() => { closeContextMenu(); isMoveModalOpen = true; }}
@@ -1435,3 +1467,31 @@
     {/if}
   </div>
 </div>
+
+<!-- Modals -->
+<DialogModal
+  bind:isOpen={dialogState.isOpen}
+  title={dialogState.title}
+  message={dialogState.message}
+  mode={dialogState.mode}
+  initialValue={dialogState.initialValue}
+  confirmText={dialogState.confirmText}
+  isDanger={dialogState.isDanger}
+  onConfirm={dialogState.onConfirm}
+  onCancel={() => dialogState.isOpen = false}
+/>
+
+<MoveCategoryModal
+  bind:isOpen={isMoveModalOpen}
+  categories={availableCategories}
+  onConfirm={handleMoveToCategory}
+  onCancel={() => isMoveModalOpen = false}
+/>
+
+<LinkXlModal
+  bind:isOpen={isLinkModalOpen}
+  xlName={targetXlToLink || ''}
+  archives={availableArchivesForLink}
+  onConfirm={handleLinkXl}
+  onCancel={() => isLinkModalOpen = false}
+/>
