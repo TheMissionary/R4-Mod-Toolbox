@@ -170,6 +170,7 @@ pub struct CetPluginItem {
     pub path: String,
     pub has_init: bool,
     pub size_bytes: u64,
+    pub file_count: usize,
     pub enabled: bool,
     #[serde(default)]
     pub is_dir: bool,
@@ -180,6 +181,7 @@ pub struct Red4extPluginItem {
     pub name: String,
     pub path: String,
     pub size_bytes: u64,
+    pub file_count: usize,
     pub enabled: bool,
     #[serde(default)]
     pub is_dir: bool,
@@ -189,8 +191,8 @@ pub struct Red4extPluginItem {
 pub struct RedScriptItem {
     pub name: String,
     pub path: String,
-    pub reds_count: usize,
     pub size_bytes: u64,
+    pub file_count: usize,
     pub enabled: bool,
     #[serde(default)]
     pub is_dir: bool,
@@ -200,8 +202,8 @@ pub struct RedScriptItem {
 pub struct R6TweaksItem {
     pub name: String,
     pub path: String,
-    pub tweaks_count: usize,
     pub size_bytes: u64,
+    pub file_count: usize,
     pub enabled: bool,
     #[serde(default)]
     pub is_dir: bool,
@@ -222,32 +224,15 @@ fn calculate_dir_size(path: &Path) -> u64 {
     total
 }
 
-fn count_reds_files(path: &Path) -> usize {
+fn count_all_files(path: &Path) -> usize {
     let mut count = 0;
     if let Ok(entries) = fs::read_dir(path) {
         for entry in entries.flatten() {
             let p = entry.path();
             if p.is_dir() {
-                count += count_reds_files(&p);
-            } else if p.extension().map_or(false, |ext| ext == "reds") {
+                count += count_all_files(&p);
+            } else {
                 count += 1;
-            }
-        }
-    }
-    count
-}
-
-fn count_tweak_files(path: &Path) -> usize {
-    let mut count = 0;
-    if let Ok(entries) = fs::read_dir(path) {
-        for entry in entries.flatten() {
-            let p = entry.path();
-            if p.is_dir() {
-                count += count_tweak_files(&p);
-            } else if let Some(ext) = p.extension() {
-                if ext == "yaml" || ext == "tweak" {
-                    count += 1;
-                }
             }
         }
     }
@@ -412,12 +397,17 @@ fn get_cet_details(game_path: String) -> Result<Vec<CetPluginItem>, String> {
                 let is_dir = p.is_dir();
                 let name = entry.file_name().to_string_lossy().to_string();
                 let has_init = p.join("init.lua").exists();
-                let size_bytes = if is_dir { calculate_dir_size(&p) } else { entry.metadata().map(|m| m.len()).unwrap_or(0) };
+                let (file_count, size_bytes) = if is_dir {
+                    (count_all_files(&p), calculate_dir_size(&p))
+                } else {
+                    (1, entry.metadata().map(|m| m.len()).unwrap_or(0))
+                };
                 list.push(CetPluginItem {
                     name,
                     path: p.to_string_lossy().to_string(),
                     has_init,
                     size_bytes,
+                    file_count,
                     enabled: true,
                     is_dir,
                 });
@@ -432,12 +422,17 @@ fn get_cet_details(game_path: String) -> Result<Vec<CetPluginItem>, String> {
                 let is_dir = p.is_dir();
                 let name = entry.file_name().to_string_lossy().to_string();
                 let has_init = p.join("init.lua").exists();
-                let size_bytes = if is_dir { calculate_dir_size(&p) } else { entry.metadata().map(|m| m.len()).unwrap_or(0) };
+                let (file_count, size_bytes) = if is_dir {
+                    (count_all_files(&p), calculate_dir_size(&p))
+                } else {
+                    (1, entry.metadata().map(|m| m.len()).unwrap_or(0))
+                };
                 list.push(CetPluginItem {
                     name,
                     path: p.to_string_lossy().to_string(),
                     has_init,
                     size_bytes,
+                    file_count,
                     enabled: false,
                     is_dir,
                 });
@@ -463,15 +458,16 @@ fn get_red4ext_details(game_path: String) -> Result<Vec<Red4extPluginItem>, Stri
                 let p = entry.path();
                 let is_dir = p.is_dir();
                 let name = entry.file_name().to_string_lossy().to_string();
-                let size_bytes = if is_dir {
-                    calculate_dir_size(&p)
+                let (file_count, size_bytes) = if is_dir {
+                    (count_all_files(&p), calculate_dir_size(&p))
                 } else {
-                    entry.metadata().map(|m| m.len()).unwrap_or(0)
+                    (1, entry.metadata().map(|m| m.len()).unwrap_or(0))
                 };
                 list.push(Red4extPluginItem {
                     name,
                     path: p.to_string_lossy().to_string(),
                     size_bytes,
+                    file_count,
                     enabled: true,
                     is_dir,
                 });
@@ -485,15 +481,16 @@ fn get_red4ext_details(game_path: String) -> Result<Vec<Red4extPluginItem>, Stri
                 let p = entry.path();
                 let is_dir = p.is_dir();
                 let name = entry.file_name().to_string_lossy().to_string();
-                let size_bytes = if is_dir {
-                    calculate_dir_size(&p)
+                let (file_count, size_bytes) = if is_dir {
+                    (count_all_files(&p), calculate_dir_size(&p))
                 } else {
-                    entry.metadata().map(|m| m.len()).unwrap_or(0)
+                    (1, entry.metadata().map(|m| m.len()).unwrap_or(0))
                 };
                 list.push(Red4extPluginItem {
                     name,
                     path: p.to_string_lossy().to_string(),
                     size_bytes,
+                    file_count,
                     enabled: false,
                     is_dir,
                 });
@@ -519,20 +516,16 @@ fn get_redscript_details(game_path: String) -> Result<Vec<RedScriptItem>, String
                 let p = entry.path();
                 let is_dir = p.is_dir();
                 let name = entry.file_name().to_string_lossy().to_string();
-                let (reds_count, size_bytes) = if is_dir {
-                    (count_reds_files(&p), calculate_dir_size(&p))
+                let (file_count, size_bytes) = if is_dir {
+                    (count_all_files(&p), calculate_dir_size(&p))
                 } else {
-                    let is_reds = p.extension().map_or(false, |ext| ext == "reds");
-                    (
-                        if is_reds { 1 } else { 0 },
-                        entry.metadata().map(|m| m.len()).unwrap_or(0),
-                    )
+                    (1, entry.metadata().map(|m| m.len()).unwrap_or(0))
                 };
                 list.push(RedScriptItem {
                     name,
                     path: p.to_string_lossy().to_string(),
-                    reds_count,
                     size_bytes,
+                    file_count,
                     enabled: true,
                     is_dir,
                 });
@@ -546,20 +539,16 @@ fn get_redscript_details(game_path: String) -> Result<Vec<RedScriptItem>, String
                 let p = entry.path();
                 let is_dir = p.is_dir();
                 let name = entry.file_name().to_string_lossy().to_string();
-                let (reds_count, size_bytes) = if is_dir {
-                    (count_reds_files(&p), calculate_dir_size(&p))
+                let (file_count, size_bytes) = if is_dir {
+                    (count_all_files(&p), calculate_dir_size(&p))
                 } else {
-                    let is_reds = p.extension().map_or(false, |ext| ext == "reds");
-                    (
-                        if is_reds { 1 } else { 0 },
-                        entry.metadata().map(|m| m.len()).unwrap_or(0),
-                    )
+                    (1, entry.metadata().map(|m| m.len()).unwrap_or(0))
                 };
                 list.push(RedScriptItem {
                     name,
                     path: p.to_string_lossy().to_string(),
-                    reds_count,
                     size_bytes,
+                    file_count,
                     enabled: false,
                     is_dir,
                 });
@@ -585,20 +574,16 @@ fn get_r6tweaks_details(game_path: String) -> Result<Vec<R6TweaksItem>, String> 
                 let p = entry.path();
                 let is_dir = p.is_dir();
                 let name = entry.file_name().to_string_lossy().to_string();
-                let (tweaks_count, size_bytes) = if is_dir {
-                    (count_tweak_files(&p), calculate_dir_size(&p))
+                let (file_count, size_bytes) = if is_dir {
+                    (count_all_files(&p), calculate_dir_size(&p))
                 } else {
-                    let is_tweak = p.extension().map_or(false, |ext| ext == "yaml" || ext == "tweak");
-                    (
-                        if is_tweak { 1 } else { 0 },
-                        entry.metadata().map(|m| m.len()).unwrap_or(0),
-                    )
+                    (1, entry.metadata().map(|m| m.len()).unwrap_or(0))
                 };
                 list.push(R6TweaksItem {
                     name,
                     path: p.to_string_lossy().to_string(),
-                    tweaks_count,
                     size_bytes,
+                    file_count,
                     enabled: true,
                     is_dir,
                 });
@@ -612,20 +597,16 @@ fn get_r6tweaks_details(game_path: String) -> Result<Vec<R6TweaksItem>, String> 
                 let p = entry.path();
                 let is_dir = p.is_dir();
                 let name = entry.file_name().to_string_lossy().to_string();
-                let (tweaks_count, size_bytes) = if is_dir {
-                    (count_tweak_files(&p), calculate_dir_size(&p))
+                let (file_count, size_bytes) = if is_dir {
+                    (count_all_files(&p), calculate_dir_size(&p))
                 } else {
-                    let is_tweak = p.extension().map_or(false, |ext| ext == "yaml" || ext == "tweak");
-                    (
-                        if is_tweak { 1 } else { 0 },
-                        entry.metadata().map(|m| m.len()).unwrap_or(0),
-                    )
+                    (1, entry.metadata().map(|m| m.len()).unwrap_or(0))
                 };
                 list.push(R6TweaksItem {
                     name,
                     path: p.to_string_lossy().to_string(),
-                    tweaks_count,
                     size_bytes,
+                    file_count,
                     enabled: false,
                     is_dir,
                 });

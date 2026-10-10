@@ -48,6 +48,7 @@ export interface CetPluginItem {
   path: string;
   has_init: boolean;
   size_bytes: number;
+  file_count: number;
   enabled: boolean;
   is_dir?: boolean;
 }
@@ -56,6 +57,7 @@ export interface Red4extPluginItem {
   name: string;
   path: string;
   size_bytes: number;
+  file_count: number;
   enabled: boolean;
   is_dir?: boolean;
 }
@@ -63,8 +65,8 @@ export interface Red4extPluginItem {
 export interface RedScriptItem {
   name: string;
   path: string;
-  reds_count: number;
   size_bytes: number;
+  file_count: number;
   enabled: boolean;
   is_dir?: boolean;
 }
@@ -72,8 +74,8 @@ export interface RedScriptItem {
 export interface R6TweaksItem {
   name: string;
   path: string;
-  tweaks_count: number;
   size_bytes: number;
+  file_count: number;
   enabled: boolean;
   is_dir?: boolean;
 }

@@ -9,8 +9,7 @@
 * Svelte Frontend Root: G:\R4-Mod-TBX\src
 * Compiled Standalone Binary: G:\R4-Mod-TBX\src-tauri\target\release\r4-mod-toolbox.exe
 * Canonical Operational Log Target: C:\Users\eidsv\Desktop\_Terminal_Output.txt
-* Knowledge Base Reference Staging: C:\Users\eidsv\Desktop\Gem-Knowledge-Source-Files\GAIS-ReferenceB
-* Global System Instructions Target: D:\Scripts, GUI & Backups\GEM Instructions\R4-Mod-TBX.txt
+* Knowledge Base Reference Staging: C:\Users\eidsv\Desktop\Gem-Knowledge-Source-Files\GAIS-ReferenceF
 * Remote Repository: https://github.com/TheMissionary/R4-Mod-Toolbox.git (Private)
 * Cyberpunk 2077 Target Path: G:\SteamLibrary\steamapps\common\Cyberpunk 2077
   * Mod Archive Root: G:\SteamLibrary\steamapps\common\Cyberpunk 2077\archive\pc\mod
@@ -18,56 +17,45 @@
 
 ### Validated Dependency Versions
 * Desktop Runtime: Tauri v2 (@tauri-apps/api: ^2, @tauri-apps/cli: ^2, tauri: 2, tauri-build: 2)
-* Tauri Plugins:
-  * Opener: tauri-plugin-opener: 2
-  * Dialog: tauri-plugin-dialog: 2
-  * Log: tauri-plugin-log: 2
-* Frontend Framework: Svelte v5.56.3 (runes: $state, $derived, $props, $effect, untrack)
+* Tauri Plugins: Opener, Dialog, Log
+* Frontend Framework: Svelte v5.56.3 (runes: `$state`, `$derived`, `$props`, `$effect`, `untrack`, snippets: `{#snippet}`)
 * Application Framework: SvelteKit v2.65.1 with @sveltejs/adapter-static: ^3.0.10
 * Bundler & Tooling: Vite v8.3.0, @sveltejs/vite-plugin-svelte: ^7.1.2, TypeScript ~6.0.3
 * Styling Engine: Tailwind CSS v4.3.3 (@tailwindcss/vite, @tailwindcss/postcss, autoprefixer: ^10.6.1)
 * Icon Library: lucide-svelte: ^1.0.1
-* Rust Backend Libraries:
-  * red4lib: Git rev cfa6713570e9bf859c29c05052035d38daa08d55 (RFUZZO WolvenKit core parser)
-  * notify: 6.1.1 (Filesystem change monitoring)
-  * serde: 1.0 and serde_json: 1.0 (Serialization / Deserialization)
+* Rust Backend Libraries: red4lib (Git rev cfa6713570e9bf859c29c05052035d38daa08d55), notify (6.1.1), serde (1.0)
 
 ---
 
 ## 2. Completed Milestones & Validated Architecture
 
-### Milestones 1-19: Baseline Architecture & Rebranding
-* In-Memory Hash Scanner via red4lib, Physical 0-Byte [CAT] Delimiters, Load Order Preservation, Block Drag-and-Drop, 1-Color Generative Theme, Dual Typography Studio, In-App Themed Dialog Engine, %APPDATA% Native Configuration Persistence, 60fps $derived drag conflict engine, tree line indentation, log folder integration, and full rebranding to "R4 Mod Toolbox".
+### Milestones 1-30: Baseline Architecture & Core Frameworks
+* In-Memory Hash Scanner via red4lib, Physical 0-Byte [CAT] Delimiters, Load Order Preservation, Block Drag-and-Drop, 1-Color Generative Theme, Dual Typography Studio, In-App Themed Dialog Engine, %APPDATA% Native Configuration Persistence, 60fps `$derived` drag conflict engine, tree line indentation, log folder integration, full rebranding to "R4 Mod Toolbox", Multi-Select Set<string> engine, MoveCategoryModal, LinkXlModal, case-insensitive sidecar JSON parsing, defensive window coordinate clamping (-32000 trap), removal of custom presets in favor of Profile 0, universal category collapse toggle, R6 framework bifurcation, App-Tracked Ledger for recent mods, lazy-loaded recursive folders, custom text editor integration, dynamic color-mix glows, instant vw-scaled splash screen, and debounced ledger inputs.
 
-### Milestone 20: Custom Archive Presets & State Persistence
-* Implemented %APPDATA%\r4-mod-toolbox\profiles.json snapshot schema.
-* Engineered Rust Atomic Load Engine (apply_archive_profile): Discovers archives on disk, reconciles active vs disabled state, auto-disables unknown/new mods, rewrites modlist.txt from snapshot, and executes a fresh integrity audit scan.
-* Introduced "Radio Station" preset model: Preset 1 & 2 slots in sidebar with theme accent glow.
-* Real-Time Drift Detection: Manual toggles, reordering, or category creations immediately extinguish the active preset glow.
-* Implemented full-screen non-dismissible blocking overlay during atomic load.
-* Added activeProfileSlot to AppConfig (config.json) to persist the active preset selection across app restarts.
+### Milestone 31: Full-Screen Views Architecture
+* Promoted Settings, Help, and About from constrained modal dialogs to full-screen workspace views, matching the native desktop aesthetic of Home and Archive.
+* Implemented a secondary navigation cluster on the left sidebar above the Launch Game button.
+* Corrected REDengine documentation in HelpView: Archives loaded first (top of order) claim assets and win conflicts; archives loaded later (bottom of order) are locked out and lose.
+* Documented physical category delimiters as 0-byte `.archive` files prefixed with `[CAT]`.
 
-### Milestone 21: Top-Placement for New Mods, Category Counts, & Windows Symbol Support
-* Top-Placement: Inverted ordered_paths in scan_archives so files detected on disk that are not in modlist.txt are prepended to index 0 ("Uncategorized" above all categories).
-* Nested Mod Count Badges: Svelte $derived reactive map (categoryCounts) computing count of mods in each category, passed to CategoryDelimiterRow as (N mods) in both expanded and collapsed states.
-* Windows Symbol Support: Replaced restrictive alphanumeric category filter with a check against 9 Windows-forbidden filename characters (< > : " / \ | ? *), allowing brackets [], parentheses (), hyphens, hashtags, etc.
-* Fixed delimiter parsing using Rust's exact strip_prefix("[CAT] ") and strip_suffix(".archive") to prevent character-mangling bugs.
-* Rebranded UI text from "Archive Profiles" to "Custom Archive Presets".
-
-### Milestone 22: Developer Tile Branding & Home Dashboard Default Launch
-* Replaced legacy CP77 version indicator in bottom-left sidebar with custom Mi55ionary Developer Tile.
-* Integrated hand-drawn orange heart avatar SVG (#e08528), developer label, and working external links to Nexus Mods profile and GitHub repository via Tauri opener plugin.
-* Locked default application startup strictly to the Home dashboard tab, removing persistent sub-tab restoration.
+### Milestone 31.1: AboutView Polish & Interaction Stability
+* Implemented an expandable "Release Notes & Changelog" standalone card with reverse-chronological milestones and an external "See All" link to GitHub releases.
+* Implemented an `IntersectionObserver` action (`watchVisibility`) on the full-width Ko-fi button to trigger a 3.5-second cyan pulse animation every time the About view becomes visible on screen.
+* Added a dedicated Special Acknowledgements card honoring `rfuzzo` for Wolvenkit and `red4lib` positioned above Core Technologies.
+* Added a "Check for Updates" button linking directly to the Nexus Mods profile.
+* Updated developer title to "Lead Developer".
 
 ---
 
-## 3. Critical Architectural Learnings & Svelte 5 Protocols
+## 3. Critical Architectural Learnings & Protocols
 
-1. **Windows Minimized Coordinates (-32000) Off-Screen Trap:**
-   * When closed while minimized, Windows reports window coordinates as -32000, -32000. If persisted blindly to config.json, the window launches off-screen in the void. Must enforce boundary validation (x > -1000 && y > -1000) before saving or restoring window positions.
-2. **Git Source Control Hygiene:**
-   * Never track compiled binaries (*.exe, *.dll) in source control. Stored .gitignore must explicitly ignore *.exe to prevent repository bloat; binaries belong in GitHub Releases.
-3. **Markdown Stream Buffer Thresholds in Web UIs:**
-   * Single markdown code blocks exceeding ~1,200–1,500 lines can crash the DOM/parser in web chat UIs, stripping formatting containers and copy buttons. Multi-file deliveries must be broken into discrete, atomic script blocks (<800 lines).
-4. **Safe Delimiter String Stripping:**
-   * Never use trim_start_matches with a string set in Rust, as it strips any character in the set (e.g. "[CAT] " strips 'C', 'A', 'T'). Use exact strip_prefix and strip_suffix.
+1. **Svelte 5 HTML Parser vs. TypeScript Non-Null Assertions:**
+   * While TypeScript non-null assertions (`!`) are valid inside `<script>` blocks, Svelte 5's template compiler rejects them inside markup or `{@const}` blocks, throwing a fatal Rolldown `Unexpected token` error. Always use standard optional chaining (`?.`) in Svelte HTML templates.
+2. **Intersection Observers for CSS-Hidden Tab Animations:**
+   * When switching tabs via CSS display classes (`class="hidden"`) rather than mounting/unmounting, Svelte's `onMount` fires immediately on application startup for all tabs. To trigger animations (such as the Ko-fi glow) reliably on tab activation, an `IntersectionObserver` action must be attached to the target DOM node.
+3. **PowerShell Single-Quoted Here-Strings (`@' ... '@`):**
+   * Double-quoted here-strings (`@" ... "@`) in PowerShell attempt variable interpolation on Svelte runes (`$state`, `$derived`, `$props`), corrupting source files with escaped characters or empty strings. All automated file deployments containing Svelte files MUST use single-quoted here-strings (`@' ... '@`).
+4. **Markdown Buffer Ceilings & Large Component Deployments:**
+   * Files exceeding ~500 lines risk overflowing the LLM markdown response buffer, truncating scripts mid-stream. When large components (like `ArchiveView` or `+page.svelte`) must be deployed, split-merge operations must be encapsulated within a single, unified PowerShell execution block to prevent local file desyncs.
+5. **Lucide-Svelte Export Strictness:**
+   * Avoid unverified brand icon exports (e.g., `Github`, `Kofi`). Always stick to verified standard icons (`Code`, `Coffee`, `ExternalLink`, `Settings`).

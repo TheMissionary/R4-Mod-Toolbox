@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { RedScriptItem, FileNode } from '$lib/types';
-  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit } from 'lucide-svelte';
+  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { tick } from 'svelte';
@@ -24,6 +24,7 @@
   let customEditorPath = $state('');
 
   let highlightedModName = $state<string | null>(null);
+  let selectedMod = $state<string | null>(null);
   let highlightTimeoutId: number | null = null;
   const modNodeMap = new Map<string, HTMLElement>();
 
@@ -66,6 +67,20 @@
       customEditorPath = config.customTextEditorPath || '';
     });
   });
+
+  // Intersection Observer for Auto-Collapse on Tab Exit
+  function watchVisibility(node: HTMLElement) {
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries[0].isIntersecting) {
+        expandedFolders = {};
+        selectedMod = null;
+      }
+    }, { threshold: 0 });
+    observer.observe(node);
+    return {
+      destroy() { observer.disconnect(); }
+    };
+  }
 
   function registerModNode(node: HTMLElement, modName: string) {
     modNodeMap.set(modName, node);
@@ -150,6 +165,26 @@
         console.error('Failed to load folder contents:', err);
       } finally {
         loadingFolders[path] = false;
+      }
+    }
+  }
+
+  let topLevelFolders = $derived(packages.filter(p => p.is_dir));
+  let isAllExpanded = $derived(topLevelFolders.length > 0 && topLevelFolders.every(p => expandedFolders[p.path]));
+
+  async function toggleAllFolders() {
+    if (isAllExpanded) {
+      expandedFolders = {};
+    } else {
+      for (const p of topLevelFolders) {
+        expandedFolders[p.path] = true;
+        if (!folderContents[p.path]) {
+          loadingFolders[p.path] = true;
+          try {
+            folderContents[p.path] = await invoke<FileNode[]>('get_folder_contents', { folderPath: p.path });
+          } catch (err) {}
+          loadingFolders[p.path] = false;
+        }
       }
     }
   }
@@ -344,10 +379,10 @@
     {#each folderContents[parentPath] as node}
       <div
         oncontextmenu={(e) => openContextMenu(e, node, 'file')}
-        class="flex items-center justify-between px-3 rounded border-b border-nvidia-border/30 hover:bg-nvidia-surface/70 transition density-row cursor-context-menu"
+        class="group flex items-center justify-between px-3 rounded border-b border-nvidia-border/30 hover:bg-nvidia-surface/70 transition density-row cursor-context-menu"
         style="padding-left: {depth * 1.25 + 1}rem"
       >
-        <div class="flex items-center gap-2.5 min-w-0">
+        <div class="flex items-center gap-2.5 min-w-0 flex-1">
           {#if node.is_dir}
             <button
               type="button"
@@ -367,8 +402,23 @@
           {/if}
           <span class="font-mono text-nvidia-text-primary truncate text-[11px]">{node.name}</span>
         </div>
-        <div class="text-[10px] font-mono text-nvidia-text-muted shrink-0">
-          {#if !node.is_dir}{formatBytes(node.size_bytes)}{/if}
+        
+        <!-- Fixed-Width Laser-Aligned Right Column for Inner Files -->
+        <div class="flex items-center gap-2 shrink-0">
+          <div class="w-20"></div> <!-- Empty space for file count alignment -->
+          <div class="w-16 flex justify-end text-[10px] font-mono text-nvidia-text-muted">
+            {#if !node.is_dir}{formatBytes(node.size_bytes)}{/if}
+          </div>
+          <div class="w-6 flex justify-end">
+            <button
+              type="button"
+              onclick={(e) => { e.stopPropagation(); openContextMenu(e, node, 'file'); }}
+              class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-text-primary hover:bg-nvidia-card transition cursor-pointer opacity-0 group-hover:opacity-100"
+              title="More options"
+            >
+              <MoreVertical class="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       </div>
       {#if node.is_dir && expandedFolders[node.path]}
@@ -378,7 +428,7 @@
   {/if}
 {/snippet}
 
-<div class="flex flex-col h-full select-none" oncontextmenu={(e) => e.preventDefault()}>
+<div use:watchVisibility class="flex flex-col h-full select-none" oncontextmenu={(e) => e.preventDefault()}>
   <div class="flex items-center justify-between gap-3 mb-3 shrink-0">
     <div class="flex items-center gap-3 flex-1 max-w-md">
       <div class="relative flex-1">
@@ -400,9 +450,26 @@
           </button>
         {/if}
       </div>
-      <div class="text-xs font-mono text-nvidia-text-muted shrink-0">
+    </div>
+    
+    <div class="flex items-center gap-3 shrink-0">
+      <div class="text-xs font-mono text-nvidia-text-muted">
         Active: <span class="text-nvidia-accent font-semibold">{activeCount}</span> of {packages.length}
       </div>
+      <button
+        type="button"
+        onclick={toggleAllFolders}
+        disabled={topLevelFolders.length === 0}
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {#if isAllExpanded}
+          <Folder class="h-3.5 w-3.5 text-nvidia-accent" />
+          <span>Collapse All</span>
+        {:else}
+          <FolderOpen class="h-3.5 w-3.5 text-nvidia-accent" />
+          <span>Expand All</span>
+        {/if}
+      </button>
     </div>
   </div>
 
@@ -414,25 +481,28 @@
     {:else}
       {#each filteredPackages as pkg (pkg.name)}
         {@const isHighlighted = highlightedModName === pkg.name}
+        {@const isSelected = selectedMod === pkg.name}
         <div class="flex flex-col">
           <div
             use:registerModNode={pkg.name}
+            onclick={() => selectedMod = pkg.name}
             data-mod-item="true"
             data-mod-name={pkg.name}
             data-mod-path={pkg.path}
             data-mod-type="redscript"
             data-is-file={!pkg.is_dir}
             oncontextmenu={(e) => openContextMenu(e, pkg, 'pkg')}
-            class="flex items-center justify-between px-3 rounded border transition-all duration-300 density-row cursor-context-menu
-              {isHighlighted ? 'border-nvidia-accent ring-2 ring-nvidia-accent bg-nvidia-accent/20 scale-[1.008] z-10 relative' : 'border-nvidia-border/70 bg-nvidia-surface/40 hover:bg-nvidia-surface/70'}
+            class="group flex items-center justify-between px-3 rounded border transition-all duration-300 density-row cursor-context-menu
+              {isHighlighted ? 'border-nvidia-accent ring-2 ring-nvidia-accent bg-nvidia-accent/20 scale-[1.008] z-10 relative' : 
+              (isSelected ? 'border-nvidia-accent/60 bg-nvidia-accent/10' : 'border-nvidia-border/70 bg-nvidia-surface/40 hover:bg-nvidia-surface/70')}
               {pkg.enabled ? 'text-nvidia-text-primary' : 'opacity-50 text-nvidia-text-muted'}"
             style={isHighlighted ? 'box-shadow: 0 0 15px color-mix(in srgb, var(--theme-accent) 35%, transparent);' : ''}
           >
-            <div class="flex items-center gap-2.5 min-w-0">
+            <div class="flex items-center gap-2.5 min-w-0 flex-1">
               <!-- Subtle Calmed Switch -->
               <button
                 type="button"
-                onclick={() => handleToggle(pkg)}
+                onclick={(e) => { e.stopPropagation(); handleToggle(pkg); }}
                 aria-label={pkg.enabled ? "Disable package " + pkg.name : "Enable package " + pkg.name}
                 class="w-7 h-4 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer {pkg.enabled ? 'bg-zinc-700/80 border border-zinc-600' : 'bg-zinc-900/90 border border-zinc-800'}"
               >
@@ -463,11 +533,26 @@
               </span>
             </div>
 
-            <div class="flex items-center gap-3 text-[11px] font-mono text-nvidia-text-muted shrink-0">
-              <span class="px-1.5 py-0.2 rounded bg-nvidia-surface border border-nvidia-border/60 text-[10px] text-nvidia-text-muted">
-                {pkg.reds_count} .reds
-              </span>
-              <span>{formatBytes(pkg.size_bytes)}</span>
+            <!-- Fixed-Width Laser-Aligned Right Column -->
+            <div class="flex items-center gap-2 shrink-0">
+              <div class="w-20 flex justify-end">
+                <span class="px-1.5 py-0.2 rounded bg-nvidia-accent/15 border border-nvidia-accent/30 text-[10px] text-nvidia-accent font-semibold truncate">
+                  {pkg.file_count} {pkg.file_count === 1 ? 'file' : 'files'}
+                </span>
+              </div>
+              <div class="w-16 flex justify-end text-[11px] font-mono text-nvidia-text-muted">
+                {formatBytes(pkg.size_bytes)}
+              </div>
+              <div class="w-6 flex justify-end">
+                <button
+                  type="button"
+                  onclick={(e) => { e.stopPropagation(); openContextMenu(e, pkg, 'pkg'); }}
+                  class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-text-primary hover:bg-nvidia-card transition cursor-pointer opacity-0 group-hover:opacity-100"
+                  title="More options"
+                >
+                  <MoreVertical class="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           </div>
 
