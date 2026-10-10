@@ -70,11 +70,11 @@
           <ul class="space-y-2 mt-2">
             <li class="flex items-start gap-2">
               <div class="h-2.5 w-2.5 rounded-full bg-[#22c55e] shadow-[0_0_6px_rgba(34,197,94,0.7)] mt-0.5 shrink-0"></div>
-              <span><strong class="text-[#22c55e]">Green (Winning):</strong> This mod is loaded lower in the order and is successfully overwriting assets from a mod above it.</span>
+              <span><strong class="text-[#22c55e]">Green (Winning):</strong> This mod is placed higher in the load order and successfully overwrites conflicting assets from mods below it.</span>
             </li>
             <li class="flex items-start gap-2">
               <div class="h-2.5 w-2.5 rounded-full bg-[#ef4444] shadow-[0_0_6px_rgba(239,68,68,0.7)] mt-0.5 shrink-0"></div>
-              <span><strong class="text-[#ef4444]">Red (Losing):</strong> This mod is loaded higher in the order, and some or all of its assets are being overwritten by a mod below it.</span>
+              <span><strong class="text-[#ef4444]">Red (Losing):</strong> This mod is placed lower in the load order, and its assets are being overwritten by a winning mod above it.</span>
             </li>
           </ul>
           <p class="pt-1">
