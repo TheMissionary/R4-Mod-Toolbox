@@ -28,7 +28,8 @@
     MoreVertical,
     FolderInput,
     Link2,
-    Unlink
+    Unlink,
+    ArrowUp
   } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -638,7 +639,7 @@
     else if (targetType === 'xl') menuHeight = 180;
     else if (targetType === 'archive') {
       const archive = target as ArchiveItem;
-      menuHeight = archive.is_delimiter ? 190 : (selectedMods.size > 0 ? 180 : 145);
+      menuHeight = archive.is_delimiter ? 190 : (selectedMods.size > 0 ? 215 : 145);
     }
 
     const posX = (event.clientX + menuWidth > window.innerWidth) ? (window.innerWidth - menuWidth - 10) : event.clientX;
@@ -1031,6 +1032,15 @@
         >
           <FolderInput class="h-3.5 w-3.5 text-nvidia-accent" />
           <span>Move {selectedMods.size} Mods to Category...</span>
+        </button>
+
+        <button
+          type="button"
+          onclick={() => { closeContextMenu(); handleMoveToCategory('[TOP]'); }}
+          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        >
+          <ArrowUp class="h-3.5 w-3.5 text-nvidia-accent" />
+          <span>Move to Top (Uncategorized)</span>
         </button>
       {/if}
 
