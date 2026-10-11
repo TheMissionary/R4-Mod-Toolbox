@@ -24,7 +24,10 @@
     Sparkles,
     FileText,
     FolderOpen,
-    FileCode
+    FileCode,
+    Palette,
+    Play,
+    Trash2
   } from 'lucide-svelte';
 
   let draft = $state<ThemeSettings>(loadThemeSettings());
@@ -34,7 +37,9 @@
   let selectedModsPreset = $state<string>(MOD_FONT_PRESETS[0].value);
   let customModsInput = $state('');
   let customEditorPath = $state('');
+  let customLaunchPath = $state('');
   let isDirty = $state(false);
+  let clearedFeedback = $state(false);
 
   let activeColors = $derived(draft.mode === 'light' ? draft.lightColors : draft.darkColors);
 
@@ -69,6 +74,7 @@
 
     loadConfigFromDisk().then(config => {
       customEditorPath = config.customTextEditorPath || '';
+      customLaunchPath = config.customLaunchPath || '';
     });
   });
 
@@ -157,6 +163,23 @@
     }
   }
 
+  async function handleBrowseLaunchPath() {
+    try {
+      const selected = await open({
+        multiple: false,
+        directory: false,
+        filters: [{ name: 'Executables & Shortcuts', extensions: ['exe', 'lnk'] }],
+        title: 'Select Custom Launch Target'
+      });
+      if (typeof selected === 'string') {
+        customLaunchPath = selected;
+        markDirty();
+      }
+    } catch (err) {
+      console.error('Failed to select launch path:', err);
+    }
+  }
+
   function handleResetDefault() {
     if (draft.mode === 'light') {
       draft.lightColors = generateThemeColors('light', '#5A8F00');
@@ -172,6 +195,7 @@
     customBaseInput = '';
     customModsInput = '';
     customEditorPath = '';
+    customLaunchPath = '';
     markDirty();
   }
 
@@ -192,6 +216,7 @@
       let config = await loadConfigFromDisk();
       config.theme = plainPayload;
       config.customTextEditorPath = customEditorPath.trim();
+      config.customLaunchPath = customLaunchPath.trim();
       await saveConfigToDisk(config);
       isDirty = false;
     } catch (err) {
@@ -204,6 +229,16 @@
       await invoke('open_log_folder');
     } catch (err) {
       console.error('Failed to open log folder:', err);
+    }
+  }
+
+  async function handleClearLogs() {
+    try {
+      await invoke('clear_user_log');
+      clearedFeedback = true;
+      setTimeout(() => { clearedFeedback = false; }, 2000);
+    } catch (err) {
+      console.error('Failed to clear logs:', err);
     }
   }
 </script>
@@ -245,7 +280,7 @@
 
     <!-- Live Preview Mockup -->
     <div
-      class="rounded-lg border shadow-inner p-4 space-y-3 transition-colors duration-200 max-w-3xl"
+      class="rounded-lg border shadow-inner p-4 space-y-3 transition-colors duration-200 max-w-3xl relative"
       style="
         background-color: {activeColors.bg};
         border-color: {activeColors.border};
@@ -253,6 +288,12 @@
         color: {activeColors.textPrimary};
       "
     >
+      <!-- Theme Preview Label -->
+      <div class="flex items-center gap-1.5 opacity-60 mb-1" style="color: {activeColors.textPrimary};">
+        <Palette class="h-3.5 w-3.5" style="color: {activeColors.accent};" />
+        <span class="text-[10px] font-bold uppercase tracking-wider">R4 Theme Preview</span>
+      </div>
+
       <!-- Mockup Header -->
       <div
         class="px-3 py-2 rounded border flex items-center justify-between"
@@ -432,6 +473,35 @@
       </div>
     </div>
 
+    <!-- Custom Launch Path Configuration -->
+    <div class="max-w-4xl">
+      <div class="p-4 rounded-xl border border-nvidia-border bg-nvidia-surface/50 space-y-3">
+        <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-nvidia-text-muted">
+          <Play class="h-4 w-4 text-nvidia-accent" />
+          <span>Custom Launch Path</span>
+        </div>
+        <p class="text-xs text-nvidia-text-muted leading-tight">
+          Select a custom executable or shortcut (.lnk) to launch instead of the default Cyberpunk2077.exe. Leave blank to use the default.
+        </p>
+        <div class="flex items-center gap-3">
+          <input
+            type="text"
+            bind:value={customLaunchPath}
+            oninput={markDirty}
+            placeholder="C:\Users\Public\Desktop\Cyberpunk 2077.lnk"
+            class="flex-1 px-3 py-2 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/50 focus:outline-none focus:border-nvidia-accent font-mono"
+          />
+          <button
+            type="button"
+            onclick={handleBrowseLaunchPath}
+            class="px-4 py-2 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0"
+          >
+            Browse...
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Text Editor Configuration -->
     <div class="max-w-4xl">
       <div class="p-4 rounded-xl border border-nvidia-border bg-nvidia-surface/50 space-y-3">
@@ -473,14 +543,29 @@
             Application logs are saved automatically. Use these files when reporting issues.
           </p>
         </div>
-        <button
-          type="button"
-          onclick={handleOpenLogs}
-          class="flex items-center gap-2 px-4 py-2 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0 shadow-xs"
-        >
-          <FolderOpen class="h-4 w-4 text-nvidia-text-muted" />
-          <span>Open Log Folder</span>
-        </button>
+        <div class="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onclick={handleClearLogs}
+            class="flex items-center gap-2 px-4 py-2 rounded bg-nvidia-surface hover:bg-red-500/10 border border-nvidia-border hover:border-red-500/30 text-xs text-nvidia-text-primary hover:text-red-400 transition cursor-pointer shadow-xs"
+          >
+            {#if clearedFeedback}
+              <Check class="h-4 w-4 text-nvidia-accent" />
+              <span class="text-nvidia-accent">Cleared!</span>
+            {:else}
+              <Trash2 class="h-4 w-4" />
+              <span>Clear User Log</span>
+            {/if}
+          </button>
+          <button
+            type="button"
+            onclick={handleOpenLogs}
+            class="flex items-center gap-2 px-4 py-2 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shadow-xs"
+          >
+            <FolderOpen class="h-4 w-4 text-nvidia-text-muted" />
+            <span>Open Log Folder</span>
+          </button>
+        </div>
       </div>
     </div>
 

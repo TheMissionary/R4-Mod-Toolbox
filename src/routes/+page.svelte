@@ -254,7 +254,9 @@
     if (!gamePath || isLaunching) return;
     isLaunching = true;
     try {
-      await invoke('launch_game', { gamePath });
+      // Fetch the absolute latest config from disk to ensure we have the newest customLaunchPath
+      const config = await loadConfigFromDisk();
+      await invoke('launch_game', { gamePath, customLaunchPath: config.customLaunchPath });
     } catch (err) {
       console.error('Failed to launch game:', err);
     } finally {
@@ -569,38 +571,26 @@
           </div>
           <div class="min-w-0 flex flex-col">
             <span class="text-[9px] text-nvidia-text-muted uppercase tracking-wider font-semibold leading-tight">Dev</span>
-            <span class="text-[11px] font-mono font-bold text-nvidia-text-primary truncate leading-tight" title="Mi55ionary">
+            <button 
+              type="button" 
+              onclick={() => openExternalLink('https://www.nexusmods.com/profile/Mi55ionary')} 
+              class="text-[11px] font-mono font-bold text-nvidia-text-primary hover:text-nvidia-accent transition-colors truncate leading-tight text-left cursor-pointer" 
+              title="View Mi55ionary on Nexus Mods"
+            >
               Mi55ionary
-            </span>
+            </button>
           </div>
         </div>
 
         <div class="flex items-center gap-1 shrink-0">
           <button
             type="button"
-            onclick={() => openExternalLink('https://www.nexusmods.com/profile/Mi55ionary')}
-            class="px-1.5 py-0.5 rounded bg-nvidia-card hover:bg-amber-500/20 text-[10px] font-mono font-bold text-amber-400 border border-nvidia-border hover:border-amber-500/50 transition cursor-pointer"
-            title="View Mi55ionary on Nexus Mods"
-          >
-            Nexus
-          </button>
-
-          <button
-            type="button"
-            onclick={() => openExternalLink('https://github.com/TheMissionary/R4-Mod-Toolbox')}
-            class="px-1.5 py-0.5 rounded bg-nvidia-card hover:bg-nvidia-surface text-[10px] font-mono text-nvidia-text-muted hover:text-nvidia-text-primary border border-nvidia-border transition cursor-pointer"
-            title="View GitHub Repository"
-          >
-            GitHub
-          </button>
-
-          <button
-            type="button"
-            onclick={() => openExternalLink('https://ko-fi.com/mi55ionary')}
-            class="px-1.5 py-0.5 rounded bg-nvidia-card hover:bg-cyan-500/10 text-[10px] font-mono text-nvidia-text-muted hover:text-cyan-400 border border-nvidia-border hover:border-cyan-500/30 transition cursor-pointer flex items-center justify-center"
+            onclick={() => openExternalLink('https://ko-fi.com/themissionary')}
+            class="px-2 py-1 rounded bg-nvidia-card hover:bg-cyan-500/10 text-[10px] font-mono text-nvidia-text-muted hover:text-cyan-400 border border-nvidia-border hover:border-cyan-500/30 transition cursor-pointer flex items-center justify-center gap-1.5"
             title="Support on Ko-fi"
           >
             <Coffee class="h-3 w-3" />
+            <span class="font-bold">Ko-fi</span>
           </button>
         </div>
       </div>
@@ -621,7 +611,7 @@
           </div>
           <h2 class="text-xl font-bold text-nvidia-text-primary mb-1">R4 Management Engine</h2>
           <p class="text-xs text-nvidia-text-muted max-w-xl">
-            Master your mod conflicts with real-time archive resolution. Organize your workspace using custom categories, drag-and-drop load ordering, and seamless management across all mod frameworks.
+            Master your mod conflicts with real-time archive resolution. Organize your workspace using custom categories, drag-and-drop load ordering, and seamless management across the mod frameworks below.
           </p>
         </div>
 

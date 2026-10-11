@@ -101,7 +101,7 @@
             
             <button
               type="button"
-              onclick={() => handleOpenLink('https://www.nexusmods.com/profile/Mi55ionary')}
+              onclick={() => handleOpenLink('https://www.nexusmods.com/cyberpunk2077/mods/34691')}
               class="flex items-center gap-2 px-3 py-2 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border transition cursor-pointer shrink-0 shadow-xs group"
             >
               <Download class="h-3.5 w-3.5 text-nvidia-accent group-hover:brightness-110" />
@@ -163,11 +163,11 @@
             <button
               use:watchVisibility
               type="button"
-              onclick={() => handleOpenLink('https://ko-fi.com/mi55ionary')}
+              onclick={() => handleOpenLink('https://ko-fi.com/themissionary')}
               class="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded bg-nvidia-card hover:bg-cyan-500/10 border transition-all duration-700 cursor-pointer group {isKofiGlowing ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.4)]' : 'border-nvidia-border hover:border-cyan-500/50'}"
             >
               <Coffee class="h-4 w-4 text-cyan-400 group-hover:brightness-110 {isKofiGlowing ? 'animate-pulse' : ''}" />
-              <span class="text-xs font-bold text-nvidia-text-primary">Keep the Engine Running - Support me on Ko-fi</span>
+              <span class="text-xs font-bold text-nvidia-text-primary">Buy me a coffee, keep the engine running</span>
             </button>
           </div>
 

@@ -91,6 +91,8 @@ pub struct AppConfig {
     pub recent_days_threshold: Option<u32>,
     #[serde(default)]
     pub custom_text_editor_path: Option<String>,
+    #[serde(default)]
+    pub custom_launch_path: Option<String>,
     pub theme: ThemeConfig,
 }
 
@@ -106,6 +108,7 @@ impl Default for AppConfig {
             window_y: None,
             recent_days_threshold: Some(30),
             custom_text_editor_path: None,
+            custom_launch_path: None,
             theme: ThemeConfig::default(),
         }
     }
@@ -852,6 +855,42 @@ fn open_log_folder(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn clear_user_log(app: tauri::AppHandle) -> Result<(), String> {
+    let log_dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
+    if log_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&log_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() && path.extension().map_or(false, |ext| ext == "log") {
+                    // Truncate the file to 0 bytes to avoid file lock deletion issues
+                    let _ = std::fs::File::create(&path);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn launch_game(game_path: String, custom_launch_path: Option<String>) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        let target = if let Some(cp) = custom_launch_path.filter(|s| !s.trim().is_empty()) {
+            cp
+        } else {
+            let default_exe = PathBuf::from(&game_path).join("bin").join("x64").join("Cyberpunk2077.exe");
+            default_exe.to_string_lossy().to_string()
+        };
+
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", &target])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -915,7 +954,9 @@ pub fn run() {
             toggle_plugin_state,
             get_folder_contents,
             open_in_text_editor,
-            open_log_folder
+            open_log_folder,
+            clear_user_log,
+            launch_game
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

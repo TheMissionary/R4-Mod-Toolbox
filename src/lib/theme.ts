@@ -124,6 +124,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   windowHeight: 1000,
   recentDaysThreshold: 30,
   customTextEditorPath: '',
+  customLaunchPath: '',
   theme: { ...DEFAULT_THEME_SETTINGS },
 };
 
@@ -211,6 +212,9 @@ export async function loadConfigFromDisk(): Promise<AppConfig> {
       }
       if (config.customTextEditorPath === undefined) {
         config.customTextEditorPath = '';
+      }
+      if (config.customLaunchPath === undefined) {
+        config.customLaunchPath = '';
       }
 
       if (typeof localStorage !== 'undefined') {

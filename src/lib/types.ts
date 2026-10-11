@@ -141,5 +141,6 @@ export interface AppConfig {
   windowY?: number;
   recentDaysThreshold?: number;
   customTextEditorPath?: string;
+  customLaunchPath?: string;
   theme: ThemeSettings;
 }
