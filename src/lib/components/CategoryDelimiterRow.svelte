@@ -83,7 +83,7 @@
       </button>
 
       <span class="font-bold text-nvidia-text-primary uppercase tracking-wider truncate">
-        {archive.category_name || archive.file_name.replace('[CAT] ', '').replace('.archive', '')}
+        {archive.category_name || archive.file_name.replace('[CAT] ', '').replace('.txt', '')}
       </span>
 
       <!-- Dynamic Nested Mod Count Badge -->

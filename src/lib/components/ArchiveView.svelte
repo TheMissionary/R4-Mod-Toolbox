@@ -226,7 +226,7 @@
             archives = report.archives;
             if (onStateChanged) onStateChanged();
             
-            const newFileName = `[CAT] ${name.trim()}.archive`;
+            const newFileName = `[CAT] ${name.trim()}.txt`;
             setTimeout(() => {
               focusModInMainList(newFileName);
             }, 100);
@@ -239,7 +239,7 @@
   }
 
   function handleRenameCategory(archive: ArchiveItem) {
-    const currentName = archive.category_name || archive.file_name.replace('[CAT] ', '').replace('.archive', '');
+    const currentName = archive.category_name || archive.file_name.replace('[CAT] ', '').replace('.txt', '');
     dialogState = {
       isOpen: true,
       title: 'Rename Category',
@@ -261,7 +261,7 @@
           if (report && Array.isArray(report.archives)) {
             const wasCollapsed = !!collapsedCategories[archive.file_name];
             delete collapsedCategories[archive.file_name];
-            const newFileName = `[CAT] ${newName.trim()}.archive`;
+            const newFileName = `[CAT] ${newName.trim()}.txt`;
             if (wasCollapsed) {
               collapsedCategories[newFileName] = true;
             }
@@ -744,7 +744,7 @@
 
   let availableCategories = $derived.by(() => {
     const cats = localArchives.filter(a => a.is_delimiter).map(a => ({
-      name: a.category_name || a.file_name.replace('[CAT] ', '').replace('.archive', ''),
+      name: a.category_name || a.file_name.replace('[CAT] ', '').replace('.txt', ''),
       file_name: a.file_name
     }));
     return [{ name: 'Top (Uncategorized)', file_name: '[TOP]' }, ...cats];
@@ -926,7 +926,7 @@
     {#if draggedEntry.is_delimiter}
       <Folder class="h-3.5 w-3.5 text-nvidia-accent" />
       <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">
-        {draggedEntry.category_name || draggedEntry.file_name.replace('[CAT] ', '').replace('.archive', '')}
+        {draggedEntry.category_name || draggedEntry.file_name.replace('[CAT] ', '').replace('.txt', '')}
         {#if dragBlockSize > 1}
           <span class="text-nvidia-accent ml-1 font-mono">({dragBlockSize - 1} mods)</span>
         {/if}

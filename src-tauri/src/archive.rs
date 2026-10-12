@@ -102,6 +102,73 @@ fn get_archive_stem(clean_name: &str) -> String {
     }
 }
 
+// --- DUAL LOAD ORDER SYSTEM ---
+
+fn sync_engine_modlist(archive_dir: &Path) {
+    let loadorder_path = archive_dir.join("r4_loadorder.txt");
+    let modlist_path = archive_dir.join("modlist.txt");
+    
+    if let Ok(content) = fs::read_to_string(&loadorder_path) {
+        let mut engine_lines = Vec::new();
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() { continue; }
+            // Only write valid .archive files to the engine's modlist.txt
+            if !trimmed.starts_with("[CAT] ") && trimmed.ends_with(".archive") {
+                engine_lines.push(trimmed.to_string());
+            }
+        }
+        let _ = fs::write(&modlist_path, engine_lines.join("\r\n") + "\r\n");
+    }
+}
+
+fn migrate_legacy_categories(archive_dir: &Path) {
+    let modlist_path = archive_dir.join("modlist.txt");
+    let loadorder_path = archive_dir.join("r4_loadorder.txt");
+    let mut needs_sync = false;
+
+    // 1. Rename physical files from .archive to .txt
+    if let Ok(entries) = fs::read_dir(archive_dir) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let p = entry.path();
+            if p.is_file() {
+                let name = p.file_name().unwrap_or_default().to_string_lossy().to_string();
+                if name.starts_with("[CAT] ") {
+                    if name.ends_with(".archive") {
+                        let new_name = name.replace(".archive", ".txt");
+                        let _ = fs::rename(&p, archive_dir.join(new_name));
+                    } else if name.ends_with(".archive.disabled") {
+                        let new_name = name.replace(".archive.disabled", ".txt.disabled");
+                        let _ = fs::rename(&p, archive_dir.join(new_name));
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Migrate modlist.txt to r4_loadorder.txt if it doesn't exist yet
+    if !loadorder_path.exists() && modlist_path.exists() {
+        if let Ok(content) = fs::read_to_string(&modlist_path) {
+            let mut new_lines = Vec::new();
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with("[CAT] ") && trimmed.ends_with(".archive") {
+                    new_lines.push(trimmed.replace(".archive", ".txt"));
+                } else {
+                    new_lines.push(trimmed.to_string());
+                }
+            }
+            let _ = fs::write(&loadorder_path, new_lines.join("\r\n") + "\r\n");
+            needs_sync = true;
+        }
+    }
+
+    // 3. Clean up the engine's modlist.txt
+    if needs_sync {
+        sync_engine_modlist(archive_dir);
+    }
+}
+
 pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> {
     let archive_dir = PathBuf::from(base_game_path).join("archive").join("pc").join("mod");
 
@@ -114,6 +181,9 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
         });
     }
 
+    // Execute silent migration for Dual Load Order System
+    migrate_legacy_categories(&archive_dir);
+
     let mut active_archive_files: Vec<PathBuf> = Vec::new();
     let mut disabled_archive_files: Vec<PathBuf> = Vec::new();
     let mut xl_files: Vec<PathBuf> = Vec::new();
@@ -123,9 +193,9 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
             let p = entry.path();
             if p.is_file() {
                 let name = p.file_name().unwrap_or_default().to_string_lossy().to_string();
-                if name.ends_with(".archive") {
+                if name.ends_with(".archive") || (name.starts_with("[CAT] ") && name.ends_with(".txt")) {
                     active_archive_files.push(p);
-                } else if name.ends_with(".archive.disabled") {
+                } else if name.ends_with(".archive.disabled") || (name.starts_with("[CAT] ") && name.ends_with(".txt.disabled")) {
                     disabled_archive_files.push(p);
                 } else if name.ends_with(".xl") || name.ends_with(".xl.disabled") {
                     xl_files.push(p);
@@ -143,10 +213,11 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
         clean_a.as_bytes().cmp(clean_b.as_bytes())
     });
 
-    let modlist_path = archive_dir.join("modlist.txt");
+    // Read from the internal master tracker, not the engine's modlist
+    let loadorder_path = archive_dir.join("r4_loadorder.txt");
     let mut ordered_paths: Vec<PathBuf> = Vec::new();
-    if modlist_path.exists() {
-        if let Ok(file) = File::open(&modlist_path) {
+    if loadorder_path.exists() {
+        if let Ok(file) = File::open(&loadorder_path) {
             let reader = BufReader::new(file);
             for line in reader.lines().map_while(Result::ok) {
                 let trimmed = line.trim();
@@ -161,7 +232,7 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
         }
     }
 
-    // New/untracked files (not in modlist.txt) are introduced at the very TOP
+    // New/untracked files are introduced at the very TOP
     let mut final_ordered_paths = all_archive_files;
     final_ordered_paths.extend(ordered_paths);
     let ordered_paths = final_ordered_paths;
@@ -196,19 +267,19 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
         let metadata = path.metadata().ok();
         let size_bytes = metadata.map(|m| m.len()).unwrap_or(0);
 
-        // Delimiter Detection with exact prefix/suffix stripping
-        let is_delimiter = display_name.starts_with("[CAT] ") && display_name.ends_with(".archive");
+        // Delimiter Detection updated for .txt
+        let is_delimiter = display_name.starts_with("[CAT] ") && display_name.ends_with(".txt");
         let category_name = if is_delimiter {
             display_name
                 .strip_prefix("[CAT] ")
-                .and_then(|s| s.strip_suffix(".archive"))
+                .and_then(|s| s.strip_suffix(".txt"))
                 .map(|s| s.trim().to_string())
         } else {
             None
         };
 
         let mut hashes = Vec::new();
-        // Bypass red4lib parsing for 0-byte delimiter files to prevent panics
+        // Bypass red4lib parsing for .txt delimiter files to prevent panics
         if is_enabled && !is_delimiter {
             if let Ok(archive) = red4lib::archive::open_read(path) {
                 hashes = archive.get_entries().clone().into_keys().collect::<Vec<u64>>();
@@ -223,7 +294,7 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
         let mut matched_xls: Vec<XlItem> = Vec::new();
         let base_stem = get_archive_stem(&display_name);
 
-        // 1. Explicit pairing match from sidecar JSON (Case-Insensitive Safety)
+        // 1. Explicit pairing match from sidecar JSON
         let mut to_remove = Vec::new();
         for (i, xl) in xl_items.iter().enumerate() {
             let mut matched_target = None;
@@ -246,7 +317,7 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
             matched_xls.push(item);
         }
 
-        // 2. Exact match: <stem>.archive.xl (Pattern 1) - Respects [UNLINKED] flag
+        // 2. Exact match: <stem>.archive.xl
         let candidate_archive_xl = format!("{}.xl", display_name);
         if let Some(pos) = xl_items.iter().position(|x| x.file_name.eq_ignore_ascii_case(&candidate_archive_xl)) {
             let actual_name = xl_items[pos].file_name.clone();
@@ -264,7 +335,7 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
             }
         }
 
-        // 3. Stem match: <stem>.xl (Pattern 2) - Respects [UNLINKED] flag
+        // 3. Stem match: <stem>.xl
         let candidate_stem_xl = format!("{}.xl", base_stem);
         if let Some(pos) = xl_items.iter().position(|x| x.file_name.eq_ignore_ascii_case(&candidate_stem_xl)) {
             let actual_name = xl_items[pos].file_name.clone();
@@ -356,7 +427,7 @@ pub fn toggle_mod(base_game_path: &str, mod_name: &str, enable: bool) -> Result<
     let enabled_archive_path = archive_dir.join(&clean_name);
     let disabled_archive_path = archive_dir.join(format!("{}.disabled", clean_name));
 
-    // 1. Toggle parent archive file
+    // 1. Toggle parent archive/txt file
     if enable {
         if disabled_archive_path.exists() {
             fs::rename(&disabled_archive_path, &enabled_archive_path).map_err(|e| e.to_string())?;
@@ -431,13 +502,14 @@ pub fn toggle_mod(base_game_path: &str, mod_name: &str, enable: bool) -> Result<
 pub fn save_modlist(base_game_path: &str, ordered_archives: Vec<String>) -> Result<ArchiveScanReport, String> {
     let archive_dir = PathBuf::from(base_game_path).join("archive").join("pc").join("mod");
     fs::create_dir_all(&archive_dir).map_err(|e| e.to_string())?;
-    let modlist_path = archive_dir.join("modlist.txt");
-
-    let mut file = File::create(&modlist_path).map_err(|e| e.to_string())?;
+    
+    // Write to internal master tracker
+    let loadorder_path = archive_dir.join("r4_loadorder.txt");
+    let mut file = File::create(&loadorder_path).map_err(|e| e.to_string())?;
 
     for name in ordered_archives {
         let clean_name = clean_name_str(&name);
-        if clean_name.ends_with(".archive") {
+        if clean_name.ends_with(".archive") || (clean_name.starts_with("[CAT] ") && clean_name.ends_with(".txt")) {
             let active_path = archive_dir.join(&clean_name);
             let disabled_path = archive_dir.join(format!("{}.disabled", clean_name));
             
@@ -447,6 +519,9 @@ pub fn save_modlist(base_game_path: &str, ordered_archives: Vec<String>) -> Resu
             }
         }
     }
+
+    // Sync sanitized list to engine
+    sync_engine_modlist(&archive_dir);
 
     scan_archives(base_game_path)
 }
@@ -473,7 +548,6 @@ pub fn create_physical_category(base_game_path: &str, category_name: &str) -> Re
     let archive_dir = PathBuf::from(base_game_path).join("archive").join("pc").join("mod");
     fs::create_dir_all(&archive_dir).map_err(|e| e.to_string())?;
     
-    // Allow all standard Windows characters except < > : " / \ | ? * and control chars
     let forbidden = ['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
     let safe_name: String = category_name
         .chars()
@@ -485,17 +559,17 @@ pub fn create_physical_category(base_game_path: &str, category_name: &str) -> Re
         return Err("Category name cannot be empty".to_string());
     }
 
-    let file_name = format!("[CAT] {}.archive", safe_trimmed);
+    let file_name = format!("[CAT] {}.txt", safe_trimmed);
     let file_path = archive_dir.join(&file_name);
     
     if !file_path.exists() {
         File::create(&file_path).map_err(|e| e.to_string())?;
         
-        let modlist_path = archive_dir.join("modlist.txt");
+        let loadorder_path = archive_dir.join("r4_loadorder.txt");
         let mut existing_content = String::new();
         
-        if modlist_path.exists() {
-            if let Ok(content) = fs::read_to_string(&modlist_path) {
+        if loadorder_path.exists() {
+            if let Ok(content) = fs::read_to_string(&loadorder_path) {
                 existing_content = content;
             }
         }
@@ -505,7 +579,7 @@ pub fn create_physical_category(base_game_path: &str, category_name: &str) -> Re
             new_content.push_str(&existing_content);
         }
         
-        fs::write(&modlist_path, new_content).map_err(|e| e.to_string())?;
+        fs::write(&loadorder_path, new_content).map_err(|e| e.to_string())?;
     }
     
     scan_archives(base_game_path)
@@ -513,7 +587,7 @@ pub fn create_physical_category(base_game_path: &str, category_name: &str) -> Re
 
 pub fn delete_physical_category(base_game_path: &str, category_file_name: &str) -> Result<ArchiveScanReport, String> {
     let clean_name = clean_name_str(category_file_name);
-    if !clean_name.starts_with("[CAT] ") || !clean_name.ends_with(".archive") {
+    if !clean_name.starts_with("[CAT] ") || !clean_name.ends_with(".txt") {
         return Err("Safety check failed: Target is not a physical category delimiter".to_string());
     }
 
@@ -528,9 +602,9 @@ pub fn delete_physical_category(base_game_path: &str, category_file_name: &str) 
         fs::remove_file(&disabled_path).map_err(|e| e.to_string())?;
     }
 
-    let modlist_path = archive_dir.join("modlist.txt");
-    if modlist_path.exists() {
-        if let Ok(content) = fs::read_to_string(&modlist_path) {
+    let loadorder_path = archive_dir.join("r4_loadorder.txt");
+    if loadorder_path.exists() {
+        if let Ok(content) = fs::read_to_string(&loadorder_path) {
             let mut updated_lines = Vec::new();
             for line in content.lines() {
                 let trimmed = line.trim();
@@ -539,11 +613,11 @@ pub fn delete_physical_category(base_game_path: &str, category_file_name: &str) 
                     updated_lines.push(trimmed.to_string());
                 }
             }
-            let mut new_modlist = updated_lines.join("\r\n");
-            if !new_modlist.is_empty() {
-                new_modlist.push_str("\r\n");
+            let mut new_loadorder = updated_lines.join("\r\n");
+            if !new_loadorder.is_empty() {
+                new_loadorder.push_str("\r\n");
             }
-            fs::write(&modlist_path, new_modlist).map_err(|e| e.to_string())?;
+            fs::write(&loadorder_path, new_loadorder).map_err(|e| e.to_string())?;
         }
     }
 
@@ -552,11 +626,10 @@ pub fn delete_physical_category(base_game_path: &str, category_file_name: &str) 
 
 pub fn rename_physical_category(base_game_path: &str, old_file_name: &str, new_category_name: &str) -> Result<ArchiveScanReport, String> {
     let old_clean_name = clean_name_str(old_file_name);
-    if !old_clean_name.starts_with("[CAT] ") || !old_clean_name.ends_with(".archive") {
+    if !old_clean_name.starts_with("[CAT] ") || !old_clean_name.ends_with(".txt") {
         return Err("Safety check failed: Target is not a physical category delimiter".to_string());
     }
 
-    // Allow all standard Windows characters except < > : " / \ | ? * and control chars
     let forbidden = ['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
     let safe_name: String = new_category_name
         .chars()
@@ -568,7 +641,7 @@ pub fn rename_physical_category(base_game_path: &str, old_file_name: &str, new_c
         return Err("Category name cannot be empty".to_string());
     }
 
-    let new_clean_name = format!("[CAT] {}.archive", safe_trimmed);
+    let new_clean_name = format!("[CAT] {}.txt", safe_trimmed);
     let archive_dir = PathBuf::from(base_game_path).join("archive").join("pc").join("mod");
 
     let old_active_path = archive_dir.join(&old_clean_name);
@@ -582,9 +655,9 @@ pub fn rename_physical_category(base_game_path: &str, old_file_name: &str, new_c
         fs::rename(&old_disabled_path, &new_disabled_path).map_err(|e| e.to_string())?;
     }
 
-    let modlist_path = archive_dir.join("modlist.txt");
-    if modlist_path.exists() {
-        if let Ok(content) = fs::read_to_string(&modlist_path) {
+    let loadorder_path = archive_dir.join("r4_loadorder.txt");
+    if loadorder_path.exists() {
+        if let Ok(content) = fs::read_to_string(&loadorder_path) {
             let mut updated_lines = Vec::new();
             for line in content.lines() {
                 let trimmed = line.trim();
@@ -595,11 +668,11 @@ pub fn rename_physical_category(base_game_path: &str, old_file_name: &str, new_c
                     updated_lines.push(trimmed.to_string());
                 }
             }
-            let mut new_modlist = updated_lines.join("\r\n");
-            if !new_modlist.is_empty() {
-                new_modlist.push_str("\r\n");
+            let mut new_loadorder = updated_lines.join("\r\n");
+            if !new_loadorder.is_empty() {
+                new_loadorder.push_str("\r\n");
             }
-            fs::write(&modlist_path, new_modlist).map_err(|e| e.to_string())?;
+            fs::write(&loadorder_path, new_loadorder).map_err(|e| e.to_string())?;
         }
     }
 

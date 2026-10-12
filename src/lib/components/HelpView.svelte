@@ -15,8 +15,6 @@
     Code
   } from 'lucide-svelte';
 
-  // State to track which accordion section is currently open. 
-  // Defaulting to the first section so the page doesn't look completely empty.
   let openSection = $state<string | null>('load_order');
 
   function toggleSection(section: string) {
@@ -33,7 +31,6 @@
 </script>
 
 <div class="flex flex-col h-full overflow-hidden bg-nvidia-bg text-nvidia-text-primary select-none">
-  <!-- Header -->
   <div class="p-6 pb-4 shrink-0 border-b border-nvidia-border/50 bg-nvidia-surface/20">
     <div class="flex items-center gap-2 text-xs font-mono text-nvidia-accent mb-2">
       <HelpCircle class="h-4 w-4" />
@@ -45,9 +42,7 @@
     </p>
   </div>
 
-  <!-- Scrollable Content -->
   <div class="flex-1 overflow-y-auto p-6 space-y-6">
-    
     <div class="max-w-4xl space-y-3">
       
       <!-- Accordion 1: Load Order & Categories -->
@@ -81,7 +76,7 @@
               </div>
               <div>
                 <strong class="text-nvidia-text-primary block mb-1">Physical Categories:</strong>
-                R4 leverages native engine mechanics to create categories without compromising your data through app-injected logic. These optional created categories are real 0-byte <span class="font-mono text-nvidia-text-primary">.archive</span> files, meaning your perfect build is preserved even if you launch the game without the toolbox.
+                R4 leverages native engine mechanics to create categories without compromising your data through app-injected logic. These optional created categories are real 0-byte <span class="font-mono text-nvidia-text-primary">.txt</span> files, meaning your perfect build is preserved even if you launch the game without the toolbox.
               </div>
               <div>
                 <strong class="text-nvidia-text-primary block mb-1">Multi-Select:</strong>
