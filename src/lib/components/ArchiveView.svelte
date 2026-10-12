@@ -346,7 +346,6 @@
       searchQuery = '';
     }
 
-    // Expand parent category if it is collapsed
     const targetIndex = localArchives.findIndex(a => a.file_name === modName);
     if (targetIndex !== -1) {
       for (let i = targetIndex - 1; i >= 0; i--) {
@@ -547,6 +546,50 @@
 
   function handleMoveToCategory(targetCategoryFileName: string) {
     isMoveModalOpen = false;
+    
+    if (targetCategoryFileName.startsWith('[CREATE_NEW]')) {
+      const prefill = targetCategoryFileName.split(':')[1] || 'New Category';
+      dialogState = {
+        isOpen: true,
+        title: 'Create & Move to Category',
+        message: 'Enter a name for the new category delimiter:',
+        mode: 'prompt',
+        initialValue: prefill,
+        confirmText: 'Create & Move',
+        isDanger: false,
+        onConfirm: async (name: string) => {
+          dialogState.isOpen = false;
+          if (!name || name.trim() === '') return;
+          
+          try {
+            const report = await invoke<ArchiveScanReport>('create_physical_category', {
+              gamePath,
+              categoryName: name.trim()
+            });
+            if (report && Array.isArray(report.archives)) {
+              archives = report.archives;
+              localArchives = [...archives];
+              
+              const newFileName = `[CAT] ${name.trim()}.txt`;
+              executeMoveToCategory(newFileName);
+              
+              if (onStateChanged) onStateChanged();
+              setTimeout(() => {
+                focusModInMainList(newFileName);
+              }, 100);
+            }
+          } catch (err) {
+            console.error("Failed to create physical category:", err);
+          }
+        }
+      };
+      return;
+    }
+
+    executeMoveToCategory(targetCategoryFileName);
+  }
+
+  function executeMoveToCategory(targetCategoryFileName: string) {
     if (selectedMods.size === 0) return;
 
     const updated = [...localArchives];
@@ -566,6 +609,8 @@
         while (insertIndex < updated.length && !updated[insertIndex].is_delimiter) {
           insertIndex++;
         }
+      } else {
+        insertIndex = updated.length;
       }
     }
 
@@ -669,7 +714,6 @@
 
     const targetState = !contextMenu.archive.enabled;
 
-    // Bulk toggle condition: target is an archive (not category), multiple items selected, and clicked item is part of selection
     if (!contextMenu.archive.is_delimiter && selectedMods.size > 1 && selectedMods.has(contextMenu.archive.file_name)) {
       const itemsToToggle = localArchives.filter(a => selectedMods.has(a.file_name) && a.enabled !== targetState);
       
@@ -689,7 +733,6 @@
       await persistState();
       if (onStateChanged) onStateChanged();
     } else {
-      // Standard single toggle
       await toggleMod(contextMenu.archive);
     }
     
@@ -743,11 +786,10 @@
   }
 
   let availableCategories = $derived.by(() => {
-    const cats = localArchives.filter(a => a.is_delimiter).map(a => ({
+    return localArchives.filter(a => a.is_delimiter).map(a => ({
       name: a.category_name || a.file_name.replace('[CAT] ', '').replace('.txt', ''),
       file_name: a.file_name
     }));
-    return [{ name: 'Top (Uncategorized)', file_name: '[TOP]' }, ...cats];
   });
 
   let availableArchivesForLink = $derived.by(() => {

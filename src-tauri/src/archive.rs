@@ -102,8 +102,6 @@ fn get_archive_stem(clean_name: &str) -> String {
     }
 }
 
-// --- DUAL LOAD ORDER SYSTEM ---
-
 fn sync_engine_modlist(archive_dir: &Path) {
     let loadorder_path = archive_dir.join("r4_loadorder.txt");
     let modlist_path = archive_dir.join("modlist.txt");
@@ -113,7 +111,6 @@ fn sync_engine_modlist(archive_dir: &Path) {
         for line in content.lines() {
             let trimmed = line.trim();
             if trimmed.is_empty() { continue; }
-            // Only write valid .archive files to the engine's modlist.txt
             if !trimmed.starts_with("[CAT] ") && trimmed.ends_with(".archive") {
                 engine_lines.push(trimmed.to_string());
             }
@@ -127,7 +124,6 @@ fn migrate_legacy_categories(archive_dir: &Path) {
     let loadorder_path = archive_dir.join("r4_loadorder.txt");
     let mut needs_sync = false;
 
-    // 1. Rename physical files from .archive to .txt
     if let Ok(entries) = fs::read_dir(archive_dir) {
         for entry in entries.filter_map(|e| e.ok()) {
             let p = entry.path();
@@ -146,7 +142,6 @@ fn migrate_legacy_categories(archive_dir: &Path) {
         }
     }
 
-    // 2. Migrate modlist.txt to r4_loadorder.txt if it doesn't exist yet
     if !loadorder_path.exists() && modlist_path.exists() {
         if let Ok(content) = fs::read_to_string(&modlist_path) {
             let mut new_lines = Vec::new();
@@ -163,7 +158,6 @@ fn migrate_legacy_categories(archive_dir: &Path) {
         }
     }
 
-    // 3. Clean up the engine's modlist.txt
     if needs_sync {
         sync_engine_modlist(archive_dir);
     }
@@ -181,7 +175,6 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
         });
     }
 
-    // Execute silent migration for Dual Load Order System
     migrate_legacy_categories(&archive_dir);
 
     let mut active_archive_files: Vec<PathBuf> = Vec::new();
@@ -213,7 +206,6 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
         clean_a.as_bytes().cmp(clean_b.as_bytes())
     });
 
-    // Read from the internal master tracker, not the engine's modlist
     let loadorder_path = archive_dir.join("r4_loadorder.txt");
     let mut ordered_paths: Vec<PathBuf> = Vec::new();
     if loadorder_path.exists() {
@@ -232,7 +224,6 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
         }
     }
 
-    // New/untracked files are introduced at the very TOP
     let mut final_ordered_paths = all_archive_files;
     final_ordered_paths.extend(ordered_paths);
     let ordered_paths = final_ordered_paths;
@@ -267,7 +258,6 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
         let metadata = path.metadata().ok();
         let size_bytes = metadata.map(|m| m.len()).unwrap_or(0);
 
-        // Delimiter Detection updated for .txt
         let is_delimiter = display_name.starts_with("[CAT] ") && display_name.ends_with(".txt");
         let category_name = if is_delimiter {
             display_name
@@ -279,7 +269,6 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
         };
 
         let mut hashes = Vec::new();
-        // Bypass red4lib parsing for .txt delimiter files to prevent panics
         if is_enabled && !is_delimiter {
             if let Ok(archive) = red4lib::archive::open_read(path) {
                 hashes = archive.get_entries().clone().into_keys().collect::<Vec<u64>>();
@@ -294,7 +283,6 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
         let mut matched_xls: Vec<XlItem> = Vec::new();
         let base_stem = get_archive_stem(&display_name);
 
-        // 1. Explicit pairing match from sidecar JSON
         let mut to_remove = Vec::new();
         for (i, xl) in xl_items.iter().enumerate() {
             let mut matched_target = None;
@@ -317,7 +305,6 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
             matched_xls.push(item);
         }
 
-        // 2. Exact match: <stem>.archive.xl
         let candidate_archive_xl = format!("{}.xl", display_name);
         if let Some(pos) = xl_items.iter().position(|x| x.file_name.eq_ignore_ascii_case(&candidate_archive_xl)) {
             let actual_name = xl_items[pos].file_name.clone();
@@ -335,7 +322,6 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
             }
         }
 
-        // 3. Stem match: <stem>.xl
         let candidate_stem_xl = format!("{}.xl", base_stem);
         if let Some(pos) = xl_items.iter().position(|x| x.file_name.eq_ignore_ascii_case(&candidate_stem_xl)) {
             let actual_name = xl_items[pos].file_name.clone();
@@ -427,7 +413,6 @@ pub fn toggle_mod(base_game_path: &str, mod_name: &str, enable: bool) -> Result<
     let enabled_archive_path = archive_dir.join(&clean_name);
     let disabled_archive_path = archive_dir.join(format!("{}.disabled", clean_name));
 
-    // 1. Toggle parent archive/txt file
     if enable {
         if disabled_archive_path.exists() {
             fs::rename(&disabled_archive_path, &enabled_archive_path).map_err(|e| e.to_string())?;
@@ -438,7 +423,6 @@ pub fn toggle_mod(base_game_path: &str, mod_name: &str, enable: bool) -> Result<
         }
     }
 
-    // 2. Discover companion XL candidates
     let associations = load_xl_associations_map(base_game_path);
     let base_stem = get_archive_stem(&clean_name);
 
@@ -503,7 +487,6 @@ pub fn save_modlist(base_game_path: &str, ordered_archives: Vec<String>) -> Resu
     let archive_dir = PathBuf::from(base_game_path).join("archive").join("pc").join("mod");
     fs::create_dir_all(&archive_dir).map_err(|e| e.to_string())?;
     
-    // Write to internal master tracker
     let loadorder_path = archive_dir.join("r4_loadorder.txt");
     let mut file = File::create(&loadorder_path).map_err(|e| e.to_string())?;
 
@@ -520,9 +503,7 @@ pub fn save_modlist(base_game_path: &str, ordered_archives: Vec<String>) -> Resu
         }
     }
 
-    // Sync sanitized list to engine
     sync_engine_modlist(&archive_dir);
-
     scan_archives(base_game_path)
 }
 
@@ -574,14 +555,17 @@ pub fn create_physical_category(base_game_path: &str, category_name: &str) -> Re
             }
         }
         
-        let mut new_content = format!("{}\r\n", file_name);
-        if !existing_content.is_empty() {
-            new_content.push_str(&existing_content);
+        // Append to bottom
+        let mut new_content = existing_content;
+        if !new_content.is_empty() && !new_content.ends_with('\n') {
+            new_content.push_str("\r\n");
         }
+        new_content.push_str(&format!("{}\r\n", file_name));
         
         fs::write(&loadorder_path, new_content).map_err(|e| e.to_string())?;
     }
     
+    sync_engine_modlist(&archive_dir);
     scan_archives(base_game_path)
 }
 
@@ -621,6 +605,7 @@ pub fn delete_physical_category(base_game_path: &str, category_file_name: &str) 
         }
     }
 
+    sync_engine_modlist(&archive_dir);
     scan_archives(base_game_path)
 }
 
@@ -676,6 +661,7 @@ pub fn rename_physical_category(base_game_path: &str, old_file_name: &str, new_c
         }
     }
 
+    sync_engine_modlist(&archive_dir);
     scan_archives(base_game_path)
 }
 

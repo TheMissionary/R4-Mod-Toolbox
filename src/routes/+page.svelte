@@ -414,7 +414,8 @@
   <!-- Left Navigation Sidebar -->
   <aside class="w-64 border-r border-nvidia-border flex flex-col justify-between bg-nvidia-surface/40 select-none shrink-0">
     <div class="flex flex-col h-full overflow-hidden">
-      <div class="h-14 border-b border-nvidia-border px-5 flex items-center gap-3 shrink-0">
+      <!-- Logo Box: h-16 to match HeaderBar -->
+      <div class="h-16 border-b border-nvidia-border px-5 flex items-center gap-3 shrink-0">
         <div class="h-6 w-6 rounded bg-nvidia-accent flex items-center justify-center text-black font-black text-sm shadow-sm">
           R4
         </div>
@@ -436,6 +437,9 @@
             <Home class="h-4 w-4" />
             <span>Home</span>
           </button>
+
+          <!-- Separator below Home -->
+          <div class="h-px bg-nvidia-border/50 my-1.5 mx-2"></div>
 
           <button
             type="button"
@@ -519,8 +523,21 @@
         </nav>
       </div>
 
+      <!-- Launch Game Button -->
+      <div class="p-3 border-t border-nvidia-border/50 bg-nvidia-surface/20 shrink-0">
+        <button
+          type="button"
+          onclick={handleLaunchGame}
+          disabled={isLaunching || !scanResult?.is_valid_game_path}
+          class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded bg-nvidia-accent hover:brightness-105 text-black font-semibold text-xs transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+        >
+          <Play class="h-3.5 w-3.5 fill-black" />
+          <span>{isLaunching ? 'Starting Game...' : 'Launch Game'}</span>
+        </button>
+      </div>
+
       <!-- Secondary Navigation Cluster -->
-      <div class="p-3 space-y-1 border-t border-nvidia-border/50 bg-nvidia-surface/20 shrink-0">
+      <div class="px-3 pb-3 space-y-1 bg-nvidia-surface/20 shrink-0">
         <button
           type="button"
           onclick={() => setTab('help')}
@@ -548,19 +565,8 @@
       </div>
     </div>
 
-    <!-- Lower Left Launch Game & Developer Tile -->
-    <div class="p-3 border-t border-nvidia-border bg-nvidia-surface/30 space-y-2.5 shrink-0">
-      <button
-        type="button"
-        onclick={handleLaunchGame}
-        disabled={isLaunching || !scanResult?.is_valid_game_path}
-        class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded bg-nvidia-accent hover:brightness-105 text-black font-semibold text-xs transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-      >
-        <Play class="h-3.5 w-3.5 fill-black" />
-        <span>{isLaunching ? 'Starting Game...' : 'Launch Game'}</span>
-      </button>
-
-      <!-- Mi55ionary Developer Tile -->
+    <!-- Developer Tile -->
+    <div class="p-3 border-t border-nvidia-border bg-nvidia-surface/30 shrink-0">
       <div class="rounded-lg border border-nvidia-border/70 bg-nvidia-surface/70 p-2 flex items-center justify-between gap-2 shadow-xs select-none">
         <div class="flex items-center gap-2 min-w-0">
           <!-- Stylized Hand-Drawn Heart Avatar -->
