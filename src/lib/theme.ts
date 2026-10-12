@@ -84,7 +84,8 @@ export const THEME_COLOR_META = [
 ] as const;
 
 export const APP_FONT_PRESETS = [
-  { label: 'System Sans (Default)', value: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' },
+  { label: 'Geist (Default)', value: "'Geist', -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif" },
+  { label: 'System Sans', value: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' },
   { label: 'Segoe UI (Modern Windows)', value: '"Segoe UI", sans-serif' },
   { label: 'Bahnschrift (Industrial DIN)', value: '"Bahnschrift", sans-serif' },
   { label: 'Aptos (Modern Clean)', value: '"Aptos", sans-serif' },
@@ -95,7 +96,8 @@ export const APP_FONT_PRESETS = [
 ] as const;
 
 export const MOD_FONT_PRESETS = [
-  { label: 'Cascadia Code (Default Windows Terminal)', value: '"Cascadia Code", "Consolas", monospace' },
+  { label: 'Geist Mono (Default)', value: "'GeistMono', \"Cascadia Code\", \"Consolas\", monospace" },
+  { label: 'Cascadia Code (Windows Terminal)', value: '"Cascadia Code", "Consolas", monospace' },
   { label: 'Consolas (Crisp Monospace)', value: '"Consolas", "Courier New", monospace' },
   { label: 'Lucida Console (Terminal Classic)', value: '"Lucida Console", monospace' },
   { label: 'Courier New (Fixed Pitch)', value: '"Courier New", monospace' },
@@ -130,6 +132,10 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
 
 const STORAGE_KEY = 'cp2077_theme_settings_v2';
 
+// Legacy defaults to check against for smart migration
+const LEGACY_DEFAULT_BASE = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+const LEGACY_DEFAULT_MODS = '"Cascadia Code", "Consolas", monospace';
+
 export function loadThemeSettings(): ThemeSettings {
   if (typeof localStorage === 'undefined') {
     return {
@@ -143,9 +149,18 @@ export function loadThemeSettings(): ThemeSettings {
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      const legacyFont = parsed.fontFamily || APP_FONT_PRESETS[0].value;
-      const loadedMode = parsed.mode === 'light' ? 'light' : 'dark';
+      let loadedBase = parsed.fontFamilyBase || parsed.fontFamily || APP_FONT_PRESETS[0].value;
+      let loadedMods = parsed.fontFamilyMods || MOD_FONT_PRESETS[0].value;
 
+      // Smart Migration: Upgrade legacy defaults to Geist
+      if (loadedBase === LEGACY_DEFAULT_BASE) {
+        loadedBase = APP_FONT_PRESETS[0].value;
+      }
+      if (loadedMods === LEGACY_DEFAULT_MODS) {
+        loadedMods = MOD_FONT_PRESETS[0].value;
+      }
+
+      const loadedMode = parsed.mode === 'light' ? 'light' : 'dark';
       const darkAccent = parsed.darkColors?.accent || ACCENT_PRESETS[0].hex;
       const lightAccent = parsed.lightColors?.accent || '#5A8F00';
 
@@ -153,9 +168,9 @@ export function loadThemeSettings(): ThemeSettings {
         mode: loadedMode,
         darkColors: generateThemeColors('dark', darkAccent),
         lightColors: generateThemeColors('light', lightAccent),
-        fontFamilyBase: parsed.fontFamilyBase || legacyFont,
-        fontFamilyMods: parsed.fontFamilyMods || MOD_FONT_PRESETS[0].value,
-        fontFamily: parsed.fontFamilyBase || legacyFont,
+        fontFamilyBase: loadedBase,
+        fontFamilyMods: loadedMods,
+        fontFamily: loadedBase,
         isCompact: true,
       };
     } catch {
@@ -202,6 +217,15 @@ export async function loadConfigFromDisk(): Promise<AppConfig> {
       if (!config.theme.fontFamilyMods) {
         config.theme.fontFamilyMods = MOD_FONT_PRESETS[0].value;
       }
+
+      // Smart Migration for disk config
+      if (config.theme.fontFamilyBase === LEGACY_DEFAULT_BASE) {
+        config.theme.fontFamilyBase = APP_FONT_PRESETS[0].value;
+      }
+      if (config.theme.fontFamilyMods === LEGACY_DEFAULT_MODS) {
+        config.theme.fontFamilyMods = MOD_FONT_PRESETS[0].value;
+      }
+
       config.theme.fontFamily = config.theme.fontFamilyBase;
 
       config.theme.darkColors = generateThemeColors('dark', config.theme.darkColors?.accent || ACCENT_PRESETS[0].hex);

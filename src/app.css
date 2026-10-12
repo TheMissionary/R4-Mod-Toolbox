@@ -1,5 +1,21 @@
 @import "../node_modules/tailwindcss/index.css";
 
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Bold.woff2') format('woff2');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'GeistMono';
+  src: url('/fonts/GeistMono-Regular.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   color-scheme: dark;
   
@@ -14,8 +30,8 @@
   --theme-text-primary: #ffffff;
 
   /* Dual Typography Tokens */
-  --theme-font-base: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --theme-font-mods: "Cascadia Code", "Consolas", monospace;
+  --theme-font-base: 'Geist', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --theme-font-mods: 'GeistMono', "Cascadia Code", "Consolas", monospace;
 
   /* Permanent Universal Compact Density Variables (28px) */
   --row-h: 1.75rem;

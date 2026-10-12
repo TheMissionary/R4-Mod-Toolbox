@@ -22,8 +22,19 @@
 
   const changelog = [
     {
+      version: "0.36.0 (Beta 1)",
+      date: "November 2024",
+      changes: [
+        "Dual Load Order System: Completely resolved the REDengine 0-byte crash vector. R4 now safely utilizes .txt files for physical categories and dynamically generates a sanitized modlist.txt strictly for the game engine.",
+        "FTUE Category Creation: Overhauled the 'Move to Category' workflow. Users can now create new categories inline, which automatically append to the bottom of the load order to prevent the 'swallowing' effect on uncategorized mods.",
+        "Typography Overhaul: Integrated Geist and GeistMono as the systemic default fonts, providing a crisp, modern aesthetic across the application and mod listings.",
+        "Custom Launch Paths: Added support for launching the game via custom executables or .lnk shortcuts directly from the sidebar.",
+        "UX & UI Refinements: Improved sidebar visual hierarchy, refined modal keyboard navigation, and added a safe log-truncation utility."
+      ]
+    },
+    {
       version: "0.30.0 (Beta)",
-      date: "October 2026",
+      date: "October 2024",
       changes: [
         "R4 Engine: Introduced real-time archive conflict resolution with in-memory hashing.",
         "Load Order: Implemented 60fps drag-and-drop management with physical 0-byte [CAT] delimiters.",
@@ -34,7 +45,6 @@
     }
   ];
 
-  // Intersection Observer to trigger glow EVERY time the tab becomes visible
   function watchVisibility(node: HTMLElement) {
     const observer = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting) {
@@ -44,7 +54,7 @@
           isKofiGlowing = false;
         }, 3500);
       } else {
-        isKofiGlowing = false; // Reset state when hidden so it can trigger again
+        isKofiGlowing = false;
       }
     }, { threshold: 0.1 });
     
@@ -64,7 +74,6 @@
 </script>
 
 <div class="flex flex-col h-full overflow-hidden bg-nvidia-bg text-nvidia-text-primary select-none">
-  <!-- Header -->
   <div class="p-6 pb-4 shrink-0 border-b border-nvidia-border/50 bg-nvidia-surface/20">
     <div class="flex items-center gap-2 text-xs font-mono text-nvidia-accent mb-2">
       <Info class="h-4 w-4" />
@@ -76,12 +85,9 @@
     </p>
   </div>
 
-  <!-- Scrollable Content -->
   <div class="flex-1 overflow-y-auto p-6 space-y-6">
-    
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl">
       
-      <!-- Application Info Card -->
       <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col">
         <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center gap-2.5">
           <ShieldCheck class="h-4 w-4 text-nvidia-accent" />
@@ -95,7 +101,7 @@
               </div>
               <div>
                 <div class="text-lg font-bold text-nvidia-text-primary">R4 Mod Toolbox</div>
-                <div class="text-xs font-mono text-nvidia-text-muted mt-0.5">Version 0.30.0 (Beta)</div>
+                <div class="text-xs font-mono text-nvidia-text-muted mt-0.5">Version 0.36.0 (Beta 1)</div>
               </div>
             </div>
             
@@ -114,17 +120,14 @@
         </div>
       </div>
 
-      <!-- Developer Card -->
       <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col">
         <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center gap-2.5">
           <Heart class="h-4 w-4 text-amber-500" />
           <h3 class="text-sm font-bold uppercase tracking-wider">Developer</h3>
         </div>
         <div class="p-5 space-y-4 flex-1 flex flex-col justify-between">
-          
           <div class="flex items-center justify-between gap-4">
             <div class="flex items-center gap-4">
-              <!-- Stylized Hand-Drawn Heart Avatar -->
               <div class="h-14 w-14 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 shadow-inner">
                 <svg viewBox="0 0 100 100" class="h-8 w-8 drop-shadow-md" fill="none" stroke="#e08528" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M 48 34 C 44 20 22 10 13 26 C 3 44 18 68 49 92 C 80 68 97 44 87 22 C 77 0 54 8 48 34 Z" />
@@ -158,7 +161,6 @@
             </div>
           </div>
           
-          <!-- Full Width Ko-fi Button with Intersection Observer -->
           <div class="pt-4 border-t border-nvidia-border/50">
             <button
               use:watchVisibility
@@ -170,11 +172,9 @@
               <span class="text-xs font-bold text-nvidia-text-primary">Buy me a coffee, keep the engine running</span>
             </button>
           </div>
-
         </div>
       </div>
 
-      <!-- Special Acknowledgements (Moved Above Core Tech) -->
       <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col lg:col-span-2">
         <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center gap-2.5">
           <Star class="h-4 w-4 text-amber-400" />
@@ -201,14 +201,12 @@
         </div>
       </div>
 
-      <!-- Technology Stack -->
       <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col lg:col-span-2">
         <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center gap-2.5">
           <Layers class="h-4 w-4 text-nvidia-accent" />
           <h3 class="text-sm font-bold uppercase tracking-wider">Core Technologies</h3>
         </div>
         <div class="p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          
           <div class="p-3 rounded-lg bg-nvidia-card border border-nvidia-border flex flex-col gap-1.5">
             <div class="flex items-center gap-2">
               <Cpu class="h-4 w-4 text-nvidia-accent" />
@@ -216,7 +214,6 @@
             </div>
             <span class="text-[10px] text-nvidia-text-muted leading-tight">High-performance systems backend and native desktop runtime.</span>
           </div>
-
           <div class="p-3 rounded-lg bg-nvidia-card border border-nvidia-border flex flex-col gap-1.5">
             <div class="flex items-center gap-2">
               <Code class="h-4 w-4 text-amber-500" />
@@ -224,7 +221,6 @@
             </div>
             <span class="text-[10px] text-nvidia-text-muted leading-tight">Reactive frontend framework utilizing fine-grained runes.</span>
           </div>
-
           <div class="p-3 rounded-lg bg-nvidia-card border border-nvidia-border flex flex-col gap-1.5">
             <div class="flex items-center gap-2">
               <Layers class="h-4 w-4 text-cyan-400" />
@@ -232,7 +228,6 @@
             </div>
             <span class="text-[10px] text-nvidia-text-muted leading-tight">Utility-first styling engine powering the generative theme system.</span>
           </div>
-
           <div class="p-3 rounded-lg bg-nvidia-card border border-nvidia-border flex flex-col gap-1.5">
             <div class="flex items-center gap-2">
               <ShieldCheck class="h-4 w-4 text-nvidia-text-muted" />
@@ -240,11 +235,9 @@
             </div>
             <span class="text-[10px] text-nvidia-text-muted leading-tight">Advanced REDengine archive parsing and hash extraction library.</span>
           </div>
-
         </div>
       </div>
 
-      <!-- Expandable Changelog -->
       <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col lg:col-span-2">
         <div
           role="button"
