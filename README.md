@@ -4,6 +4,7 @@
 
 ![Beta Release](https://img.shields.io/badge/Release-Beta_1-orange.svg)
 ![Platform](https://img.shields.io/badge/Platform-Windows_11-blue.svg)
+<img width="2560" height="1440" alt="Unreleased-IP=Mods-Header" src="https://github.com/user-attachments/assets/1d8909f3-6aee-42ef-97c1-d90b30c7c8be" />
 
 R4 Mod Toolbox is a high-performance, standalone desktop application built specifically for **manual modders**. If you prefer to download and extract your own mods but want a powerful, visualized dashboard to manage load orders, resolve conflicts, and organize your workspace, R4 is built for you. 
 
@@ -16,6 +17,9 @@ This is the very first public beta release of the R4 Mod Toolbox. The core engin
 
 ---
 
+<img width="1664" height="1088" alt="HomePage" src="https://github.com/user-attachments/assets/9fda1300-968e-4924-a6d5-97bfebcbbbe8" />
+
+
 ## 🚀 Key Features
 
 * **Real-Time Conflict Resolution:** R4 scans the internal hashes of every `.archive` file in milliseconds. Instantly see exactly which mods are winning (green) and losing (red) asset conflicts before you even launch the game.
@@ -26,6 +30,8 @@ This is the very first public beta release of the R4 Mod Toolbox. The core engin
 
 ---
 
+<img width="1202" height="1088" alt="multimenu" src="https://github.com/user-attachments/assets/26ff1029-1f41-4c47-ad68-4a979e57c474" />
+
 ## 📂 Transparency: How R4 Manages Your Files
 
 Because R4 is built for manual modders, we believe in 100% transparency regarding what the app does to your files. 
@@ -34,6 +40,7 @@ Because R4 is built for manual modders, we believe in 100% transparency regardin
 R4 uses two highly optimized methods to disable mods without deleting your data:
 * **Archive Mods:** Toggling an archive simply renames it in-place (appending `.disabled`). It never leaves your mod folder and retains its exact alphabetical position.
 * **Frameworks & Scripts:** Toggling CET, RED4ext, or R6 mods physically moves the files to a `Disabled_Mods` folder in your game's root directory. This prevents the REDengine from throwing fatal compilation errors on boot.
+
 
 ### 2. Physical Categories & Load Order Management
 To help you organize massive modlists, R4 allows you to create custom Categories. R4 manages these categories safely alongside the game's native load order system.
