@@ -12,8 +12,8 @@ It does not hijack your downloads or obfuscate your files in virtual file system
 
 ---
 
-## ⚠️ Beta 1 Release
-This is the very first public beta release of the R4 Mod Toolbox. The core engine is stable, but we are actively looking for community testing, feedback, and edge-case reports from users with massive, complex modlists. Please report any bugs or UX friction in the [Issues tab](https://github.com/TheMissionary/R4-Mod-Toolbox/issues).
+## ⚠️ Beta Release X.XX.X (see Releases)
+R4 Mod Toolbox has entered public beta release period. The core engine is stable, but we are actively pursuing community testing, feedback, and edge-case reports from users with massive, complex modlists. Please report any bugs or UX friction in the [Issues tab](https://github.com/TheMissionary/R4-Mod-Toolbox/issues). 
 
 ---
 
@@ -39,7 +39,7 @@ Because R4 is built for manual modders, we believe in 100% transparency regardin
 ### 1. Disabling Mods Safely
 R4 uses two highly optimized methods to disable mods without deleting your data:
 * **Archive Mods:** Toggling an archive simply renames it in-place (appending `.disabled`). It never leaves your mod folder and retains its exact alphabetical position.
-* **Frameworks & Scripts:** Toggling CET, RED4ext, or R6 mods physically moves the files to a `Disabled_Mods` folder in your game's root directory. This prevents the REDengine from throwing fatal compilation errors on boot.
+* **Frameworks & Scripts:** Toggling CET, RED4ext, or R6 mods executes an in-place swap to show the disabled files in your Cyberpunk 2077\Disabled_Mods folder. This prevents the REDengine from throwing fatal compilation errors on boot.
 
 
 ### 2. Physical Categories & Load Order Management
