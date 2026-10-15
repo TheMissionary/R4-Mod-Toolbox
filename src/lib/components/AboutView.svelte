@@ -22,8 +22,16 @@
 
   const changelog = [
     {
+      version: "0.37.0 (Beta 2)",
+      date: "October 2026",
+      changes: [
+        "Diagnostic Logging: Implemented a robust, human-readable logging system to track application state and catch file-lock errors.",
+        "Log Rotation: Logs are now capped at 50 KB and auto-pruned to keep only the 5 most recent sessions, preventing AppData bloat."
+      ]
+    },
+    {
       version: "0.36.0 (Beta 1)",
-      date: "November 2024",
+      date: "October 2026",
       changes: [
         "Dual Load Order System: Completely resolved the REDengine 0-byte crash vector. R4 now safely utilizes .txt files for physical categories and dynamically generates a sanitized modlist.txt strictly for the game engine.",
         "FTUE Category Creation: Overhauled the 'Move to Category' workflow. Users can now create new categories inline, which automatically append to the bottom of the load order to prevent the 'swallowing' effect on uncategorized mods.",
@@ -34,7 +42,7 @@
     },
     {
       version: "0.30.0 (Beta)",
-      date: "October 2024",
+      date: "October 2026",
       changes: [
         "R4 Engine: Introduced real-time archive conflict resolution with in-memory hashing.",
         "Load Order: Implemented 60fps drag-and-drop management with physical 0-byte [CAT] delimiters.",
@@ -101,7 +109,7 @@
               </div>
               <div>
                 <div class="text-lg font-bold text-nvidia-text-primary">R4 Mod Toolbox</div>
-                <div class="text-xs font-mono text-nvidia-text-muted mt-0.5">Version 0.36.0 (Beta 1)</div>
+                <div class="text-xs font-mono text-nvidia-text-muted mt-0.5">Version 0.37.0 (Beta 2)</div>
               </div>
             </div>
             
