@@ -3,6 +3,7 @@
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
   import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
+  import { info, error, warn } from '@tauri-apps/plugin-log';
   import {
     loadThemeSettings,
     applyThemeSettings,
@@ -69,12 +70,13 @@
 
   async function setTab(tab: TabType) {
     currentTab = tab;
+    info(`Navigated to tab: ${tab}`);
     try {
       const config = await loadConfigFromDisk();
       config.activeTab = tab;
       await saveConfigToDisk(config);
     } catch (err) {
-      // non-critical
+      warn(`Failed to save active tab state: ${err}`);
     }
   }
 
@@ -148,7 +150,7 @@
     try {
       recentMods = await invoke<LedgerEntry[]>('get_recent_mods', { gamePath, days: recentDaysThreshold || 30 });
     } catch (err) {
-      console.error('Failed to load recent mods:', err);
+      error(`Failed to load recent mods: ${err}`);
     }
   }
 
@@ -166,7 +168,7 @@
         config.recentDaysThreshold = recentDaysThreshold;
         await saveConfigToDisk(config);
       } catch (err) {
-        console.error('Failed to save threshold:', err);
+        error(`Failed to save threshold: ${err}`);
       }
     }, 400);
   }
@@ -197,7 +199,7 @@
     try {
       await revealItemInDir(recentContextMenu.entry.path);
     } catch (err) {
-      console.error('Failed to reveal file in explorer:', err);
+      error(`Failed to reveal file in explorer: ${err}`);
     }
     closeRecentContextMenu();
   }
@@ -236,7 +238,7 @@
         closeRecentContextMenu();
       }, 400);
     } catch (err) {
-      console.error('Failed to copy name:', err);
+      error(`Failed to copy name: ${err}`);
       closeRecentContextMenu();
     }
   }
@@ -246,19 +248,19 @@
     try {
       await openUrl(url);
     } catch (err) {
-      console.error(`Failed to open URL ${url}:`, err);
+      error(`Failed to open URL ${url}: ${err}`);
     }
   }
 
   async function handleLaunchGame() {
     if (!gamePath || isLaunching) return;
     isLaunching = true;
+    info('Initiating game launch sequence...');
     try {
-      // Fetch the absolute latest config from disk to ensure we have the newest customLaunchPath
       const config = await loadConfigFromDisk();
       await invoke('launch_game', { gamePath, customLaunchPath: config.customLaunchPath });
     } catch (err) {
-      console.error('Failed to launch game:', err);
+      error(`Failed to launch game: ${err}`);
     } finally {
       setTimeout(() => { isLaunching = false; }, 2500);
     }
@@ -281,13 +283,14 @@
         r6tweaks = await invoke<R6TweaksItem[]>('get_r6tweaks_details', { gamePath });
       }
     } catch (err) {
-      console.error(`Failed to load data for tab ${tab}:`, err);
+      error(`Failed to load data for tab ${tab}: ${err}`);
     }
   }
 
   async function refreshAll() {
     if (!gamePath) return;
     isLoading = true;
+    info('Initiating full workspace refresh...');
     try {
       scanResult = await invoke<ScanResult>('scan_game_directory', { gamePath });
       await loadTabData('archive');
@@ -296,8 +299,9 @@
       await loadTabData('redscript');
       await loadTabData('r6tweaks');
       await loadRecentMods();
+      info('Workspace refresh complete.');
     } catch (err) {
-      console.error('Failed to scan game environment:', err);
+      error(`Failed to scan game environment: ${err}`);
     } finally {
       isLoading = false;
     }
@@ -309,7 +313,7 @@
       scanResult = await invoke<ScanResult>('scan_game_directory', { gamePath });
       await loadRecentMods();
     } catch (err) {
-      console.error('Failed to refresh counts:', err);
+      error(`Failed to refresh counts: ${err}`);
     }
   }
 
@@ -341,7 +345,7 @@
         recentDaysThreshold = config.recentDaysThreshold;
       }
     }).catch(err => {
-      console.error('Config hydration error:', err);
+      error(`Config hydration error: ${err}`);
     }).finally(() => {
       refreshAll().finally(() => {
         dismissSplash();
@@ -350,6 +354,7 @@
 
     invoke('start_directory_watcher', { gamePath }).catch(() => {});
     const unlisten = listen('directory-changed', () => {
+      info('Directory change detected, triggering refresh.');
       refreshAll();
     });
 

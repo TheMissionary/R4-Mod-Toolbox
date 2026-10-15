@@ -1,5 +1,6 @@
 mod archive;
 
+use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -242,16 +243,43 @@ fn count_all_files(path: &Path) -> usize {
     count
 }
 
+fn prune_logs(app: &tauri::App) {
+    if let Ok(log_dir) = app.path().app_log_dir() {
+        if let Ok(entries) = std::fs::read_dir(&log_dir) {
+            let mut logs = Vec::new();
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() && path.extension().map_or(false, |ext| ext == "log") {
+                    if let Ok(meta) = entry.metadata() {
+                        if let Ok(modified) = meta.modified() {
+                            logs.push((path, modified));
+                        }
+                    }
+                }
+            }
+            // Sort by modified time descending (newest first)
+            logs.sort_by(|a, b| b.1.cmp(&a.1));
+            
+            // Keep the 5 newest, delete the rest
+            for (path, _) in logs.into_iter().skip(5) {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+    }
+}
+
 #[tauri::command]
 fn load_app_config() -> Result<AppConfig, String> {
     let path = get_app_config_path();
     if path.exists() {
         if let Ok(content) = fs::read_to_string(&path) {
             if let Ok(config) = serde_json::from_str::<AppConfig>(&content) {
+                info!("Successfully loaded AppConfig from {:?}", path);
                 return Ok(config);
             }
         }
     }
+    warn!("AppConfig not found or invalid, falling back to defaults.");
     Ok(AppConfig::default())
 }
 
@@ -259,18 +287,33 @@ fn load_app_config() -> Result<AppConfig, String> {
 fn save_app_config(config: AppConfig) -> Result<(), String> {
     let path = get_app_config_path();
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        fs::create_dir_all(parent).map_err(|e| {
+            error!("Failed to create config directory: {}", e);
+            e.to_string()
+        })?;
     }
-    let serialized = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
-    fs::write(&path, serialized).map_err(|e| e.to_string())?;
+    let serialized = serde_json::to_string_pretty(&config).map_err(|e| {
+        error!("Failed to serialize AppConfig: {}", e);
+        e.to_string()
+    })?;
+    fs::write(&path, serialized).map_err(|e| {
+        error!("Failed to write AppConfig to disk: {}", e);
+        e.to_string()
+    })?;
+    info!("Successfully saved AppConfig to {:?}", path);
     Ok(())
 }
 
 #[tauri::command]
 fn scan_game_directory(game_path: String) -> Result<ScanResult, String> {
+    info!("Initiating full game directory scan at: {}", game_path);
     let root = PathBuf::from(&game_path);
     let exe_path = root.join("bin").join("x64").join("Cyberpunk2077.exe");
     let is_valid = exe_path.exists();
+
+    if !is_valid {
+        warn!("Cyberpunk2077.exe not found at target path. Scan may be incomplete.");
+    }
 
     let archive_dir = root.join("archive").join("pc").join("mod");
     let mut archive_active = 0;
@@ -313,6 +356,9 @@ fn scan_game_directory(game_path: String) -> Result<ScanResult, String> {
     let r6tweaks_active = if r6tweaks_dir.exists() { fs::read_dir(&r6tweaks_dir).map(|e| e.flatten().count()).unwrap_or(0) } else { 0 };
     let r6tweaks_disabled = if r6tweaks_disabled_dir.exists() { fs::read_dir(&r6tweaks_disabled_dir).map(|e| e.flatten().count()).unwrap_or(0) } else { 0 };
     let r6tweaks_total = r6tweaks_active + r6tweaks_disabled;
+
+    info!("Scan complete. Archives: {}/{}, CET: {}/{}, RED4ext: {}/{}, Redscript: {}/{}, R6Tweaks: {}/{}", 
+        archive_active, archive_total, cet_active, cet_total, red4ext_active, red4ext_total, redscript_active, redscript_total, r6tweaks_active, r6tweaks_total);
 
     Ok(ScanResult {
         is_valid_game_path: is_valid,
@@ -625,7 +671,6 @@ fn get_r6tweaks_details(game_path: String) -> Result<Vec<R6TweaksItem>, String> 
 fn get_recent_mods(game_path: String, days: u32) -> Result<Vec<LedgerEntry>, String> {
     let mut current_mods: Vec<LedgerEntry> = Vec::new();
 
-    // 1. Archive Mods
     if let Ok(report) = archive::scan_archives(&game_path) {
         for item in report.archives {
             if !item.is_delimiter {
@@ -639,7 +684,6 @@ fn get_recent_mods(game_path: String, days: u32) -> Result<Vec<LedgerEntry>, Str
         }
     }
 
-    // 2. CET Mods
     if let Ok(cet_list) = get_cet_details(game_path.clone()) {
         for item in cet_list {
             current_mods.push(LedgerEntry {
@@ -651,7 +695,6 @@ fn get_recent_mods(game_path: String, days: u32) -> Result<Vec<LedgerEntry>, Str
         }
     }
 
-    // 3. RED4ext Mods
     if let Ok(r4e_list) = get_red4ext_details(game_path.clone()) {
         for item in r4e_list {
             current_mods.push(LedgerEntry {
@@ -663,7 +706,6 @@ fn get_recent_mods(game_path: String, days: u32) -> Result<Vec<LedgerEntry>, Str
         }
     }
 
-    // 4. Redscript Mods
     if let Ok(rs_list) = get_redscript_details(game_path.clone()) {
         for item in rs_list {
             current_mods.push(LedgerEntry {
@@ -675,7 +717,6 @@ fn get_recent_mods(game_path: String, days: u32) -> Result<Vec<LedgerEntry>, Str
         }
     }
 
-    // 5. R6 Tweaks
     if let Ok(tw_list) = get_r6tweaks_details(game_path.clone()) {
         for item in tw_list {
             current_mods.push(LedgerEntry {
@@ -705,7 +746,6 @@ fn get_recent_mods(game_path: String, days: u32) -> Result<Vec<LedgerEntry>, Str
     let cutoff_ms = days as u64 * 24 * 60 * 60 * 1000;
     let mut recent_mods: Vec<LedgerEntry> = new_ledger.into_iter().filter(|e| now.saturating_sub(e.first_seen) <= cutoff_ms).collect();
     
-    // Sort newest first
     recent_mods.sort_by(|a, b| b.first_seen.cmp(&a.first_seen));
 
     Ok(recent_mods)
@@ -740,6 +780,7 @@ fn toggle_plugin_state(
     mod_name: String,
     enable: bool,
 ) -> Result<(), String> {
+    info!("Toggling framework plugin: {} (Type: {}, Enable: {})", mod_name, mod_type, enable);
     let root = PathBuf::from(&game_path);
 
     let (active_base, disabled_base) = match mod_type.as_str() {
@@ -759,7 +800,10 @@ fn toggle_plugin_state(
             root.join("r6").join("tweaks"),
             root.join("Disabled_Mods").join("r6tweaks"),
         ),
-        _ => return Err(format!("Unsupported mod type: {}", mod_type)),
+        _ => {
+            error!("Unsupported mod type requested for toggle: {}", mod_type);
+            return Err(format!("Unsupported mod type: {}", mod_type));
+        }
     };
 
     let (source, target) = if enable {
@@ -769,17 +813,23 @@ fn toggle_plugin_state(
     };
 
     if !source.exists() {
+        error!("Toggle failed: Source path does not exist: {:?}", source);
         return Err(format!("Source path does not exist: {:?}", source));
     }
 
     if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
+        fs::create_dir_all(parent).map_err(|e| {
+            error!("Failed to create target directory for toggle: {}", e);
+            format!("Failed to create directory: {}", e)
+        })?;
     }
 
     fs::rename(&source, &target).map_err(|e| {
+        error!("Failed to move {:?} to {:?}: {}", source, target, e);
         format!("Failed to move {:?} to {:?}: {}", source, target, e)
     })?;
 
+    info!("Successfully toggled framework plugin: {}", mod_name);
     Ok(())
 }
 
@@ -809,7 +859,6 @@ fn get_folder_contents(folder_path: String) -> Result<Vec<FileNode>, String> {
         }
     }
     
-    // Sort: folders first, then alphabetical
     list.sort_by(|a, b| {
         b.is_dir.cmp(&a.is_dir).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
     });
@@ -819,8 +868,10 @@ fn get_folder_contents(folder_path: String) -> Result<Vec<FileNode>, String> {
 
 #[tauri::command]
 fn open_in_text_editor(file_path: String, editor_path: Option<String>) -> Result<(), String> {
+    info!("Opening file in text editor: {}", file_path);
     let path = PathBuf::from(&file_path);
     if !path.exists() || path.is_dir() {
+        error!("Invalid file path requested for text editor: {}", file_path);
         return Err("Invalid file path".to_string());
     }
 
@@ -834,13 +885,17 @@ fn open_in_text_editor(file_path: String, editor_path: Option<String>) -> Result
 
         cmd.arg(&file_path)
            .spawn()
-           .map_err(|e| e.to_string())?;
+           .map_err(|e| {
+               error!("Failed to spawn text editor process: {}", e);
+               e.to_string()
+           })?;
     }
     Ok(())
 }
 
 #[tauri::command]
 fn open_log_folder(app: tauri::AppHandle) -> Result<(), String> {
+    info!("User requested to open log folder.");
     let log_dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
     if !log_dir.exists() {
         std::fs::create_dir_all(&log_dir).map_err(|e| e.to_string())?;
@@ -850,21 +905,27 @@ fn open_log_folder(app: tauri::AppHandle) -> Result<(), String> {
         std::process::Command::new("explorer")
             .arg(&log_dir)
             .spawn()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| {
+                error!("Failed to open explorer for log folder: {}", e);
+                e.to_string()
+            })?;
     }
     Ok(())
 }
 
 #[tauri::command]
 fn clear_user_log(app: tauri::AppHandle) -> Result<(), String> {
+    info!("User requested to clear application logs.");
     let log_dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
     if log_dir.exists() {
         if let Ok(entries) = std::fs::read_dir(&log_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.is_file() && path.extension().map_or(false, |ext| ext == "log") {
-                    // Truncate the file to 0 bytes to avoid file lock deletion issues
-                    let _ = std::fs::File::create(&path);
+                    // Attempt to delete the file. If it fails (e.g., active log is locked), truncate it.
+                    if std::fs::remove_file(&path).is_err() {
+                        let _ = std::fs::File::create(&path);
+                    }
                 }
             }
         }
@@ -874,19 +935,25 @@ fn clear_user_log(app: tauri::AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn launch_game(game_path: String, custom_launch_path: Option<String>) -> Result<(), String> {
+    info!("User requested game launch.");
     #[cfg(target_os = "windows")]
     {
         let target = if let Some(cp) = custom_launch_path.filter(|s| !s.trim().is_empty()) {
+            info!("Using custom launch path: {}", cp);
             cp
         } else {
             let default_exe = PathBuf::from(&game_path).join("bin").join("x64").join("Cyberpunk2077.exe");
+            info!("Using default launch path: {:?}", default_exe);
             default_exe.to_string_lossy().to_string()
         };
 
         std::process::Command::new("cmd")
             .args(["/C", "start", "", &target])
             .spawn()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| {
+                error!("Failed to launch game process: {}", e);
+                e.to_string()
+            })?;
     }
     Ok(())
 }
@@ -895,9 +962,20 @@ fn launch_game(game_path: String, custom_launch_path: Option<String>) -> Result<
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_log::Builder::new().build())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Info)
+                .level_for("tao", log::LevelFilter::Error)
+                .level_for("wry", log::LevelFilter::Error)
+                .level_for("tauri", log::LevelFilter::Warn)
+                .max_file_size(50 * 1024) // 50 KB rotation limit
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
+                .build(),
+        )
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            prune_logs(app); // Keep only the 5 newest logs on boot
+            info!("R4 Mod Toolbox Boot Sequence Initiated.");
             if let Some(window) = app.get_webview_window("main") {
                 let config = load_app_config().unwrap_or_default();
                 let width = config.window_width.unwrap_or(1600.0);
@@ -914,12 +992,12 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
+                info!("Application close requested. Saving window state.");
                 if let (Ok(size), Ok(pos)) = (window.inner_size(), window.outer_position()) {
                     let scale = window.scale_factor().unwrap_or(1.0);
                     let logical_size = size.to_logical::<f64>(scale);
                     let logical_pos = pos.to_logical::<f64>(scale);
                     
-                    // Defensive window guard: ignore coordinates < -1000
                     if logical_pos.x >= -1000.0 && logical_pos.y >= -1000.0 {
                         let mut config = load_app_config().unwrap_or_default();
                         config.window_width = Some(logical_size.width);

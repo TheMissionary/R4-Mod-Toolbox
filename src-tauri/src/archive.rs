@@ -1,3 +1,4 @@
+use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
@@ -70,10 +71,19 @@ fn load_xl_associations_map(base_game_path: &str) -> HashMap<String, String> {
 fn save_xl_associations_map(base_game_path: &str, map: &HashMap<String, String>) -> Result<(), String> {
     let path = get_xl_associations_path(base_game_path);
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        fs::create_dir_all(parent).map_err(|e| {
+            error!("Failed to create directory for XL associations: {}", e);
+            e.to_string()
+        })?;
     }
-    let serialized = serde_json::to_string_pretty(map).map_err(|e| e.to_string())?;
-    fs::write(&path, serialized).map_err(|e| e.to_string())?;
+    let serialized = serde_json::to_string_pretty(map).map_err(|e| {
+        error!("Failed to serialize XL associations: {}", e);
+        e.to_string()
+    })?;
+    fs::write(&path, serialized).map_err(|e| {
+        error!("Failed to write XL associations to disk: {}", e);
+        e.to_string()
+    })?;
     Ok(())
 }
 
@@ -115,7 +125,13 @@ fn sync_engine_modlist(archive_dir: &Path) {
                 engine_lines.push(trimmed.to_string());
             }
         }
-        let _ = fs::write(&modlist_path, engine_lines.join("\r\n") + "\r\n");
+        if let Err(e) = fs::write(&modlist_path, engine_lines.join("\r\n") + "\r\n") {
+            error!("Failed to sync engine modlist.txt: {}", e);
+        } else {
+            info!("Successfully synchronized engine modlist.txt");
+        }
+    } else {
+        warn!("Could not read r4_loadorder.txt to sync engine modlist.");
     }
 }
 
@@ -132,9 +148,11 @@ fn migrate_legacy_categories(archive_dir: &Path) {
                 if name.starts_with("[CAT] ") {
                     if name.ends_with(".archive") {
                         let new_name = name.replace(".archive", ".txt");
+                        info!("Migrating legacy category: {} -> {}", name, new_name);
                         let _ = fs::rename(&p, archive_dir.join(new_name));
                     } else if name.ends_with(".archive.disabled") {
                         let new_name = name.replace(".archive.disabled", ".txt.disabled");
+                        info!("Migrating legacy disabled category: {} -> {}", name, new_name);
                         let _ = fs::rename(&p, archive_dir.join(new_name));
                     }
                 }
@@ -143,6 +161,7 @@ fn migrate_legacy_categories(archive_dir: &Path) {
     }
 
     if !loadorder_path.exists() && modlist_path.exists() {
+        info!("r4_loadorder.txt not found. Migrating from existing modlist.txt...");
         if let Ok(content) = fs::read_to_string(&modlist_path) {
             let mut new_lines = Vec::new();
             for line in content.lines() {
@@ -153,8 +172,11 @@ fn migrate_legacy_categories(archive_dir: &Path) {
                     new_lines.push(trimmed.to_string());
                 }
             }
-            let _ = fs::write(&loadorder_path, new_lines.join("\r\n") + "\r\n");
-            needs_sync = true;
+            if let Err(e) = fs::write(&loadorder_path, new_lines.join("\r\n") + "\r\n") {
+                error!("Failed to write migrated r4_loadorder.txt: {}", e);
+            } else {
+                needs_sync = true;
+            }
         }
     }
 
@@ -164,9 +186,11 @@ fn migrate_legacy_categories(archive_dir: &Path) {
 }
 
 pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> {
+    info!("Scanning archives at base path: {}", base_game_path);
     let archive_dir = PathBuf::from(base_game_path).join("archive").join("pc").join("mod");
 
     if !archive_dir.exists() {
+        warn!("Archive directory does not exist: {:?}", archive_dir);
         return Ok(ArchiveScanReport {
             archives: Vec::new(),
             total_conflicts: 0,
@@ -222,6 +246,8 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
                 }
             }
         }
+    } else {
+        warn!("r4_loadorder.txt not found during scan. Using alphabetical fallback.");
     }
 
     let mut final_ordered_paths = all_archive_files;
@@ -272,6 +298,8 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
         if is_enabled && !is_delimiter {
             if let Ok(archive) = red4lib::archive::open_read(path) {
                 hashes = archive.get_entries().clone().into_keys().collect::<Vec<u64>>();
+            } else {
+                warn!("Failed to parse archive hashes for: {:?}", path);
             }
             for h in &hashes {
                 hash_to_archives.entry(*h).or_default().push(display_name.clone());
@@ -398,6 +426,8 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
         }
     }
 
+    info!("Archive scan complete. Found {} items, {} total conflicts.", raw_items.len(), total_contested_hashes);
+
     Ok(ArchiveScanReport {
         archives: raw_items,
         total_conflicts: total_contested_hashes,
@@ -407,6 +437,7 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
 }
 
 pub fn toggle_mod(base_game_path: &str, mod_name: &str, enable: bool) -> Result<(), String> {
+    info!("Toggling archive mod: {} (Enable: {})", mod_name, enable);
     let archive_dir = PathBuf::from(base_game_path).join("archive").join("pc").join("mod");
     let clean_name = clean_name_str(mod_name);
 
@@ -415,11 +446,17 @@ pub fn toggle_mod(base_game_path: &str, mod_name: &str, enable: bool) -> Result<
 
     if enable {
         if disabled_archive_path.exists() {
-            fs::rename(&disabled_archive_path, &enabled_archive_path).map_err(|e| e.to_string())?;
+            fs::rename(&disabled_archive_path, &enabled_archive_path).map_err(|e| {
+                error!("Failed to enable archive {}: {}", clean_name, e);
+                e.to_string()
+            })?;
         }
     } else {
         if enabled_archive_path.exists() {
-            fs::rename(&enabled_archive_path, &disabled_archive_path).map_err(|e| e.to_string())?;
+            fs::rename(&enabled_archive_path, &disabled_archive_path).map_err(|e| {
+                error!("Failed to disable archive {}: {}", clean_name, e);
+                e.to_string()
+            })?;
         }
     }
 
@@ -484,11 +521,18 @@ pub fn toggle_mod(base_game_path: &str, mod_name: &str, enable: bool) -> Result<
 }
 
 pub fn save_modlist(base_game_path: &str, ordered_archives: Vec<String>) -> Result<ArchiveScanReport, String> {
+    info!("Saving load order to r4_loadorder.txt");
     let archive_dir = PathBuf::from(base_game_path).join("archive").join("pc").join("mod");
-    fs::create_dir_all(&archive_dir).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&archive_dir).map_err(|e| {
+        error!("Failed to create archive directory: {}", e);
+        e.to_string()
+    })?;
     
     let loadorder_path = archive_dir.join("r4_loadorder.txt");
-    let mut file = File::create(&loadorder_path).map_err(|e| e.to_string())?;
+    let mut file = File::create(&loadorder_path).map_err(|e| {
+        error!("Failed to create r4_loadorder.txt: {}", e);
+        e.to_string()
+    })?;
 
     for name in ordered_archives {
         let clean_name = clean_name_str(&name);
@@ -498,7 +542,10 @@ pub fn save_modlist(base_game_path: &str, ordered_archives: Vec<String>) -> Resu
             
             if active_path.exists() || disabled_path.exists() {
                 let line = format!("{}\r\n", clean_name);
-                file.write_all(line.as_bytes()).map_err(|e| e.to_string())?;
+                file.write_all(line.as_bytes()).map_err(|e| {
+                    error!("Failed to write to r4_loadorder.txt: {}", e);
+                    e.to_string()
+                })?;
             }
         }
     }
@@ -526,6 +573,7 @@ pub fn load_categories(base_game_path: &str) -> Result<String, String> {
 }
 
 pub fn create_physical_category(base_game_path: &str, category_name: &str) -> Result<ArchiveScanReport, String> {
+    info!("Creating physical category: {}", category_name);
     let archive_dir = PathBuf::from(base_game_path).join("archive").join("pc").join("mod");
     fs::create_dir_all(&archive_dir).map_err(|e| e.to_string())?;
     
@@ -537,6 +585,7 @@ pub fn create_physical_category(base_game_path: &str, category_name: &str) -> Re
     let safe_trimmed = safe_name.trim();
 
     if safe_trimmed.is_empty() {
+        error!("Category creation failed: Name cannot be empty.");
         return Err("Category name cannot be empty".to_string());
     }
 
@@ -544,7 +593,10 @@ pub fn create_physical_category(base_game_path: &str, category_name: &str) -> Re
     let file_path = archive_dir.join(&file_name);
     
     if !file_path.exists() {
-        File::create(&file_path).map_err(|e| e.to_string())?;
+        File::create(&file_path).map_err(|e| {
+            error!("Failed to create category file {}: {}", file_name, e);
+            e.to_string()
+        })?;
         
         let loadorder_path = archive_dir.join("r4_loadorder.txt");
         let mut existing_content = String::new();
@@ -555,14 +607,18 @@ pub fn create_physical_category(base_game_path: &str, category_name: &str) -> Re
             }
         }
         
-        // Append to bottom
         let mut new_content = existing_content;
         if !new_content.is_empty() && !new_content.ends_with('\n') {
             new_content.push_str("\r\n");
         }
         new_content.push_str(&format!("{}\r\n", file_name));
         
-        fs::write(&loadorder_path, new_content).map_err(|e| e.to_string())?;
+        fs::write(&loadorder_path, new_content).map_err(|e| {
+            error!("Failed to append category to r4_loadorder.txt: {}", e);
+            e.to_string()
+        })?;
+    } else {
+        warn!("Category file already exists: {}", file_name);
     }
     
     sync_engine_modlist(&archive_dir);
@@ -570,8 +626,10 @@ pub fn create_physical_category(base_game_path: &str, category_name: &str) -> Re
 }
 
 pub fn delete_physical_category(base_game_path: &str, category_file_name: &str) -> Result<ArchiveScanReport, String> {
+    info!("Deleting physical category: {}", category_file_name);
     let clean_name = clean_name_str(category_file_name);
     if !clean_name.starts_with("[CAT] ") || !clean_name.ends_with(".txt") {
+        error!("Safety check failed: Target {} is not a physical category delimiter", category_file_name);
         return Err("Safety check failed: Target is not a physical category delimiter".to_string());
     }
 
@@ -580,10 +638,16 @@ pub fn delete_physical_category(base_game_path: &str, category_file_name: &str) 
     let disabled_path = archive_dir.join(format!("{}.disabled", clean_name));
 
     if active_path.exists() {
-        fs::remove_file(&active_path).map_err(|e| e.to_string())?;
+        fs::remove_file(&active_path).map_err(|e| {
+            error!("Failed to delete category file {}: {}", clean_name, e);
+            e.to_string()
+        })?;
     }
     if disabled_path.exists() {
-        fs::remove_file(&disabled_path).map_err(|e| e.to_string())?;
+        fs::remove_file(&disabled_path).map_err(|e| {
+            error!("Failed to delete disabled category file {}: {}", clean_name, e);
+            e.to_string()
+        })?;
     }
 
     let loadorder_path = archive_dir.join("r4_loadorder.txt");
@@ -601,7 +665,10 @@ pub fn delete_physical_category(base_game_path: &str, category_file_name: &str) 
             if !new_loadorder.is_empty() {
                 new_loadorder.push_str("\r\n");
             }
-            fs::write(&loadorder_path, new_loadorder).map_err(|e| e.to_string())?;
+            fs::write(&loadorder_path, new_loadorder).map_err(|e| {
+                error!("Failed to update r4_loadorder.txt after category deletion: {}", e);
+                e.to_string()
+            })?;
         }
     }
 
@@ -610,8 +677,10 @@ pub fn delete_physical_category(base_game_path: &str, category_file_name: &str) 
 }
 
 pub fn rename_physical_category(base_game_path: &str, old_file_name: &str, new_category_name: &str) -> Result<ArchiveScanReport, String> {
+    info!("Renaming physical category from {} to {}", old_file_name, new_category_name);
     let old_clean_name = clean_name_str(old_file_name);
     if !old_clean_name.starts_with("[CAT] ") || !old_clean_name.ends_with(".txt") {
+        error!("Safety check failed: Target {} is not a physical category delimiter", old_file_name);
         return Err("Safety check failed: Target is not a physical category delimiter".to_string());
     }
 
@@ -623,6 +692,7 @@ pub fn rename_physical_category(base_game_path: &str, old_file_name: &str, new_c
     let safe_trimmed = safe_name.trim();
 
     if safe_trimmed.is_empty() {
+        error!("Category rename failed: New name cannot be empty.");
         return Err("Category name cannot be empty".to_string());
     }
 
@@ -635,9 +705,15 @@ pub fn rename_physical_category(base_game_path: &str, old_file_name: &str, new_c
     let new_disabled_path = archive_dir.join(format!("{}.disabled", new_clean_name));
 
     if old_active_path.exists() {
-        fs::rename(&old_active_path, &new_active_path).map_err(|e| e.to_string())?;
+        fs::rename(&old_active_path, &new_active_path).map_err(|e| {
+            error!("Failed to rename category file: {}", e);
+            e.to_string()
+        })?;
     } else if old_disabled_path.exists() {
-        fs::rename(&old_disabled_path, &new_disabled_path).map_err(|e| e.to_string())?;
+        fs::rename(&old_disabled_path, &new_disabled_path).map_err(|e| {
+            error!("Failed to rename disabled category file: {}", e);
+            e.to_string()
+        })?;
     }
 
     let loadorder_path = archive_dir.join("r4_loadorder.txt");
@@ -657,7 +733,10 @@ pub fn rename_physical_category(base_game_path: &str, old_file_name: &str, new_c
             if !new_loadorder.is_empty() {
                 new_loadorder.push_str("\r\n");
             }
-            fs::write(&loadorder_path, new_loadorder).map_err(|e| e.to_string())?;
+            fs::write(&loadorder_path, new_loadorder).map_err(|e| {
+                error!("Failed to update r4_loadorder.txt after category rename: {}", e);
+                e.to_string()
+            })?;
         }
     }
 
@@ -666,6 +745,7 @@ pub fn rename_physical_category(base_game_path: &str, old_file_name: &str, new_c
 }
 
 pub fn link_xl_to_archive(base_game_path: &str, xl_name: &str, archive_name: &str) -> Result<ArchiveScanReport, String> {
+    info!("Linking XL file {} to archive {}", xl_name, archive_name);
     let mut map = load_xl_associations_map(base_game_path);
     map.insert(xl_name.to_string(), archive_name.to_string());
     save_xl_associations_map(base_game_path, &map)?;
@@ -673,6 +753,7 @@ pub fn link_xl_to_archive(base_game_path: &str, xl_name: &str, archive_name: &st
 }
 
 pub fn unlink_xl_from_archive(base_game_path: &str, xl_name: &str) -> Result<ArchiveScanReport, String> {
+    info!("Unlinking XL file {}", xl_name);
     let mut map = load_xl_associations_map(base_game_path);
     map.insert(xl_name.to_string(), "[UNLINKED]".to_string());
     save_xl_associations_map(base_game_path, &map)?;
