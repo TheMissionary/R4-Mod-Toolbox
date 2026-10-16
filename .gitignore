@@ -20,3 +20,7 @@ _Terminal_Output.txt
 # OS Files
 .DS_Store
 Thumbs.db
+
+# Dev Notes
+PSTR.txt
+PTSR.txt
