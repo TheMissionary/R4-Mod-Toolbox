@@ -24,3 +24,6 @@ Thumbs.db
 # Dev Notes
 PSTR.txt
 PTSR.txt
+
+# Private agent configuration
+.agent/
