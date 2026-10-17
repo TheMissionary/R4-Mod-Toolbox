@@ -26,6 +26,7 @@
   --theme-border: #2a323d;
   --theme-accent: #76b900;
   --theme-accent-hover: #88d600;
+  --theme-accent-contrast: #000000;
   --theme-text-muted: #94a3b8;
   --theme-text-primary: #ffffff;
 
@@ -47,6 +48,7 @@
   --color-nvidia-border: var(--theme-border);
   --color-nvidia-accent: var(--theme-accent);
   --color-nvidia-accent-hover: var(--theme-accent-hover);
+  --color-nvidia-accent-contrast: var(--theme-accent-contrast);
   --color-nvidia-text-muted: var(--theme-text-muted);
   --color-nvidia-text-primary: var(--theme-text-primary);
 }

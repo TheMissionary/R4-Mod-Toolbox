@@ -51,6 +51,26 @@ export function adjustBrightness(hex: string, percent: number): string {
   return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()}`;
 }
 
+export function getContrastColor(hex: string): string {
+  let cleanHex = hex.replace('#', '').trim();
+  if (cleanHex.length === 3) {
+    cleanHex = cleanHex.split('').map(c => c + c).join('');
+  }
+  const num = parseInt(cleanHex, 16);
+  if (isNaN(num)) return '#000000';
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness > 135 ? '#000000' : '#ffffff';
+}
+
+export function isModNew(createdAtMs?: number | null, hours: number = 6): boolean {
+  if (!createdAtMs) return false;
+  const cutoff = Date.now() - (hours * 60 * 60 * 1000);
+  return createdAtMs >= cutoff;
+}
+
 export function generateThemeColors(mode: 'dark' | 'light', accentHex: string): AppThemeColors {
   const normHex = accentHex.startsWith('#') ? accentHex.toUpperCase() : `#${accentHex.toUpperCase()}`;
   const base = mode === 'light' ? LIGHT_BASE_FOUNDATION : DARK_BASE_FOUNDATION;
@@ -125,6 +145,8 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   windowWidth: 1600,
   windowHeight: 1000,
   recentDaysThreshold: 30,
+  newModsHours: 6,
+  showNewMods: false,
   customTextEditorPath: '',
   customLaunchPath: '',
   theme: { ...DEFAULT_THEME_SETTINGS },
@@ -195,6 +217,9 @@ export function applyThemeSettings(settings: ThemeSettings) {
     root.style.setProperty(meta.cssVar, activeColors[meta.key as keyof AppThemeColors]);
   }
 
+  const contrastColor = getContrastColor(activeColors.accent);
+  root.style.setProperty('--theme-accent-contrast', contrastColor);
+
   const baseFont = settings.fontFamilyBase || settings.fontFamily || APP_FONT_PRESETS[0].value;
   const modsFont = settings.fontFamilyMods || MOD_FONT_PRESETS[0].value;
 
@@ -233,6 +258,12 @@ export async function loadConfigFromDisk(): Promise<AppConfig> {
 
       if (config.recentDaysThreshold === undefined) {
         config.recentDaysThreshold = 30;
+      }
+      if (config.newModsHours === undefined) {
+        config.newModsHours = 6;
+      }
+      if (config.showNewMods === undefined) {
+        config.showNewMods = false;
       }
       if (config.customTextEditorPath === undefined) {
         config.customTextEditorPath = '';

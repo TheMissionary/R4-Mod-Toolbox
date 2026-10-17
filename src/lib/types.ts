@@ -22,6 +22,7 @@ export interface ArchiveItem {
   associated_xls?: XlItem[];
   is_delimiter?: boolean;
   category_name?: string | null;
+  created_at_ms?: number;
 }
 
 export interface CategoryItem {
@@ -51,6 +52,7 @@ export interface CetPluginItem {
   file_count: number;
   enabled: boolean;
   is_dir?: boolean;
+  created_at_ms?: number;
 }
 
 export interface Red4extPluginItem {
@@ -60,6 +62,7 @@ export interface Red4extPluginItem {
   file_count: number;
   enabled: boolean;
   is_dir?: boolean;
+  created_at_ms?: number;
 }
 
 export interface RedScriptItem {
@@ -69,6 +72,7 @@ export interface RedScriptItem {
   file_count: number;
   enabled: boolean;
   is_dir?: boolean;
+  created_at_ms?: number;
 }
 
 export interface R6TweaksItem {
@@ -78,6 +82,7 @@ export interface R6TweaksItem {
   file_count: number;
   enabled: boolean;
   is_dir?: boolean;
+  created_at_ms?: number;
 }
 
 export interface ScanResult {
@@ -140,6 +145,8 @@ export interface AppConfig {
   windowX?: number;
   windowY?: number;
   recentDaysThreshold?: number;
+  newModsHours?: number;
+  showNewMods?: boolean;
   customTextEditorPath?: string;
   customLaunchPath?: string;
   theme: ThemeSettings;

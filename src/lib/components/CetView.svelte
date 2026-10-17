@@ -5,18 +5,25 @@
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { tick } from 'svelte';
-  import { loadConfigFromDisk } from '$lib/theme';
+  import { loadConfigFromDisk, isModNew } from '$lib/theme';
+  import NewModsControl from '$lib/components/NewModsControl.svelte';
 
   let {
     plugins = $bindable([]),
     gamePath = '',
     onStateChanged,
-    targetHighlightMod = null
+    targetHighlightMod = null,
+    newModsHours = $bindable(6),
+    showNewMods = $bindable(false),
+    onNewModsConfigChanged
   }: {
     plugins: CetPluginItem[];
     gamePath: string;
     onStateChanged?: () => void;
     targetHighlightMod?: string | null;
+    newModsHours?: number;
+    showNewMods?: boolean;
+    onNewModsConfigChanged?: () => void;
   } = $props();
 
   let searchQuery = $state('');
@@ -276,6 +283,7 @@
   });
 
   let activeCount = $derived(plugins.filter(p => p.enabled).length);
+  let newModsCount = $derived(plugins.filter(p => isModNew(p.created_at_ms, newModsHours)).length);
 </script>
 
 <svelte:window onclick={closeContextMenu} />
@@ -456,6 +464,12 @@
       <div class="text-xs font-mono text-nvidia-text-muted">
         Active: <span class="text-nvidia-accent font-semibold">{activeCount}</span> of {plugins.length}
       </div>
+      <NewModsControl
+        bind:newModsHours
+        bind:showNewMods
+        {newModsCount}
+        onConfigChanged={onNewModsConfigChanged}
+      />
       <button
         type="button"
         onclick={toggleAllFolders}
@@ -526,6 +540,16 @@
               {:else}
                 <div class="w-[18px] shrink-0"></div>
                 <FileCode class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+              {/if}
+
+              {#if showNewMods && isModNew(plugin.created_at_ms, newModsHours)}
+                <span
+                  class="inline-flex items-center justify-center px-1.5 py-0.2 rounded text-[9px] font-mono font-bold tracking-wider uppercase shrink-0 shadow-xs"
+                  style="background-color: var(--theme-accent); color: var(--theme-accent-contrast);"
+                  title="Installed/modified in the last {newModsHours} hours"
+                >
+                  NEW
+                </span>
               {/if}
 
               <span class="font-mono truncate {plugin.enabled ? 'text-nvidia-text-primary' : 'line-through text-nvidia-text-muted'}">

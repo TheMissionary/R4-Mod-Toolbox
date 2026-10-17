@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct XlItem {
@@ -29,6 +30,8 @@ pub struct ArchiveItem {
     pub associated_xls: Vec<XlItem>,
     pub is_delimiter: bool,
     pub category_name: Option<String>,
+    #[serde(default)]
+    pub created_at_ms: Option<u64>,
 }
 
 #[allow(dead_code)]
@@ -38,6 +41,45 @@ pub struct CategoryItem {
     pub name: String,
     pub enabled: bool,
     pub collapsed: bool,
+}
+
+pub fn get_path_timestamp_ms(path: &Path) -> Option<u64> {
+    let mut newest_time = None;
+    if let Ok(meta) = path.metadata() {
+        let created = meta.created().ok();
+        let modified = meta.modified().ok();
+        newest_time = match (created, modified) {
+            (Some(c), Some(m)) => Some(std::cmp::max(c, m)),
+            (Some(c), None) => Some(c),
+            (None, Some(m)) => Some(m),
+            (None, None) => None,
+        };
+    }
+    if path.is_dir() {
+        if let Ok(entries) = fs::read_dir(path) {
+            for entry in entries.flatten() {
+                if let Ok(meta) = entry.metadata() {
+                    let c = meta.created().ok();
+                    let m = meta.modified().ok();
+                    let cand = match (c, m) {
+                        (Some(c), Some(m)) => Some(std::cmp::max(c, m)),
+                        (Some(c), None) => Some(c),
+                        (None, Some(m)) => Some(m),
+                        (None, None) => None,
+                    };
+                    if let Some(cand_time) = cand {
+                        newest_time = match newest_time {
+                            Some(cur) => Some(std::cmp::max(cur, cand_time)),
+                            None => Some(cand_time),
+                        };
+                    }
+                }
+            }
+        }
+    }
+    newest_time
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as u64)
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -369,6 +411,12 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
 
         matched_xls.truncate(3);
 
+        let created_at_ms = if is_delimiter {
+            None
+        } else {
+            get_path_timestamp_ms(path)
+        };
+
         raw_items.push(ArchiveItem {
             name: display_name.clone(),
             file_name: display_name,
@@ -383,6 +431,7 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
             associated_xls: matched_xls,
             is_delimiter,
             category_name,
+            created_at_ms,
         });
     }
 

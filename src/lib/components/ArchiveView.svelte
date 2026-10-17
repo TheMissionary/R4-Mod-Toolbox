@@ -34,6 +34,8 @@
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { tick } from 'svelte';
+  import NewModsControl from '$lib/components/NewModsControl.svelte';
+  import { isModNew } from '$lib/theme';
 
   let {
     archives = $bindable([]),
@@ -41,7 +43,10 @@
     scanReport = $bindable(null),
     onScanRequested,
     onStateChanged,
-    targetHighlightMod = null
+    targetHighlightMod = null,
+    newModsHours = $bindable(6),
+    showNewMods = $bindable(false),
+    onNewModsConfigChanged
   }: {
     archives: ArchiveItem[];
     gamePath: string;
@@ -49,6 +54,9 @@
     onScanRequested?: () => void;
     onStateChanged?: () => void;
     targetHighlightMod?: string | null;
+    newModsHours?: number;
+    showNewMods?: boolean;
+    onNewModsConfigChanged?: () => void;
   } = $props();
 
   let searchQuery = $state('');
@@ -951,6 +959,7 @@
 
   let actualMods = $derived(archives.filter(a => !a.is_delimiter));
   let activeCount = $derived(actualMods.filter(a => a.enabled).length);
+  let newModsCount = $derived(actualMods.filter(a => isModNew(a.created_at_ms, newModsHours)).length);
 </script>
 
 <svelte:window
@@ -1144,6 +1153,13 @@
     </div>
 
     <div class="flex items-center gap-2.5">
+      <NewModsControl
+        bind:newModsHours
+        bind:showNewMods
+        {newModsCount}
+        onConfigChanged={onNewModsConfigChanged}
+      />
+
       <button
         onclick={toggleAllCategories}
         disabled={totalCategories === 0}
@@ -1265,9 +1281,19 @@
                       <div class="h-2.5 w-2.5 rounded-full transition-transform transform {archive.enabled ? 'translate-x-3 bg-zinc-100 shadow-xs' : 'translate-x-0 bg-zinc-500'}"></div>
                     </button>
 
-                    <span class="text-[10px] font-mono px-1 py-0.2 rounded bg-nvidia-card text-nvidia-text-muted border border-nvidia-border shrink-0">
+                    <span class="text-[10px] font-mono px-1 py-0.2 min-w-[34px] text-center rounded bg-nvidia-card text-nvidia-text-muted border border-nvidia-border shrink-0">
                       #{archiveRank}
                     </span>
+
+                    {#if showNewMods && isModNew(archive.created_at_ms, newModsHours)}
+                      <span
+                        class="inline-flex items-center justify-center px-1.5 py-0.2 rounded text-[9px] font-mono font-bold tracking-wider uppercase shrink-0 shadow-xs"
+                        style="background-color: var(--theme-accent); color: var(--theme-accent-contrast);"
+                        title="Installed/modified in the last {newModsHours} hours"
+                      >
+                        NEW
+                      </span>
+                    {/if}
 
                     <span class="font-mono font-medium text-nvidia-text-primary truncate max-w-md">
                       {archive.file_name}

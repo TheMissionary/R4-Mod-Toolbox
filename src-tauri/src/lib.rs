@@ -91,6 +91,10 @@ pub struct AppConfig {
     #[serde(default)]
     pub recent_days_threshold: Option<u32>,
     #[serde(default)]
+    pub new_mods_hours: Option<u32>,
+    #[serde(default)]
+    pub show_new_mods: Option<bool>,
+    #[serde(default)]
     pub custom_text_editor_path: Option<String>,
     #[serde(default)]
     pub custom_launch_path: Option<String>,
@@ -108,6 +112,8 @@ impl Default for AppConfig {
             window_x: None,
             window_y: None,
             recent_days_threshold: Some(30),
+            new_mods_hours: Some(6),
+            show_new_mods: Some(false),
             custom_text_editor_path: None,
             custom_launch_path: None,
             theme: ThemeConfig::default(),
@@ -178,6 +184,8 @@ pub struct CetPluginItem {
     pub enabled: bool,
     #[serde(default)]
     pub is_dir: bool,
+    #[serde(default)]
+    pub created_at_ms: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -189,6 +197,8 @@ pub struct Red4extPluginItem {
     pub enabled: bool,
     #[serde(default)]
     pub is_dir: bool,
+    #[serde(default)]
+    pub created_at_ms: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -200,6 +210,8 @@ pub struct RedScriptItem {
     pub enabled: bool,
     #[serde(default)]
     pub is_dir: bool,
+    #[serde(default)]
+    pub created_at_ms: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -211,6 +223,8 @@ pub struct R6TweaksItem {
     pub enabled: bool,
     #[serde(default)]
     pub is_dir: bool,
+    #[serde(default)]
+    pub created_at_ms: Option<u64>,
 }
 
 fn calculate_dir_size(path: &Path) -> u64 {
@@ -505,6 +519,7 @@ fn get_cet_details(game_path: String) -> Result<Vec<CetPluginItem>, String> {
                 } else {
                     (1, entry.metadata().map(|m| m.len()).unwrap_or(0))
                 };
+                let created_at_ms = archive::get_path_timestamp_ms(&p);
                 list.push(CetPluginItem {
                     name,
                     path: p.to_string_lossy().to_string(),
@@ -513,6 +528,7 @@ fn get_cet_details(game_path: String) -> Result<Vec<CetPluginItem>, String> {
                     file_count,
                     enabled: true,
                     is_dir,
+                    created_at_ms,
                 });
             }
         }
@@ -530,6 +546,7 @@ fn get_cet_details(game_path: String) -> Result<Vec<CetPluginItem>, String> {
                 } else {
                     (1, entry.metadata().map(|m| m.len()).unwrap_or(0))
                 };
+                let created_at_ms = archive::get_path_timestamp_ms(&p);
                 list.push(CetPluginItem {
                     name,
                     path: p.to_string_lossy().to_string(),
@@ -538,6 +555,7 @@ fn get_cet_details(game_path: String) -> Result<Vec<CetPluginItem>, String> {
                     file_count,
                     enabled: false,
                     is_dir,
+                    created_at_ms,
                 });
             }
         }
@@ -566,6 +584,7 @@ fn get_red4ext_details(game_path: String) -> Result<Vec<Red4extPluginItem>, Stri
                 } else {
                     (1, entry.metadata().map(|m| m.len()).unwrap_or(0))
                 };
+                let created_at_ms = archive::get_path_timestamp_ms(&p);
                 list.push(Red4extPluginItem {
                     name,
                     path: p.to_string_lossy().to_string(),
@@ -573,6 +592,7 @@ fn get_red4ext_details(game_path: String) -> Result<Vec<Red4extPluginItem>, Stri
                     file_count,
                     enabled: true,
                     is_dir,
+                    created_at_ms,
                 });
             }
         }
@@ -589,6 +609,7 @@ fn get_red4ext_details(game_path: String) -> Result<Vec<Red4extPluginItem>, Stri
                 } else {
                     (1, entry.metadata().map(|m| m.len()).unwrap_or(0))
                 };
+                let created_at_ms = archive::get_path_timestamp_ms(&p);
                 list.push(Red4extPluginItem {
                     name,
                     path: p.to_string_lossy().to_string(),
@@ -596,6 +617,7 @@ fn get_red4ext_details(game_path: String) -> Result<Vec<Red4extPluginItem>, Stri
                     file_count,
                     enabled: false,
                     is_dir,
+                    created_at_ms,
                 });
             }
         }
@@ -624,6 +646,7 @@ fn get_redscript_details(game_path: String) -> Result<Vec<RedScriptItem>, String
                 } else {
                     (1, entry.metadata().map(|m| m.len()).unwrap_or(0))
                 };
+                let created_at_ms = archive::get_path_timestamp_ms(&p);
                 list.push(RedScriptItem {
                     name,
                     path: p.to_string_lossy().to_string(),
@@ -631,6 +654,7 @@ fn get_redscript_details(game_path: String) -> Result<Vec<RedScriptItem>, String
                     file_count,
                     enabled: true,
                     is_dir,
+                    created_at_ms,
                 });
             }
         }
@@ -647,6 +671,7 @@ fn get_redscript_details(game_path: String) -> Result<Vec<RedScriptItem>, String
                 } else {
                     (1, entry.metadata().map(|m| m.len()).unwrap_or(0))
                 };
+                let created_at_ms = archive::get_path_timestamp_ms(&p);
                 list.push(RedScriptItem {
                     name,
                     path: p.to_string_lossy().to_string(),
@@ -654,6 +679,7 @@ fn get_redscript_details(game_path: String) -> Result<Vec<RedScriptItem>, String
                     file_count,
                     enabled: false,
                     is_dir,
+                    created_at_ms,
                 });
             }
         }
@@ -682,6 +708,7 @@ fn get_r6tweaks_details(game_path: String) -> Result<Vec<R6TweaksItem>, String> 
                 } else {
                     (1, entry.metadata().map(|m| m.len()).unwrap_or(0))
                 };
+                let created_at_ms = archive::get_path_timestamp_ms(&p);
                 list.push(R6TweaksItem {
                     name,
                     path: p.to_string_lossy().to_string(),
@@ -689,6 +716,7 @@ fn get_r6tweaks_details(game_path: String) -> Result<Vec<R6TweaksItem>, String> 
                     file_count,
                     enabled: true,
                     is_dir,
+                    created_at_ms,
                 });
             }
         }
@@ -705,6 +733,7 @@ fn get_r6tweaks_details(game_path: String) -> Result<Vec<R6TweaksItem>, String> 
                 } else {
                     (1, entry.metadata().map(|m| m.len()).unwrap_or(0))
                 };
+                let created_at_ms = archive::get_path_timestamp_ms(&p);
                 list.push(R6TweaksItem {
                     name,
                     path: p.to_string_lossy().to_string(),
@@ -712,6 +741,7 @@ fn get_r6tweaks_details(game_path: String) -> Result<Vec<R6TweaksItem>, String> 
                     file_count,
                     enabled: false,
                     is_dir,
+                    created_at_ms,
                 });
             }
         }

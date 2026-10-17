@@ -99,6 +99,25 @@
   let redscriptPackages = $state<RedScriptItem[]>([]);
   let r6tweaks = $state<R6TweaksItem[]>([]);
 
+  // New Mods Badge System State
+  let newModsHours = $state(6);
+  let showNewMods = $state(false);
+
+  let newModsSaveTimeout: ReturnType<typeof setTimeout>;
+  function handleNewModsConfigChange() {
+    clearTimeout(newModsSaveTimeout);
+    newModsSaveTimeout = setTimeout(async () => {
+      try {
+        const config = await loadConfigFromDisk();
+        config.newModsHours = newModsHours;
+        config.showNewMods = showNewMods;
+        await saveConfigToDisk(config);
+      } catch (err) {
+        error(`Failed to save new mods config: ${err}`);
+      }
+    }, 200);
+  }
+
   // Recently Added Mods State
   let recentMods = $state<LedgerEntry[]>([]);
   let showRecentMods = $state(false);
@@ -394,6 +413,12 @@
       }
       if (config.recentDaysThreshold !== undefined) {
         recentDaysThreshold = config.recentDaysThreshold;
+      }
+      if (config.newModsHours !== undefined) {
+        newModsHours = config.newModsHours;
+      }
+      if (config.showNewMods !== undefined) {
+        showNewMods = config.showNewMods;
       }
     }).catch(err => {
       error(`Config hydration error: ${err}`);
@@ -963,23 +988,65 @@
 
       <!-- Persistent Tab Views -->
       <div class={currentTab === 'archive' ? 'h-full' : 'hidden'}>
-        <ArchiveView bind:archives {gamePath} scanReport={archiveReport} onScanRequested={refreshAll} onStateChanged={refreshCountsOnly} {targetHighlightMod} />
+        <ArchiveView
+          bind:archives
+          {gamePath}
+          scanReport={archiveReport}
+          onScanRequested={refreshAll}
+          onStateChanged={refreshCountsOnly}
+          {targetHighlightMod}
+          bind:newModsHours
+          bind:showNewMods
+          onNewModsConfigChanged={handleNewModsConfigChange}
+        />
       </div>
 
       <div class={currentTab === 'cet' ? 'h-full' : 'hidden'}>
-        <CetView bind:plugins={cetPlugins} {gamePath} onStateChanged={refreshCountsOnly} {targetHighlightMod} />
+        <CetView
+          bind:plugins={cetPlugins}
+          {gamePath}
+          onStateChanged={refreshCountsOnly}
+          {targetHighlightMod}
+          bind:newModsHours
+          bind:showNewMods
+          onNewModsConfigChanged={handleNewModsConfigChange}
+        />
       </div>
 
       <div class={currentTab === 'red4ext' ? 'h-full' : 'hidden'}>
-        <Red4extView bind:plugins={red4extPlugins} {gamePath} onStateChanged={refreshCountsOnly} {targetHighlightMod} />
+        <Red4extView
+          bind:plugins={red4extPlugins}
+          {gamePath}
+          onStateChanged={refreshCountsOnly}
+          {targetHighlightMod}
+          bind:newModsHours
+          bind:showNewMods
+          onNewModsConfigChanged={handleNewModsConfigChange}
+        />
       </div>
 
       <div class={currentTab === 'redscript' ? 'h-full' : 'hidden'}>
-        <RedscriptView bind:packages={redscriptPackages} {gamePath} onStateChanged={refreshCountsOnly} {targetHighlightMod} />
+        <RedscriptView
+          bind:packages={redscriptPackages}
+          {gamePath}
+          onStateChanged={refreshCountsOnly}
+          {targetHighlightMod}
+          bind:newModsHours
+          bind:showNewMods
+          onNewModsConfigChanged={handleNewModsConfigChange}
+        />
       </div>
 
       <div class={currentTab === 'r6tweaks' ? 'h-full' : 'hidden'}>
-        <R6TweaksView bind:tweaks={r6tweaks} {gamePath} onStateChanged={refreshCountsOnly} {targetHighlightMod} />
+        <R6TweaksView
+          bind:tweaks={r6tweaks}
+          {gamePath}
+          onStateChanged={refreshCountsOnly}
+          {targetHighlightMod}
+          bind:newModsHours
+          bind:showNewMods
+          onNewModsConfigChanged={handleNewModsConfigChange}
+        />
       </div>
 
       <!-- New Full-Screen Views -->
