@@ -40,6 +40,8 @@
     Sliders,
     Play,
     CheckCircle2,
+    RefreshCw,
+    X,
     AlertTriangle,
     AlertCircle,
     ArrowUpRight,
@@ -85,6 +87,9 @@
   let gamePath = $state('');
   let isLoading = $state(false);
   let isLaunching = $state(false);
+  let isGameRunning = $state(false);
+  let isConfirmingKill = $state(false);
+  let killConfirmTimer: ReturnType<typeof setTimeout> | null = null;
 
   let scanResult = $state<ScanResult | null>(null);
   let archiveReport = $state<ArchiveScanReport | null>(null);
@@ -255,16 +260,60 @@
   }
 
   async function handleLaunchGame() {
-    if (!gamePath || isLaunching) return;
+    if (!gamePath || isLaunching || isGameRunning) return;
     isLaunching = true;
     info('Initiating game launch sequence...');
     try {
       const config = await loadConfigFromDisk();
       await invoke('launch_game', { gamePath, customLaunchPath: config.customLaunchPath });
+      
+      let attempts = 0;
+      const pollInterval = setInterval(async () => {
+        attempts++;
+        try {
+          const running = await invoke<boolean>('check_game_process_running');
+          if (running) {
+            isGameRunning = true;
+            isLaunching = false;
+            clearInterval(pollInterval);
+          } else if (attempts > 30) {
+            isLaunching = false;
+            clearInterval(pollInterval);
+          }
+        } catch {
+          if (attempts > 30) {
+            isLaunching = false;
+            clearInterval(pollInterval);
+          }
+        }
+      }, 1000);
     } catch (err) {
       error(`Failed to launch game: ${err}`);
-    } finally {
-      setTimeout(() => { isLaunching = false; }, 2500);
+      isLaunching = false;
+    }
+  }
+
+  async function handleKillClick() {
+    if (!isConfirmingKill) {
+      // Step 1: Request confirmation
+      isConfirmingKill = true;
+      if (killConfirmTimer) clearTimeout(killConfirmTimer);
+      killConfirmTimer = setTimeout(() => {
+        isConfirmingKill = false;
+      }, 3500);
+    } else {
+      // Step 2: Confirmed!
+      if (killConfirmTimer) clearTimeout(killConfirmTimer);
+      isConfirmingKill = false;
+      info('User confirmed force kill of Cyberpunk2077.exe');
+      try {
+        await invoke('kill_game_process');
+        setTimeout(async () => {
+          isGameRunning = await invoke<boolean>('check_game_process_running');
+        }, 600);
+      } catch (err) {
+        error(`Failed to kill game process: ${err}`);
+      }
     }
   }
 
@@ -360,7 +409,28 @@
       refreshAll();
     });
 
+    async function checkProcess() {
+      try {
+        const running = await invoke<boolean>('check_game_process_running');
+        isGameRunning = running;
+        if (running && isLaunching) {
+          isLaunching = false;
+        }
+        if (!running && isConfirmingKill) {
+          isConfirmingKill = false;
+          if (killConfirmTimer) clearTimeout(killConfirmTimer);
+        }
+      } catch (err) {
+        // non-fatal process check
+      }
+    }
+
+    checkProcess();
+    const processInterval = setInterval(checkProcess, 2500);
+
     return () => {
+      clearInterval(processInterval);
+      if (killConfirmTimer) clearTimeout(killConfirmTimer);
       unlisten.then(f => f());
     };
   });
@@ -532,15 +602,48 @@
 
       <!-- Launch Game Button -->
       <div class="p-3 border-t border-nvidia-border/50 bg-nvidia-surface/20 shrink-0">
-        <button
-          type="button"
-          onclick={handleLaunchGame}
-          disabled={isLaunching || !scanResult?.is_valid_game_path}
-          class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded bg-nvidia-accent hover:brightness-105 text-black font-semibold text-xs transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-        >
-          <Play class="h-3.5 w-3.5 fill-black" />
-          <span>{isLaunching ? 'Starting Game...' : 'Launch Game'}</span>
-        </button>
+        {#if isGameRunning}
+          <!-- Split Running / Force Stop Button (75% / 25%) -->
+          <div class="w-full flex items-stretch rounded overflow-hidden border border-nvidia-border bg-nvidia-card shadow-sm text-xs">
+            <!-- 75% Left: Now Playing Status -->
+            <div class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-nvidia-surface/90 text-nvidia-text-primary select-none">
+              <div class="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse"></div>
+              <span class="font-semibold tracking-wide">Now Playing</span>
+            </div>
+
+            <!-- 25% Right: 2-Step Force Stop Button -->
+            <button
+              type="button"
+              onclick={handleKillClick}
+              class="w-12 flex items-center justify-center border-l border-nvidia-border transition cursor-pointer {isConfirmingKill ? 'bg-red-600 hover:bg-red-500 text-white font-bold animate-pulse' : 'bg-nvidia-surface/50 hover:bg-red-500/20 text-nvidia-text-muted hover:text-red-400'}"
+              title={isConfirmingKill ? 'Click again to confirm force stop (kill process)' : 'Force stop (kill process)'}
+              aria-label={isConfirmingKill ? 'Confirm force stop' : 'Force stop'}
+            >
+              {#if isConfirmingKill}
+                <span class="text-[10px] uppercase font-bold tracking-tighter">Kill?</span>
+              {:else}
+                <X class="h-3.5 w-3.5" />
+              {/if}
+            </button>
+          </div>
+        {:else}
+          <!-- Standard / Launching Button -->
+          <button
+            type="button"
+            onclick={handleLaunchGame}
+            disabled={isLaunching || !scanResult?.is_valid_game_path}
+            class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded bg-nvidia-accent hover:brightness-105 text-black font-semibold text-xs transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            title={!scanResult?.is_valid_game_path ? 'Configure a valid Cyberpunk 2077 game directory to enable launch' : (isLaunching ? 'Game is launching...' : 'Launch Cyberpunk 2077')}
+          >
+            {#if isLaunching}
+              <RefreshCw class="h-3.5 w-3.5 animate-spin" />
+              <span>Loading...</span>
+            {:else}
+              <Play class="h-3.5 w-3.5 fill-black" />
+              <span>Launch Game</span>
+            {/if}
+          </button>
+        {/if}
       </div>
 
       <!-- Secondary Navigation Cluster -->

@@ -1012,6 +1012,46 @@ fn launch_game(game_path: String, custom_launch_path: Option<String>) -> Result<
     Ok(())
 }
 
+#[tauri::command]
+fn check_game_process_running() -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let output = std::process::Command::new("tasklist")
+            .args(["/FI", "IMAGENAME eq Cyberpunk2077.exe", "/FO", "CSV", "/NH"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map_err(|e| e.to_string())?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        Ok(stdout.to_lowercase().contains("cyberpunk2077.exe"))
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(false)
+    }
+}
+
+#[tauri::command]
+fn kill_game_process() -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let output = std::process::Command::new("taskkill")
+            .args(["/F", "/IM", "Cyberpunk2077.exe", "/T"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map_err(|e| e.to_string())?;
+        info!("kill_game_process executed: {:?}", output.status);
+        Ok(output.status.success())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(false)
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1089,7 +1129,9 @@ pub fn run() {
             open_in_text_editor,
             open_log_folder,
             clear_user_log,
-            launch_game
+            launch_game,
+            check_game_process_running,
+            kill_game_process
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
