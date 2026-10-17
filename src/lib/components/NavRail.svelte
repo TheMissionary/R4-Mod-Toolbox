@@ -8,7 +8,7 @@
     { id: 'home', label: 'Home', icon: Layers },
     { id: 'archive', label: 'Archive', icon: Box },
     { id: 'cet', label: 'CET Mods', icon: Cpu },
-    { id: 'red', label: 'Red Mods', icon: AlertTriangle },
+    { id: 'redscript', label: 'Red Mods', icon: AlertTriangle },
   ];
 </script>
 

@@ -25,7 +25,7 @@
   import ArchiveView from '$lib/components/ArchiveView.svelte';
   import CetView from '$lib/components/CetView.svelte';
   import Red4extView from '$lib/components/Red4extView.svelte';
-  import RedscriptView from '$lib/components/RedscriptView.svelte';
+  import RedscriptView from '$lib/components/RedScriptView.svelte';
   import R6TweaksView from '$lib/components/R6TweaksView.svelte';
   import SettingsView from '$lib/components/SettingsView.svelte';
   import HelpView from '$lib/components/HelpView.svelte';
