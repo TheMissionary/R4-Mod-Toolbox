@@ -100,7 +100,7 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            target_game_path: "G:\\SteamLibrary\\steamapps\\common\\Cyberpunk 2077".to_string(),
+            target_game_path: "".to_string(),
             active_tab: "home".to_string(),
             show_conflict_summary: true,
             window_width: Some(1600.0),
@@ -304,9 +304,63 @@ fn save_app_config(config: AppConfig) -> Result<(), String> {
     Ok(())
 }
 
+fn resolve_game_root(candidate: &Path) -> Option<PathBuf> {
+    // 1. Direct check: candidate/bin/x64/Cyberpunk2077.exe
+    if candidate.join("bin").join("x64").join("Cyberpunk2077.exe").exists() {
+        return Some(candidate.to_path_buf());
+    }
+    // 2. User selected bin/x64 directly: candidate/Cyberpunk2077.exe exists
+    if candidate.join("Cyberpunk2077.exe").exists() {
+        if let Some(parent) = candidate.parent() { // e.g. "bin"
+            if let Some(grandparent) = parent.parent() { // e.g. "Cyberpunk 2077"
+                if grandparent.join("bin").join("x64").join("Cyberpunk2077.exe").exists() {
+                    return Some(grandparent.to_path_buf());
+                }
+            }
+        }
+    }
+    // 3. User selected bin directly: candidate/x64/Cyberpunk2077.exe exists
+    if candidate.join("x64").join("Cyberpunk2077.exe").exists() {
+        if let Some(parent) = candidate.parent() { // e.g. "Cyberpunk 2077"
+            if parent.join("bin").join("x64").join("Cyberpunk2077.exe").exists() {
+                return Some(parent.to_path_buf());
+            }
+        }
+    }
+    None
+}
+
+#[tauri::command]
+fn validate_and_resolve_game_path(candidate_path: String) -> Result<Option<String>, String> {
+    let trimmed = candidate_path.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    let path = PathBuf::from(trimmed);
+    let resolved = resolve_game_root(&path).map(|p| p.to_string_lossy().to_string());
+    Ok(resolved)
+}
+
 #[tauri::command]
 fn scan_game_directory(game_path: String) -> Result<ScanResult, String> {
     info!("Initiating full game directory scan at: {}", game_path);
+    if game_path.trim().is_empty() {
+        return Ok(ScanResult {
+            is_valid_game_path: false,
+            game_version: "2.31".to_string(),
+            archive_active: 0,
+            archive_total: 0,
+            cet_active: 0,
+            cet_total: 0,
+            red4ext_active: 0,
+            red4ext_total: 0,
+            redscript_active: 0,
+            redscript_total: 0,
+            r6tweaks_active: 0,
+            r6tweaks_total: 0,
+        });
+    }
+
     let root = PathBuf::from(&game_path);
     let exe_path = root.join("bin").join("x64").join("Cyberpunk2077.exe");
     let is_valid = exe_path.exists();
@@ -1012,6 +1066,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load_app_config,
             save_app_config,
+            validate_and_resolve_game_path,
             scan_game_directory,
             get_archive_details,
             toggle_mod_state,

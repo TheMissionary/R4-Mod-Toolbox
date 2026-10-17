@@ -119,7 +119,7 @@ export const DEFAULT_THEME_SETTINGS: ThemeSettings = {
 };
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
-  targetGamePath: 'G:\\SteamLibrary\\steamapps\\common\\Cyberpunk 2077',
+  targetGamePath: '',
   activeTab: 'home',
   showConflictSummary: true,
   windowWidth: 1600,

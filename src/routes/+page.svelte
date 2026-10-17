@@ -25,7 +25,7 @@
   import ArchiveView from '$lib/components/ArchiveView.svelte';
   import CetView from '$lib/components/CetView.svelte';
   import Red4extView from '$lib/components/Red4extView.svelte';
-  import RedscriptView from '$lib/components/RedscriptView.svelte';
+  import RedscriptView from '$lib/components/RedScriptView.svelte';
   import R6TweaksView from '$lib/components/R6TweaksView.svelte';
   import SettingsView from '$lib/components/SettingsView.svelte';
   import HelpView from '$lib/components/HelpView.svelte';
@@ -40,6 +40,8 @@
     Sliders,
     Play,
     CheckCircle2,
+    AlertTriangle,
+    AlertCircle,
     ArrowUpRight,
     Clock,
     ChevronDown,
@@ -80,7 +82,7 @@
     }
   }
 
-  let gamePath = $state('G:\\SteamLibrary\\steamapps\\common\\Cyberpunk 2077');
+  let gamePath = $state('');
   let isLoading = $state(false);
   let isLaunching = $state(false);
 
@@ -615,16 +617,40 @@
     <main class="flex-1 overflow-y-auto {['settings', 'help', 'about'].includes(currentTab) ? 'p-0' : 'p-6'}">
       <!-- Persistent Tab: Home -->
       <div class={currentTab === 'home' ? 'space-y-6' : 'hidden'}>
-        <div class="p-6 rounded-lg border border-nvidia-border bg-nvidia-card relative overflow-hidden">
-          <div class="flex items-center gap-2 text-xs font-mono text-nvidia-accent mb-2">
-            <CheckCircle2 class="h-4 w-4" />
-            <span>ENGINE CONNECTED</span>
+        {#if !gamePath}
+          <div class="p-6 rounded-lg border border-amber-500/30 bg-nvidia-card relative overflow-hidden">
+            <div class="flex items-center gap-2 text-xs font-mono text-amber-400 mb-2">
+              <AlertTriangle class="h-4 w-4" />
+              <span>NO GAME FOLDER CONFIGURED</span>
+            </div>
+            <h2 class="text-xl font-bold text-nvidia-text-primary mb-1">Welcome to R4 Mod Toolbox</h2>
+            <p class="text-xs text-nvidia-text-muted max-w-xl">
+              Please select your Cyberpunk 2077 root directory using the <span class="text-nvidia-text-primary font-semibold">Verify Game Path</span> button in the top bar to begin managing mods, load orders, and asset conflicts.
+            </p>
           </div>
-          <h2 class="text-xl font-bold text-nvidia-text-primary mb-1">R4 Management Engine</h2>
-          <p class="text-xs text-nvidia-text-muted max-w-xl">
-            Master your mod conflicts with real-time archive resolution. Organize your workspace using custom categories, drag-and-drop load ordering, and seamless management across the mod frameworks below.
-          </p>
-        </div>
+        {:else if !scanResult?.is_valid_game_path}
+          <div class="p-6 rounded-lg border border-red-500/30 bg-nvidia-card relative overflow-hidden">
+            <div class="flex items-center gap-2 text-xs font-mono text-red-400 mb-2">
+              <AlertCircle class="h-4 w-4" />
+              <span>GAME EXECUTABLE NOT FOUND</span>
+            </div>
+            <h2 class="text-xl font-bold text-nvidia-text-primary mb-1">Game Path Unverified</h2>
+            <p class="text-xs text-nvidia-text-muted max-w-xl">
+              Could not find <span class="font-mono text-nvidia-text-primary">bin\x64\Cyberpunk2077.exe</span> at the selected path. Please use <span class="text-nvidia-text-primary font-semibold">Verify Game Path</span> to locate your main Cyberpunk 2077 directory.
+            </p>
+          </div>
+        {:else}
+          <div class="p-6 rounded-lg border border-nvidia-border bg-nvidia-card relative overflow-hidden">
+            <div class="flex items-center gap-2 text-xs font-mono text-nvidia-accent mb-2">
+              <CheckCircle2 class="h-4 w-4" />
+              <span>ENGINE CONNECTED</span>
+            </div>
+            <h2 class="text-xl font-bold text-nvidia-text-primary mb-1">R4 Management Engine</h2>
+            <p class="text-xs text-nvidia-text-muted max-w-xl">
+              Master your mod conflicts with real-time archive resolution. Organize your workspace using custom categories, drag-and-drop load ordering, and seamless management across the mod frameworks below.
+            </p>
+          </div>
+        {/if}
 
         <!-- 6-Column Grid for 5 Cards (3 Top, 2 Bottom) -->
         <div class="grid grid-cols-1 md:grid-cols-6 gap-4">

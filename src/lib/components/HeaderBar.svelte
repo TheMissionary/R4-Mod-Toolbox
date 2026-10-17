@@ -1,6 +1,8 @@
 <script lang="ts">
   import { RefreshCw, FolderSearch } from 'lucide-svelte';
-  import { open } from '@tauri-apps/plugin-dialog';
+  import { open, message } from '@tauri-apps/plugin-dialog';
+  import { invoke } from '@tauri-apps/api/core';
+  import { loadConfigFromDisk, saveConfigToDisk } from '$lib/theme';
 
   let { 
     gamePath = $bindable(''), 
@@ -17,12 +19,28 @@
       const selected = await open({
         directory: true,
         multiple: false,
-        title: 'Select Cyberpunk 2077 Root Folder'
+        title: 'Select Cyberpunk 2077 Root Folder',
+        defaultPath: gamePath || undefined
       });
       
       if (typeof selected === 'string') {
-        gamePath = selected;
-        if (onRefresh) onRefresh();
+        const resolved = await invoke<string | null>('validate_and_resolve_game_path', { candidatePath: selected });
+        if (resolved) {
+          gamePath = resolved;
+          try {
+            const config = await loadConfigFromDisk();
+            config.targetGamePath = resolved;
+            await saveConfigToDisk(config);
+          } catch (e) {
+            console.error('Failed to save updated gamePath:', e);
+          }
+          if (onRefresh) onRefresh();
+        } else {
+          await message(
+            'The selected directory does not appear to be a valid Cyberpunk 2077 root folder (bin\\x64\\Cyberpunk2077.exe was not found).\n\nPlease select the main Cyberpunk 2077 game directory.',
+            { title: 'Invalid Game Directory', kind: 'error' }
+          );
+        }
       }
     } catch (err) {
       console.error('Directory picker failed:', err);
