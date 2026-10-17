@@ -612,7 +612,7 @@
 
   <!-- Workspace Canvas -->
   <div class="flex-1 flex flex-col h-full overflow-hidden relative">
-    <HeaderBar bind:gamePath onRefresh={refreshAll} {isLoading} />
+    <HeaderBar bind:gamePath onRefresh={refreshAll} {isLoading} {scanResult} />
 
     <main class="flex-1 overflow-y-auto {['settings', 'help', 'about'].includes(currentTab) ? 'p-0' : 'p-6'}">
       <!-- Persistent Tab: Home -->
@@ -625,7 +625,7 @@
             </div>
             <h2 class="text-xl font-bold text-nvidia-text-primary mb-1">Welcome to R4 Mod Toolbox</h2>
             <p class="text-xs text-nvidia-text-muted max-w-xl">
-              Please select your Cyberpunk 2077 root directory using the <span class="text-nvidia-text-primary font-semibold">Verify Game Path</span> button in the top bar to begin managing mods, load orders, and asset conflicts.
+              Please select your Cyberpunk 2077 root directory using the <span class="text-nvidia-text-primary font-semibold">Change Folder</span> button in the top bar to begin managing mods, load orders, and asset conflicts.
             </p>
           </div>
         {:else if !scanResult?.is_valid_game_path}
@@ -636,7 +636,7 @@
             </div>
             <h2 class="text-xl font-bold text-nvidia-text-primary mb-1">Game Path Unverified</h2>
             <p class="text-xs text-nvidia-text-muted max-w-xl">
-              Could not find <span class="font-mono text-nvidia-text-primary">bin\x64\Cyberpunk2077.exe</span> at the selected path. Please use <span class="text-nvidia-text-primary font-semibold">Verify Game Path</span> to locate your main Cyberpunk 2077 directory.
+              Could not find <span class="font-mono text-nvidia-text-primary">bin\x64\Cyberpunk2077.exe</span> at the selected path. Please use <span class="text-nvidia-text-primary font-semibold">Change Folder</span> to locate your main Cyberpunk 2077 directory.
             </p>
           </div>
         {:else}
