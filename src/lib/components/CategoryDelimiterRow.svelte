@@ -1,6 +1,6 @@
-<script lang="ts">
+﻿<script lang="ts">
   import type { ArchiveItem } from '$lib/types';
-  import { GripVertical, Folder, FolderOpen, Pencil, Trash2, MoreVertical } from 'lucide-svelte';
+  import { GripVertical, Folder, FolderOpen, Pencil, Trash2, MoreVertical, ChevronDown, ChevronRight } from 'lucide-svelte';
 
   let {
     archive,
@@ -69,22 +69,24 @@
         <div class="h-2.5 w-2.5 rounded-full transition-transform transform {archive.enabled ? 'translate-x-3 bg-zinc-100 shadow-xs' : 'translate-x-0 bg-zinc-500'}"></div>
       </button>
 
+      <!-- Unified Chevron + Folder + Name Toggle -->
       <button
         type="button"
         onclick={() => onToggleCollapse && onToggleCollapse(archive.file_name)}
-        class="text-nvidia-accent hover:text-nvidia-accent-hover transition shrink-0 p-1 rounded hover:bg-nvidia-surface/60 cursor-pointer"
+        class="flex items-center gap-1.5 text-nvidia-text-primary hover:text-nvidia-accent transition cursor-pointer min-w-0"
         title={collapsed ? "Expand category" : "Collapse category"}
       >
         {#if collapsed}
-          <Folder class="h-4 w-4" />
+          <ChevronRight class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+          <Folder class="h-4 w-4 text-nvidia-text-muted shrink-0" />
         {:else}
-          <FolderOpen class="h-4 w-4" />
+          <ChevronDown class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+          <FolderOpen class="h-4 w-4 text-nvidia-text-muted shrink-0" />
         {/if}
+        <span class="font-bold uppercase tracking-wider truncate">
+          {archive.category_name || archive.file_name.replace('[CAT] ', '').replace('.txt', '')}
+        </span>
       </button>
-
-      <span class="font-bold text-nvidia-text-primary uppercase tracking-wider truncate">
-        {archive.category_name || archive.file_name.replace('[CAT] ', '').replace('.txt', '')}
-      </span>
 
       <!-- Dynamic Nested Mod Count Badge -->
       <span class="text-[10px] font-mono text-nvidia-text-muted shrink-0 opacity-80">

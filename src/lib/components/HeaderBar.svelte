@@ -35,6 +35,7 @@
     'red4ext': 'RED4ext Plugins',
     'redscript': 'R6\\Scripts',
     'r6tweaks': 'R6\\Tweaks',
+    'history': 'Mod History & Ledger',
     'settings': 'Application Settings',
     'help': 'Help & Documentation',
     'about': 'About R4'

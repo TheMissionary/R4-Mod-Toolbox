@@ -1,4 +1,4 @@
-mod archive;
+﻿mod archive;
 
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
@@ -105,7 +105,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             target_game_path: "".to_string(),
-            active_tab: "home".to_string(),
+            active_tab: "archive".to_string(),
             show_conflict_summary: true,
             window_width: Some(1600.0),
             window_height: Some(1000.0),
@@ -271,10 +271,7 @@ fn prune_logs(app: &tauri::App) {
                     }
                 }
             }
-            // Sort by modified time descending (newest first)
             logs.sort_by(|a, b| b.1.cmp(&a.1));
-            
-            // Keep the 5 newest, delete the rest
             for (path, _) in logs.into_iter().skip(5) {
                 let _ = std::fs::remove_file(path);
             }
@@ -288,12 +285,10 @@ fn load_app_config() -> Result<AppConfig, String> {
     if path.exists() {
         if let Ok(content) = fs::read_to_string(&path) {
             if let Ok(config) = serde_json::from_str::<AppConfig>(&content) {
-                info!("Successfully loaded AppConfig from {:?}", path);
                 return Ok(config);
             }
         }
     }
-    warn!("AppConfig not found or invalid, falling back to defaults.");
     Ok(AppConfig::default())
 }
 
@@ -301,41 +296,28 @@ fn load_app_config() -> Result<AppConfig, String> {
 fn save_app_config(config: AppConfig) -> Result<(), String> {
     let path = get_app_config_path();
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| {
-            error!("Failed to create config directory: {}", e);
-            e.to_string()
-        })?;
+        let _ = fs::create_dir_all(parent);
     }
-    let serialized = serde_json::to_string_pretty(&config).map_err(|e| {
-        error!("Failed to serialize AppConfig: {}", e);
-        e.to_string()
-    })?;
-    fs::write(&path, serialized).map_err(|e| {
-        error!("Failed to write AppConfig to disk: {}", e);
-        e.to_string()
-    })?;
-    info!("Successfully saved AppConfig to {:?}", path);
+    let serialized = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    fs::write(&path, serialized).map_err(|e| e.to_string())?;
     Ok(())
 }
 
 fn resolve_game_root(candidate: &Path) -> Option<PathBuf> {
-    // 1. Direct check: candidate/bin/x64/Cyberpunk2077.exe
     if candidate.join("bin").join("x64").join("Cyberpunk2077.exe").exists() {
         return Some(candidate.to_path_buf());
     }
-    // 2. User selected bin/x64 directly: candidate/Cyberpunk2077.exe exists
     if candidate.join("Cyberpunk2077.exe").exists() {
-        if let Some(parent) = candidate.parent() { // e.g. "bin"
-            if let Some(grandparent) = parent.parent() { // e.g. "Cyberpunk 2077"
+        if let Some(parent) = candidate.parent() {
+            if let Some(grandparent) = parent.parent() {
                 if grandparent.join("bin").join("x64").join("Cyberpunk2077.exe").exists() {
                     return Some(grandparent.to_path_buf());
                 }
             }
         }
     }
-    // 3. User selected bin directly: candidate/x64/Cyberpunk2077.exe exists
     if candidate.join("x64").join("Cyberpunk2077.exe").exists() {
-        if let Some(parent) = candidate.parent() { // e.g. "Cyberpunk 2077"
+        if let Some(parent) = candidate.parent() {
             if parent.join("bin").join("x64").join("Cyberpunk2077.exe").exists() {
                 return Some(parent.to_path_buf());
             }
@@ -355,6 +337,82 @@ fn validate_and_resolve_game_path(candidate_path: String) -> Result<Option<Strin
     Ok(resolved)
 }
 
+fn update_ledger(game_path: &str) {
+    let mut current_mods: Vec<LedgerEntry> = Vec::new();
+
+    if let Ok(report) = archive::scan_archives(game_path) {
+        for item in report.archives {
+            if !item.is_delimiter {
+                current_mods.push(LedgerEntry {
+                    name: item.file_name,
+                    mod_type: "archive".to_string(),
+                    path: item.path,
+                    first_seen: 0,
+                });
+            }
+        }
+    }
+
+    if let Ok(cet_list) = get_cet_details(game_path.to_string()) {
+        for item in cet_list {
+            current_mods.push(LedgerEntry {
+                name: item.name,
+                mod_type: "cet".to_string(),
+                path: item.path,
+                first_seen: 0,
+            });
+        }
+    }
+
+    if let Ok(r4e_list) = get_red4ext_details(game_path.to_string()) {
+        for item in r4e_list {
+            current_mods.push(LedgerEntry {
+                name: item.name,
+                mod_type: "red4ext".to_string(),
+                path: item.path,
+                first_seen: 0,
+            });
+        }
+    }
+
+    if let Ok(rs_list) = get_redscript_details(game_path.to_string()) {
+        for item in rs_list {
+            current_mods.push(LedgerEntry {
+                name: item.name,
+                mod_type: "redscript".to_string(),
+                path: item.path,
+                first_seen: 0,
+            });
+        }
+    }
+
+    if let Ok(tw_list) = get_r6tweaks_details(game_path.to_string()) {
+        for item in tw_list {
+            current_mods.push(LedgerEntry {
+                name: item.name,
+                mod_type: "r6tweaks".to_string(),
+                path: item.path,
+                first_seen: 0,
+            });
+        }
+    }
+
+    let old_ledger = get_ledger_data();
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
+    let mut new_ledger = Vec::new();
+
+    for mut cmod in current_mods {
+        if let Some(existing) = old_ledger.iter().find(|e| e.name == cmod.name && e.mod_type == cmod.mod_type) {
+            cmod.first_seen = existing.first_seen;
+        } else {
+            cmod.first_seen = now;
+        }
+        new_ledger.push(cmod);
+    }
+
+    let _ = save_ledger_data(&new_ledger);
+}
+
 #[tauri::command]
 fn scan_game_directory(game_path: String) -> Result<ScanResult, String> {
     info!("Initiating full game directory scan at: {}", game_path);
@@ -362,16 +420,11 @@ fn scan_game_directory(game_path: String) -> Result<ScanResult, String> {
         return Ok(ScanResult {
             is_valid_game_path: false,
             game_version: "2.31".to_string(),
-            archive_active: 0,
-            archive_total: 0,
-            cet_active: 0,
-            cet_total: 0,
-            red4ext_active: 0,
-            red4ext_total: 0,
-            redscript_active: 0,
-            redscript_total: 0,
-            r6tweaks_active: 0,
-            r6tweaks_total: 0,
+            archive_active: 0, archive_total: 0,
+            cet_active: 0, cet_total: 0,
+            red4ext_active: 0, red4ext_total: 0,
+            redscript_active: 0, redscript_total: 0,
+            r6tweaks_active: 0, r6tweaks_total: 0,
         });
     }
 
@@ -379,9 +432,8 @@ fn scan_game_directory(game_path: String) -> Result<ScanResult, String> {
     let exe_path = root.join("bin").join("x64").join("Cyberpunk2077.exe");
     let is_valid = exe_path.exists();
 
-    if !is_valid {
-        warn!("Cyberpunk2077.exe not found at target path. Scan may be incomplete.");
-    }
+    // Automatically sync the ledger on every scan
+    update_ledger(&game_path);
 
     let archive_dir = root.join("archive").join("pc").join("mod");
     let mut archive_active = 0;
@@ -425,22 +477,14 @@ fn scan_game_directory(game_path: String) -> Result<ScanResult, String> {
     let r6tweaks_disabled = if r6tweaks_disabled_dir.exists() { fs::read_dir(&r6tweaks_disabled_dir).map(|e| e.flatten().count()).unwrap_or(0) } else { 0 };
     let r6tweaks_total = r6tweaks_active + r6tweaks_disabled;
 
-    info!("Scan complete. Archives: {}/{}, CET: {}/{}, RED4ext: {}/{}, Redscript: {}/{}, R6Tweaks: {}/{}", 
-        archive_active, archive_total, cet_active, cet_total, red4ext_active, red4ext_total, redscript_active, redscript_total, r6tweaks_active, r6tweaks_total);
-
     Ok(ScanResult {
         is_valid_game_path: is_valid,
         game_version: "2.31".to_string(),
-        archive_active,
-        archive_total,
-        cet_active,
-        cet_total,
-        red4ext_active,
-        red4ext_total,
-        redscript_active,
-        redscript_total,
-        r6tweaks_active,
-        r6tweaks_total,
+        archive_active, archive_total,
+        cet_active, cet_total,
+        red4ext_active, red4ext_total,
+        redscript_active, redscript_total,
+        r6tweaks_active, r6tweaks_total,
     })
 }
 
@@ -521,14 +565,7 @@ fn get_cet_details(game_path: String) -> Result<Vec<CetPluginItem>, String> {
                 };
                 let created_at_ms = archive::get_path_timestamp_ms(&p);
                 list.push(CetPluginItem {
-                    name,
-                    path: p.to_string_lossy().to_string(),
-                    has_init,
-                    size_bytes,
-                    file_count,
-                    enabled: true,
-                    is_dir,
-                    created_at_ms,
+                    name, path: p.to_string_lossy().to_string(), has_init, size_bytes, file_count, enabled: true, is_dir, created_at_ms,
                 });
             }
         }
@@ -548,14 +585,7 @@ fn get_cet_details(game_path: String) -> Result<Vec<CetPluginItem>, String> {
                 };
                 let created_at_ms = archive::get_path_timestamp_ms(&p);
                 list.push(CetPluginItem {
-                    name,
-                    path: p.to_string_lossy().to_string(),
-                    has_init,
-                    size_bytes,
-                    file_count,
-                    enabled: false,
-                    is_dir,
-                    created_at_ms,
+                    name, path: p.to_string_lossy().to_string(), has_init, size_bytes, file_count, enabled: false, is_dir, created_at_ms,
                 });
             }
         }
@@ -586,13 +616,7 @@ fn get_red4ext_details(game_path: String) -> Result<Vec<Red4extPluginItem>, Stri
                 };
                 let created_at_ms = archive::get_path_timestamp_ms(&p);
                 list.push(Red4extPluginItem {
-                    name,
-                    path: p.to_string_lossy().to_string(),
-                    size_bytes,
-                    file_count,
-                    enabled: true,
-                    is_dir,
-                    created_at_ms,
+                    name, path: p.to_string_lossy().to_string(), size_bytes, file_count, enabled: true, is_dir, created_at_ms,
                 });
             }
         }
@@ -611,13 +635,7 @@ fn get_red4ext_details(game_path: String) -> Result<Vec<Red4extPluginItem>, Stri
                 };
                 let created_at_ms = archive::get_path_timestamp_ms(&p);
                 list.push(Red4extPluginItem {
-                    name,
-                    path: p.to_string_lossy().to_string(),
-                    size_bytes,
-                    file_count,
-                    enabled: false,
-                    is_dir,
-                    created_at_ms,
+                    name, path: p.to_string_lossy().to_string(), size_bytes, file_count, enabled: false, is_dir, created_at_ms,
                 });
             }
         }
@@ -648,13 +666,7 @@ fn get_redscript_details(game_path: String) -> Result<Vec<RedScriptItem>, String
                 };
                 let created_at_ms = archive::get_path_timestamp_ms(&p);
                 list.push(RedScriptItem {
-                    name,
-                    path: p.to_string_lossy().to_string(),
-                    size_bytes,
-                    file_count,
-                    enabled: true,
-                    is_dir,
-                    created_at_ms,
+                    name, path: p.to_string_lossy().to_string(), size_bytes, file_count, enabled: true, is_dir, created_at_ms,
                 });
             }
         }
@@ -673,13 +685,7 @@ fn get_redscript_details(game_path: String) -> Result<Vec<RedScriptItem>, String
                 };
                 let created_at_ms = archive::get_path_timestamp_ms(&p);
                 list.push(RedScriptItem {
-                    name,
-                    path: p.to_string_lossy().to_string(),
-                    size_bytes,
-                    file_count,
-                    enabled: false,
-                    is_dir,
-                    created_at_ms,
+                    name, path: p.to_string_lossy().to_string(), size_bytes, file_count, enabled: false, is_dir, created_at_ms,
                 });
             }
         }
@@ -710,13 +716,7 @@ fn get_r6tweaks_details(game_path: String) -> Result<Vec<R6TweaksItem>, String> 
                 };
                 let created_at_ms = archive::get_path_timestamp_ms(&p);
                 list.push(R6TweaksItem {
-                    name,
-                    path: p.to_string_lossy().to_string(),
-                    size_bytes,
-                    file_count,
-                    enabled: true,
-                    is_dir,
-                    created_at_ms,
+                    name, path: p.to_string_lossy().to_string(), size_bytes, file_count, enabled: true, is_dir, created_at_ms,
                 });
             }
         }
@@ -735,13 +735,7 @@ fn get_r6tweaks_details(game_path: String) -> Result<Vec<R6TweaksItem>, String> 
                 };
                 let created_at_ms = archive::get_path_timestamp_ms(&p);
                 list.push(R6TweaksItem {
-                    name,
-                    path: p.to_string_lossy().to_string(),
-                    size_bytes,
-                    file_count,
-                    enabled: false,
-                    is_dir,
-                    created_at_ms,
+                    name, path: p.to_string_lossy().to_string(), size_bytes, file_count, enabled: false, is_dir, created_at_ms,
                 });
             }
         }
@@ -752,86 +746,16 @@ fn get_r6tweaks_details(game_path: String) -> Result<Vec<R6TweaksItem>, String> 
 }
 
 #[tauri::command]
-fn get_recent_mods(game_path: String, days: u32) -> Result<Vec<LedgerEntry>, String> {
-    let mut current_mods: Vec<LedgerEntry> = Vec::new();
-
-    if let Ok(report) = archive::scan_archives(&game_path) {
-        for item in report.archives {
-            if !item.is_delimiter {
-                current_mods.push(LedgerEntry {
-                    name: item.file_name,
-                    mod_type: "archive".to_string(),
-                    path: item.path,
-                    first_seen: 0,
-                });
-            }
-        }
-    }
-
-    if let Ok(cet_list) = get_cet_details(game_path.clone()) {
-        for item in cet_list {
-            current_mods.push(LedgerEntry {
-                name: item.name,
-                mod_type: "cet".to_string(),
-                path: item.path,
-                first_seen: 0,
-            });
-        }
-    }
-
-    if let Ok(r4e_list) = get_red4ext_details(game_path.clone()) {
-        for item in r4e_list {
-            current_mods.push(LedgerEntry {
-                name: item.name,
-                mod_type: "red4ext".to_string(),
-                path: item.path,
-                first_seen: 0,
-            });
-        }
-    }
-
-    if let Ok(rs_list) = get_redscript_details(game_path.clone()) {
-        for item in rs_list {
-            current_mods.push(LedgerEntry {
-                name: item.name,
-                mod_type: "redscript".to_string(),
-                path: item.path,
-                first_seen: 0,
-            });
-        }
-    }
-
-    if let Ok(tw_list) = get_r6tweaks_details(game_path.clone()) {
-        for item in tw_list {
-            current_mods.push(LedgerEntry {
-                name: item.name,
-                mod_type: "r6tweaks".to_string(),
-                path: item.path,
-                first_seen: 0,
-            });
-        }
-    }
-
-    let old_ledger = get_ledger_data();
+fn get_recent_mods(_game_path: String, hours: u32) -> Result<Vec<LedgerEntry>, String> {
+    let ledger = get_ledger_data();
     let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
-    let mut new_ledger = Vec::new();
-
-    for mut cmod in current_mods {
-        if let Some(existing) = old_ledger.iter().find(|e| e.name == cmod.name && e.mod_type == cmod.mod_type) {
-            cmod.first_seen = existing.first_seen;
-        } else {
-            cmod.first_seen = now;
-        }
-        new_ledger.push(cmod);
-    }
-
-    let _ = save_ledger_data(&new_ledger);
-
-    let cutoff_ms = days as u64 * 24 * 60 * 60 * 1000;
-    let mut recent_mods: Vec<LedgerEntry> = new_ledger.into_iter().filter(|e| now.saturating_sub(e.first_seen) <= cutoff_ms).collect();
+    let cutoff_ms = hours as u64 * 60 * 60 * 1000;
+    
+    let mut recent_mods: Vec<LedgerEntry> = ledger.into_iter()
+        .filter(|e| now.saturating_sub(e.first_seen) <= cutoff_ms)
+        .collect();
     
     recent_mods.sort_by(|a, b| b.first_seen.cmp(&a.first_seen));
-
     Ok(recent_mods)
 }
 
@@ -864,7 +788,6 @@ fn toggle_plugin_state(
     mod_name: String,
     enable: bool,
 ) -> Result<(), String> {
-    info!("Toggling framework plugin: {} (Type: {}, Enable: {})", mod_name, mod_type, enable);
     let root = PathBuf::from(&game_path);
 
     let (active_base, disabled_base) = match mod_type.as_str() {
@@ -884,10 +807,7 @@ fn toggle_plugin_state(
             root.join("r6").join("tweaks"),
             root.join("Disabled_Mods").join("r6tweaks"),
         ),
-        _ => {
-            error!("Unsupported mod type requested for toggle: {}", mod_type);
-            return Err(format!("Unsupported mod type: {}", mod_type));
-        }
+        _ => return Err(format!("Unsupported mod type: {}", mod_type)),
     };
 
     let (source, target) = if enable {
@@ -897,23 +817,14 @@ fn toggle_plugin_state(
     };
 
     if !source.exists() {
-        error!("Toggle failed: Source path does not exist: {:?}", source);
         return Err(format!("Source path does not exist: {:?}", source));
     }
 
     if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent).map_err(|e| {
-            error!("Failed to create target directory for toggle: {}", e);
-            format!("Failed to create directory: {}", e)
-        })?;
+        let _ = fs::create_dir_all(parent);
     }
 
-    fs::rename(&source, &target).map_err(|e| {
-        error!("Failed to move {:?} to {:?}: {}", source, target, e);
-        format!("Failed to move {:?} to {:?}: {}", source, target, e)
-    })?;
-
-    info!("Successfully toggled framework plugin: {}", mod_name);
+    fs::rename(&source, &target).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -933,29 +844,18 @@ fn get_folder_contents(folder_path: String) -> Result<Vec<FileNode>, String> {
             let size_bytes = if is_dir { 0 } else { entry.metadata().map(|m| m.len()).unwrap_or(0) };
             let extension = p.extension().unwrap_or_default().to_string_lossy().to_lowercase();
 
-            list.push(FileNode {
-                name,
-                path: p.to_string_lossy().to_string(),
-                size_bytes,
-                is_dir,
-                extension,
-            });
+            list.push(FileNode { name, path: p.to_string_lossy().to_string(), size_bytes, is_dir, extension });
         }
     }
     
-    list.sort_by(|a, b| {
-        b.is_dir.cmp(&a.is_dir).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
-    });
-    
+    list.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
     Ok(list)
 }
 
 #[tauri::command]
 fn open_in_text_editor(file_path: String, editor_path: Option<String>) -> Result<(), String> {
-    info!("Opening file in text editor: {}", file_path);
     let path = PathBuf::from(&file_path);
     if !path.exists() || path.is_dir() {
-        error!("Invalid file path requested for text editor: {}", file_path);
         return Err("Invalid file path".to_string());
     }
 
@@ -967,46 +867,32 @@ fn open_in_text_editor(file_path: String, editor_path: Option<String>) -> Result
             std::process::Command::new("notepad.exe")
         };
 
-        cmd.arg(&file_path)
-           .spawn()
-           .map_err(|e| {
-               error!("Failed to spawn text editor process: {}", e);
-               e.to_string()
-           })?;
+        cmd.arg(&file_path).spawn().map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
 #[tauri::command]
 fn open_log_folder(app: tauri::AppHandle) -> Result<(), String> {
-    info!("User requested to open log folder.");
     let log_dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
     if !log_dir.exists() {
         std::fs::create_dir_all(&log_dir).map_err(|e| e.to_string())?;
     }
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("explorer")
-            .arg(&log_dir)
-            .spawn()
-            .map_err(|e| {
-                error!("Failed to open explorer for log folder: {}", e);
-                e.to_string()
-            })?;
+        std::process::Command::new("explorer").arg(&log_dir).spawn().map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
 #[tauri::command]
 fn clear_user_log(app: tauri::AppHandle) -> Result<(), String> {
-    info!("User requested to clear application logs.");
     let log_dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
     if log_dir.exists() {
         if let Ok(entries) = std::fs::read_dir(&log_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.is_file() && path.extension().map_or(false, |ext| ext == "log") {
-                    // Attempt to delete the file. If it fails (e.g., active log is locked), truncate it.
                     if std::fs::remove_file(&path).is_err() {
                         let _ = std::fs::File::create(&path);
                     }
@@ -1019,25 +905,15 @@ fn clear_user_log(app: tauri::AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn launch_game(game_path: String, custom_launch_path: Option<String>) -> Result<(), String> {
-    info!("User requested game launch.");
     #[cfg(target_os = "windows")]
     {
         let target = if let Some(cp) = custom_launch_path.filter(|s| !s.trim().is_empty()) {
-            info!("Using custom launch path: {}", cp);
             cp
         } else {
-            let default_exe = PathBuf::from(&game_path).join("bin").join("x64").join("Cyberpunk2077.exe");
-            info!("Using default launch path: {:?}", default_exe);
-            default_exe.to_string_lossy().to_string()
+            PathBuf::from(&game_path).join("bin").join("x64").join("Cyberpunk2077.exe").to_string_lossy().to_string()
         };
 
-        std::process::Command::new("cmd")
-            .args(["/C", "start", "", &target])
-            .spawn()
-            .map_err(|e| {
-                error!("Failed to launch game process: {}", e);
-                e.to_string()
-            })?;
+        std::process::Command::new("cmd").args(["/C", "start", "", &target]).spawn().map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -1073,7 +949,6 @@ fn kill_game_process() -> Result<bool, String> {
             .creation_flags(CREATE_NO_WINDOW)
             .output()
             .map_err(|e| e.to_string())?;
-        info!("kill_game_process executed: {:?}", output.status);
         Ok(output.status.success())
     }
     #[cfg(not(target_os = "windows"))]
@@ -1092,14 +967,13 @@ pub fn run() {
                 .level_for("tao", log::LevelFilter::Error)
                 .level_for("wry", log::LevelFilter::Error)
                 .level_for("tauri", log::LevelFilter::Warn)
-                .max_file_size(50 * 1024) // 50 KB rotation limit
+                .max_file_size(50 * 1024)
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            prune_logs(app); // Keep only the 5 newest logs on boot
-            info!("R4 Mod Toolbox Boot Sequence Initiated.");
+            prune_logs(app);
             if let Some(window) = app.get_webview_window("main") {
                 let config = load_app_config().unwrap_or_default();
                 let width = config.window_width.unwrap_or(1600.0);
@@ -1116,7 +990,6 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
-                info!("Application close requested. Saving window state.");
                 if let (Ok(size), Ok(pos)) = (window.inner_size(), window.outer_position()) {
                     let scale = window.scale_factor().unwrap_or(1.0);
                     let logical_size = size.to_logical::<f64>(scale);

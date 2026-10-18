@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
   import type { ArchiveItem, ArchiveScanReport, XlItem } from '$lib/types';
   import CategoryDelimiterRow from '$lib/components/CategoryDelimiterRow.svelte';
   import DialogModal from '$lib/components/DialogModal.svelte';
@@ -34,7 +34,6 @@
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { tick } from 'svelte';
-  import NewModsControl from '$lib/components/NewModsControl.svelte';
   import { isModNew } from '$lib/theme';
 
   let {
@@ -46,7 +45,8 @@
     targetHighlightMod = null,
     newModsHours = $bindable(6),
     showNewMods = $bindable(false),
-    onNewModsConfigChanged
+    onNewModsConfigChanged,
+    onRouteToHistory
   }: {
     archives: ArchiveItem[];
     gamePath: string;
@@ -57,6 +57,7 @@
     newModsHours?: number;
     showNewMods?: boolean;
     onNewModsConfigChanged?: () => void;
+    onRouteToHistory?: () => void;
   } = $props();
 
   let searchQuery = $state('');
@@ -959,7 +960,6 @@
 
   let actualMods = $derived(archives.filter(a => !a.is_delimiter));
   let activeCount = $derived(actualMods.filter(a => a.enabled).length);
-  let newModsCount = $derived(actualMods.filter(a => isModNew(a.created_at_ms, newModsHours)).length);
 </script>
 
 <svelte:window
@@ -1125,8 +1125,18 @@
   </div>
 {/if}
 
-<div class="space-y-3 select-none flex flex-col h-full" oncontextmenu={(e) => e.preventDefault()}>
-  <div class="flex items-center justify-between gap-4 shrink-0">
+<div class="flex flex-col h-full select-none" oncontextmenu={(e) => e.preventDefault()}>
+  
+  <!-- Standardized Header -->
+  <div class="mb-4 shrink-0">
+    <h2 class="text-lg font-bold text-nvidia-text-primary uppercase tracking-wider">Archive Mods</h2>
+    <div class="flex items-center gap-2 text-xs text-nvidia-text-muted mt-1">
+      <span class="font-mono bg-nvidia-surface px-1.5 py-0.5 rounded border border-nvidia-border">archive\pc\mod</span>
+      <span>Standard REDengine archive modifications and physical load order categories.</span>
+    </div>
+  </div>
+
+  <div class="flex items-center justify-between gap-4 shrink-0 mb-3">
     <div class="flex items-center gap-3 flex-1 max-w-md">
       <div class="relative flex-1">
         <Search class="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-nvidia-text-muted" />
@@ -1153,12 +1163,24 @@
     </div>
 
     <div class="flex items-center gap-2.5">
-      <NewModsControl
-        bind:newModsHours
-        bind:showNewMods
-        {newModsCount}
-        onConfigChanged={onNewModsConfigChanged}
-      />
+      
+      <!-- Vanishing Global Highlight Button -->
+      {#if showNewMods}
+        <button
+          type="button"
+          onclick={() => { showNewMods = false; }}
+          class="flex items-center gap-2 px-3 py-1.5 rounded border border-nvidia-accent/60 bg-nvidia-accent/10 hover:bg-nvidia-accent/20 transition cursor-pointer shadow-sm"
+          title="Clear new mod highlights"
+        >
+          <span
+            class="inline-flex items-center justify-center px-1.5 py-0.2 rounded text-[9px] font-mono font-bold tracking-wider uppercase shrink-0 shadow-xs"
+            style="background-color: var(--theme-accent); color: var(--theme-accent-contrast);"
+          >
+            NEW
+          </span>
+          <EyeOff class="h-3.5 w-3.5 text-nvidia-accent" />
+        </button>
+      {/if}
 
       <button
         onclick={toggleAllCategories}

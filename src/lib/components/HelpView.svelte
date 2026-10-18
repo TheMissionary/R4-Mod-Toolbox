@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { slide } from 'svelte/transition';
   import {
@@ -15,7 +15,7 @@
     Code
   } from 'lucide-svelte';
 
-  let openSection = $state<string | null>('load_order');
+  let openSection = $state<string | null>(null);
 
   function toggleSection(section: string) {
     openSection = openSection === section ? null : section;

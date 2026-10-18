@@ -1,12 +1,11 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { onMount } from 'svelte';
   import type { Red4extPluginItem, FileNode } from '$lib/types';
-  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen } from 'lucide-svelte';
+  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen, EyeOff } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { tick } from 'svelte';
   import { loadConfigFromDisk, isModNew } from '$lib/theme';
-  import NewModsControl from '$lib/components/NewModsControl.svelte';
 
   let {
     plugins = $bindable([]),
@@ -283,7 +282,6 @@
   });
 
   let activeCount = $derived(plugins.filter(p => p.enabled).length);
-  let newModsCount = $derived(plugins.filter(p => isModNew(p.created_at_ms, newModsHours)).length);
 </script>
 
 <svelte:window onclick={closeContextMenu} />
@@ -395,20 +393,22 @@
             <button
               type="button"
               onclick={(e) => { e.stopPropagation(); toggleFolder(node.path); }}
-              class="p-0.5 hover:bg-nvidia-card rounded text-nvidia-text-muted transition cursor-pointer"
+              class="flex items-center gap-1.5 text-nvidia-text-primary hover:text-nvidia-accent transition cursor-pointer min-w-0"
             >
               {#if expandedFolders[node.path]}
-                <ChevronDown class="h-3.5 w-3.5" />
+                <ChevronDown class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+                <FolderOpen class="h-4 w-4 text-nvidia-text-muted shrink-0" />
               {:else}
-                <ChevronRight class="h-3.5 w-3.5" />
+                <ChevronRight class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+                <Folder class="h-4 w-4 text-nvidia-text-muted shrink-0" />
               {/if}
+              <span class="font-bold truncate text-[11px]">{node.name}</span>
             </button>
-            <Folder class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
           {:else}
             <div class="w-[18px] shrink-0"></div>
             <FileCode class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+            <span class="font-mono text-nvidia-text-primary truncate text-[11px]">{node.name}</span>
           {/if}
-          <span class="font-mono text-nvidia-text-primary truncate text-[11px]">{node.name}</span>
         </div>
         
         <!-- Fixed-Width Laser-Aligned Right Column for Inner Files -->
@@ -437,6 +437,16 @@
 {/snippet}
 
 <div use:watchVisibility class="flex flex-col h-full select-none" oncontextmenu={(e) => e.preventDefault()}>
+  
+  <!-- Standardized Header -->
+  <div class="mb-4 shrink-0">
+    <h2 class="text-lg font-bold text-nvidia-text-primary uppercase tracking-wider">RED4ext Plugins</h2>
+    <div class="flex items-center gap-2 text-xs text-nvidia-text-muted mt-1">
+      <span class="font-mono bg-nvidia-surface px-1.5 py-0.5 rounded border border-nvidia-border">red4ext\plugins</span>
+      <span>RED4ext framework plugins and scripts.</span>
+    </div>
+  </div>
+
   <div class="flex items-center justify-between gap-3 mb-3 shrink-0">
     <div class="flex items-center gap-3 flex-1 max-w-md">
       <div class="relative flex-1">
@@ -458,18 +468,30 @@
           </button>
         {/if}
       </div>
-    </div>
-    
-    <div class="flex items-center gap-3 shrink-0">
-      <div class="text-xs font-mono text-nvidia-text-muted">
+      <div class="text-xs font-mono text-nvidia-text-muted shrink-0">
         Active: <span class="text-nvidia-accent font-semibold">{activeCount}</span> of {plugins.length}
       </div>
-      <NewModsControl
-        bind:newModsHours
-        bind:showNewMods
-        {newModsCount}
-        onConfigChanged={onNewModsConfigChanged}
-      />
+    </div>
+    
+    <div class="flex items-center gap-2.5 shrink-0">
+      <!-- Vanishing Global Highlight Button -->
+      {#if showNewMods}
+        <button
+          type="button"
+          onclick={() => { showNewMods = false; }}
+          class="flex items-center gap-2 px-3 py-1.5 rounded border border-nvidia-accent/60 bg-nvidia-accent/10 hover:bg-nvidia-accent/20 transition cursor-pointer shadow-sm"
+          title="Clear new mod highlights"
+        >
+          <span
+            class="inline-flex items-center justify-center px-1.5 py-0.2 rounded text-[9px] font-mono font-bold tracking-wider uppercase shrink-0 shadow-xs"
+            style="background-color: var(--theme-accent); color: var(--theme-accent-contrast);"
+          >
+            NEW
+          </span>
+          <EyeOff class="h-3.5 w-3.5 text-nvidia-accent" />
+        </button>
+      {/if}
+
       <button
         type="button"
         onclick={toggleAllFolders}
@@ -523,23 +545,28 @@
                 <div class="h-2.5 w-2.5 rounded-full transition-transform transform {plugin.enabled ? 'translate-x-3 bg-zinc-100 shadow-xs' : 'translate-x-0 bg-zinc-500'}"></div>
               </button>
 
-              <!-- Folder vs Loose File Icon with Chevron -->
+              <!-- Unified Chevron + Folder + Name Toggle -->
               {#if plugin.is_dir}
                 <button
                   type="button"
                   onclick={(e) => { e.stopPropagation(); toggleFolder(plugin.path); }}
-                  class="p-0.5 hover:bg-nvidia-card rounded text-nvidia-text-muted transition cursor-pointer"
+                  class="flex items-center gap-1.5 text-nvidia-text-primary hover:text-nvidia-accent transition cursor-pointer min-w-0"
                 >
                   {#if expandedFolders[plugin.path]}
-                    <ChevronDown class="h-3.5 w-3.5" />
+                    <ChevronDown class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+                    <FolderOpen class="h-4 w-4 text-nvidia-text-muted shrink-0" />
                   {:else}
-                    <ChevronRight class="h-3.5 w-3.5" />
+                    <ChevronRight class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+                    <Folder class="h-4 w-4 text-nvidia-text-muted shrink-0" />
                   {/if}
+                  <span class="font-bold truncate {plugin.enabled ? '' : 'opacity-50'}">{plugin.name}</span>
                 </button>
-                <Folder class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
               {:else}
                 <div class="w-[18px] shrink-0"></div>
-                <FileCode class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+                <FileCode class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+                <span class="font-mono truncate {plugin.enabled ? 'text-nvidia-text-primary' : 'line-through text-nvidia-text-muted'}">
+                  {plugin.name}
+                </span>
               {/if}
 
               {#if showNewMods && isModNew(plugin.created_at_ms, newModsHours)}
@@ -551,10 +578,6 @@
                   NEW
                 </span>
               {/if}
-
-              <span class="font-mono truncate {plugin.enabled ? 'text-nvidia-text-primary' : 'line-through text-nvidia-text-muted'}">
-                {plugin.name}
-              </span>
             </div>
 
             <!-- Fixed-Width Laser-Aligned Right Column -->

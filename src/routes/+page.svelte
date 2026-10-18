@@ -26,6 +26,7 @@
   import Red4extView from '$lib/components/Red4extView.svelte';
   import RedscriptView from '$lib/components/RedScriptView.svelte';
   import R6TweaksView from '$lib/components/R6TweaksView.svelte';
+  import HistoryView from '$lib/components/HistoryView.svelte';
   import SettingsView from '$lib/components/SettingsView.svelte';
   import HelpView from '$lib/components/HelpView.svelte';
   import AboutView from '$lib/components/AboutView.svelte';
@@ -41,13 +42,26 @@
     Info,
     Coffee,
     PanelLeftOpen,
-    PanelLeftClose
+    PanelLeftClose,
+    Clock
   } from 'lucide-svelte';
 
-  type TabType = 'archive' | 'cet' | 'red4ext' | 'redscript' | 'r6tweaks' | 'settings' | 'help' | 'about';
+  type TabType = 'archive' | 'cet' | 'red4ext' | 'redscript' | 'r6tweaks' | 'history' | 'settings' | 'help' | 'about';
 
   let currentTab = $state<TabType>('archive');
   let isSidebarCollapsed = $state(false);
+  
+  // Responsive Auto-Collapse Logic
+  let innerWidth = $state(1200);
+  let wasBelowThreshold = $state(false);
+
+  $effect(() => {
+    const isBelow = innerWidth < 1100;
+    if (isBelow && !wasBelowThreshold) {
+      isSidebarCollapsed = true;
+    }
+    wasBelowThreshold = isBelow;
+  });
 
   async function setTab(tab: TabType) {
     currentTab = tab;
@@ -72,7 +86,7 @@
   let redscriptPackages = $state<RedScriptItem[]>([]);
   let r6tweaks = $state<R6TweaksItem[]>([]);
 
-  // New Mods Badge System State
+  // New Mods Badge System State (Volatile, per-session only)
   let newModsHours = $state(6);
   let showNewMods = $state(false);
   let targetHighlightMod = $state<string | null>(null);
@@ -84,12 +98,18 @@
       try {
         const config = await loadConfigFromDisk();
         config.newModsHours = newModsHours;
-        config.showNewMods = showNewMods;
+        // We intentionally DO NOT save showNewMods to disk so it defaults to false on boot
         await saveConfigToDisk(config);
       } catch (err) {
         error(`Failed to save new mods config: ${err}`);
       }
     }, 200);
+  }
+
+  function handleNavigateToMod(tab: string, modName: string) {
+    setTab(tab as TabType);
+    targetHighlightMod = modName;
+    setTimeout(() => { targetHighlightMod = null; }, 100);
   }
 
   async function openExternalLink(url: string) {
@@ -182,9 +202,7 @@
       if (config.newModsHours !== undefined) {
         newModsHours = config.newModsHours;
       }
-      if (config.showNewMods !== undefined) {
-        showNewMods = config.showNewMods;
-      }
+      // showNewMods is intentionally ignored here to ensure it boots as false
     }).catch(err => {
       error(`Config hydration error: ${err}`);
     }).finally(() => {
@@ -207,7 +225,7 @@
   });
 </script>
 
-<svelte:window oncontextmenu={(e) => e.preventDefault()} />
+<svelte:window bind:innerWidth oncontextmenu={(e) => e.preventDefault()} />
 
 <div class="flex h-screen w-screen overflow-hidden bg-nvidia-bg text-nvidia-text-primary font-sans">
   <!-- Left Navigation Sidebar -->
@@ -349,6 +367,20 @@
       <div class="px-3 pb-3 space-y-1.5 bg-nvidia-surface/20 shrink-0 border-t border-nvidia-border/50 pt-3">
         <button
           type="button"
+          onclick={() => setTab('history')}
+          title={isSidebarCollapsed ? 'Mod History & Ledger' : ''}
+          class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'history' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
+        >
+          {#if currentTab === 'history'}
+            <div class="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-md bg-nvidia-accent shadow-[0_0_8px_var(--theme-accent)]"></div>
+          {/if}
+          <Clock class="h-4 w-4 {currentTab === 'history' ? 'text-nvidia-accent' : ''}" />
+          {#if !isSidebarCollapsed}
+            <span>History</span>
+          {/if}
+        </button>
+        <button
+          type="button"
           onclick={() => setTab('help')}
           title={isSidebarCollapsed ? 'Help & Documentation' : ''}
           class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'help' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
@@ -446,7 +478,7 @@
   <div class="flex-1 flex flex-col h-full overflow-hidden relative">
     <HeaderBar {gamePath} {currentTab} onRefresh={refreshAll} {isLoading} {scanResult} />
 
-    <main class="flex-1 overflow-y-auto {['settings', 'help', 'about'].includes(currentTab) ? 'p-0' : 'p-6'}">
+    <main class="flex-1 overflow-y-auto {['settings', 'help', 'about', 'history'].includes(currentTab) ? 'p-0' : 'p-6'}">
       
       <!-- Persistent Tab Views -->
       <div class={currentTab === 'archive' ? 'h-full' : 'hidden'}>
@@ -460,6 +492,7 @@
           bind:newModsHours
           bind:showNewMods
           onNewModsConfigChanged={handleNewModsConfigChange}
+          onRouteToHistory={() => setTab('history')}
         />
       </div>
 
@@ -472,6 +505,7 @@
           bind:newModsHours
           bind:showNewMods
           onNewModsConfigChanged={handleNewModsConfigChange}
+          onRouteToHistory={() => setTab('history')}
         />
       </div>
 
@@ -484,6 +518,7 @@
           bind:newModsHours
           bind:showNewMods
           onNewModsConfigChanged={handleNewModsConfigChange}
+          onRouteToHistory={() => setTab('history')}
         />
       </div>
 
@@ -496,6 +531,7 @@
           bind:newModsHours
           bind:showNewMods
           onNewModsConfigChanged={handleNewModsConfigChange}
+          onRouteToHistory={() => setTab('history')}
         />
       </div>
 
@@ -508,10 +544,20 @@
           bind:newModsHours
           bind:showNewMods
           onNewModsConfigChanged={handleNewModsConfigChange}
+          onRouteToHistory={() => setTab('history')}
         />
       </div>
 
       <!-- Full-Screen Views -->
+      <div class={currentTab === 'history' ? 'h-full' : 'hidden'}>
+        <HistoryView
+          {gamePath}
+          bind:showNewMods
+          bind:newModsHours
+          onNavigateToMod={handleNavigateToMod}
+        />
+      </div>
+
       <div class={currentTab === 'settings' ? 'h-full' : 'hidden'}>
         <SettingsView bind:gamePath onRefresh={refreshAll} />
       </div>
