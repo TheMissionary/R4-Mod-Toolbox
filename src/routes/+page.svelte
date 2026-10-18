@@ -1,8 +1,8 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
-  import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
+  import { openUrl } from '@tauri-apps/plugin-opener';
   import { info, error, warn } from '@tauri-apps/plugin-log';
   import {
     loadThemeSettings,
@@ -17,8 +17,7 @@
     CetPluginItem,
     Red4extPluginItem,
     RedScriptItem,
-    R6TweaksItem,
-    LedgerEntry
+    R6TweaksItem
   } from '$lib/types';
 
   import HeaderBar from '$lib/components/HeaderBar.svelte';
@@ -32,45 +31,23 @@
   import AboutView from '$lib/components/AboutView.svelte';
 
   import {
-    Home,
     Archive,
     Cpu,
     Puzzle,
     FileCode2,
     Sliders,
-    Play,
-    CheckCircle2,
-    RefreshCw,
-    X,
-    AlertTriangle,
-    AlertCircle,
-    ArrowUpRight,
-    Clock,
-    ChevronDown,
-    ChevronRight,
-    ArrowUpDown,
-    FolderSearch,
-    ExternalLink,
-    Copy,
-    Check,
     HelpCircle,
     Settings,
     Info,
-    Coffee
+    Coffee,
+    PanelLeftOpen,
+    PanelLeftClose
   } from 'lucide-svelte';
 
-  type TabType = 'home' | 'archive' | 'cet' | 'red4ext' | 'redscript' | 'r6tweaks' | 'settings' | 'help' | 'about';
+  type TabType = 'archive' | 'cet' | 'red4ext' | 'redscript' | 'r6tweaks' | 'settings' | 'help' | 'about';
 
-  const MOD_TYPE_LABELS: Record<string, string> = {
-    'archive': 'Archive',
-    'cet': 'CET',
-    'red4ext': 'RED4ext',
-    'redscript': 'R6\\Scripts',
-    'r6tweaks': 'R6\\Tweaks'
-  };
-
-  // Always boot cleanly to the Home dashboard
-  let currentTab = $state<TabType>('home');
+  let currentTab = $state<TabType>('archive');
+  let isSidebarCollapsed = $state(false);
 
   async function setTab(tab: TabType) {
     currentTab = tab;
@@ -86,10 +63,6 @@
 
   let gamePath = $state('');
   let isLoading = $state(false);
-  let isLaunching = $state(false);
-  let isGameRunning = $state(false);
-  let isConfirmingKill = $state(false);
-  let killConfirmTimer: ReturnType<typeof setTimeout> | null = null;
 
   let scanResult = $state<ScanResult | null>(null);
   let archiveReport = $state<ArchiveScanReport | null>(null);
@@ -102,6 +75,7 @@
   // New Mods Badge System State
   let newModsHours = $state(6);
   let showNewMods = $state(false);
+  let targetHighlightMod = $state<string | null>(null);
 
   let newModsSaveTimeout: ReturnType<typeof setTimeout>;
   function handleNewModsConfigChange() {
@@ -118,221 +92,12 @@
     }, 200);
   }
 
-  // Recently Added Mods State
-  let recentMods = $state<LedgerEntry[]>([]);
-  let showRecentMods = $state(false);
-  let recentDaysThreshold = $state<number | null>(30);
-  let sortColumn = $state<'date' | 'name' | 'type'>('date');
-  let sortAscending = $state(false);
-  
-  // Global Highlight Signal
-  let targetHighlightMod = $state<string | null>(null);
-
-  let recentContextMenu = $state<{
-    visible: boolean;
-    x: number;
-    y: number;
-    entry: LedgerEntry | null;
-  }>({
-    visible: false,
-    x: 0,
-    y: 0,
-    entry: null
-  });
-  let copiedFeedback = $state(false);
-
-  let sortedRecentMods = $derived.by(() => {
-    let arr = [...recentMods];
-    arr.sort((a, b) => {
-      if (sortColumn === 'date') {
-        return sortAscending ? a.first_seen - b.first_seen : b.first_seen - a.first_seen;
-      } else if (sortColumn === 'name') {
-        return sortAscending ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-      } else if (sortColumn === 'type') {
-        return sortAscending ? a.mod_type.localeCompare(b.mod_type) : b.mod_type.localeCompare(a.mod_type);
-      }
-      return 0;
-    });
-    return arr;
-  });
-
-  function formatTimestamp(ts: number) {
-    if (!ts) return 'Unknown';
-    const d = new Date(ts);
-    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-
-  function handleSort(column: 'date' | 'name' | 'type') {
-    if (sortColumn === column) {
-      sortAscending = !sortAscending;
-    } else {
-      sortColumn = column;
-      sortAscending = column === 'name' || column === 'type'; // Default ascending for text, descending for date
-    }
-  }
-
-  async function loadRecentMods() {
-    if (!gamePath) return;
-    try {
-      recentMods = await invoke<LedgerEntry[]>('get_recent_mods', { gamePath, days: recentDaysThreshold || 30 });
-    } catch (err) {
-      error(`Failed to load recent mods: ${err}`);
-    }
-  }
-
-  let thresholdTimeout: ReturnType<typeof setTimeout>;
-  function handleThresholdChange() {
-    clearTimeout(thresholdTimeout);
-    thresholdTimeout = setTimeout(async () => {
-      if (recentDaysThreshold === null || recentDaysThreshold === undefined) return;
-      if (recentDaysThreshold < 1) recentDaysThreshold = 1;
-      if (recentDaysThreshold > 365) recentDaysThreshold = 365;
-      
-      await loadRecentMods();
-      try {
-        const config = await loadConfigFromDisk();
-        config.recentDaysThreshold = recentDaysThreshold;
-        await saveConfigToDisk(config);
-      } catch (err) {
-        error(`Failed to save threshold: ${err}`);
-      }
-    }, 400);
-  }
-
-  function openRecentContextMenu(event: MouseEvent, entry: LedgerEntry) {
-    event.preventDefault();
-    event.stopPropagation();
-    copiedFeedback = false;
-
-    const menuWidth = 200;
-    const menuHeight = 120;
-    const posX = (event.clientX + menuWidth > window.innerWidth) ? (window.innerWidth - menuWidth - 10) : event.clientX;
-    const posY = (event.clientY + menuHeight > window.innerHeight) ? (window.innerHeight - menuHeight - 10) : event.clientY;
-
-    recentContextMenu = { visible: true, x: posX, y: posY, entry };
-  }
-
-  function closeRecentContextMenu() {
-    if (recentContextMenu.visible) {
-      recentContextMenu.visible = false;
-      recentContextMenu.entry = null;
-      copiedFeedback = false;
-    }
-  }
-
-  async function handleRecentShowInExplorer() {
-    if (!recentContextMenu.entry) return;
-    try {
-      await revealItemInDir(recentContextMenu.entry.path);
-    } catch (err) {
-      error(`Failed to reveal file in explorer: ${err}`);
-    }
-    closeRecentContextMenu();
-  }
-
-  async function handleRecentShowInApp() {
-    if (!recentContextMenu.entry) return;
-    const entry = recentContextMenu.entry;
-    
-    const tabMap: Record<string, TabType> = {
-      'archive': 'archive',
-      'cet': 'cet',
-      'red4ext': 'red4ext',
-      'redscript': 'redscript',
-      'r6tweaks': 'r6tweaks'
-    };
-    
-    const targetTab = tabMap[entry.mod_type];
-    if (targetTab) {
-      await setTab(targetTab);
-      targetHighlightMod = entry.name;
-      // Clear the signal shortly after so it can be re-triggered later if needed
-      setTimeout(() => { targetHighlightMod = null; }, 100);
-      try {
-        await navigator.clipboard.writeText(entry.name);
-      } catch (err) {}
-    }
-    closeRecentContextMenu();
-  }
-
-  async function handleRecentCopyName() {
-    if (!recentContextMenu.entry) return;
-    try {
-      await navigator.clipboard.writeText(recentContextMenu.entry.name);
-      copiedFeedback = true;
-      setTimeout(() => {
-        closeRecentContextMenu();
-      }, 400);
-    } catch (err) {
-      error(`Failed to copy name: ${err}`);
-      closeRecentContextMenu();
-    }
-  }
-
   async function openExternalLink(url: string) {
     if (!url) return;
     try {
       await openUrl(url);
     } catch (err) {
       error(`Failed to open URL ${url}: ${err}`);
-    }
-  }
-
-  async function handleLaunchGame() {
-    if (!gamePath || isLaunching || isGameRunning) return;
-    isLaunching = true;
-    info('Initiating game launch sequence...');
-    try {
-      const config = await loadConfigFromDisk();
-      await invoke('launch_game', { gamePath, customLaunchPath: config.customLaunchPath });
-      
-      let attempts = 0;
-      const pollInterval = setInterval(async () => {
-        attempts++;
-        try {
-          const running = await invoke<boolean>('check_game_process_running');
-          if (running) {
-            isGameRunning = true;
-            isLaunching = false;
-            clearInterval(pollInterval);
-          } else if (attempts > 30) {
-            isLaunching = false;
-            clearInterval(pollInterval);
-          }
-        } catch {
-          if (attempts > 30) {
-            isLaunching = false;
-            clearInterval(pollInterval);
-          }
-        }
-      }, 1000);
-    } catch (err) {
-      error(`Failed to launch game: ${err}`);
-      isLaunching = false;
-    }
-  }
-
-  async function handleKillClick() {
-    if (!isConfirmingKill) {
-      // Step 1: Request confirmation
-      isConfirmingKill = true;
-      if (killConfirmTimer) clearTimeout(killConfirmTimer);
-      killConfirmTimer = setTimeout(() => {
-        isConfirmingKill = false;
-      }, 3500);
-    } else {
-      // Step 2: Confirmed!
-      if (killConfirmTimer) clearTimeout(killConfirmTimer);
-      isConfirmingKill = false;
-      info('User confirmed force kill of Cyberpunk2077.exe');
-      try {
-        await invoke('kill_game_process');
-        setTimeout(async () => {
-          isGameRunning = await invoke<boolean>('check_game_process_running');
-        }, 600);
-      } catch (err) {
-        error(`Failed to kill game process: ${err}`);
-      }
     }
   }
 
@@ -368,7 +133,6 @@
       await loadTabData('red4ext');
       await loadTabData('redscript');
       await loadTabData('r6tweaks');
-      await loadRecentMods();
       info('Workspace refresh complete.');
     } catch (err) {
       error(`Failed to scan game environment: ${err}`);
@@ -381,7 +145,6 @@
     if (!gamePath) return;
     try {
       scanResult = await invoke<ScanResult>('scan_game_directory', { gamePath });
-      await loadRecentMods();
     } catch (err) {
       error(`Failed to refresh counts: ${err}`);
     }
@@ -410,9 +173,11 @@
       }
       if (config.targetGamePath) {
         gamePath = config.targetGamePath;
-      }
-      if (config.recentDaysThreshold !== undefined) {
-        recentDaysThreshold = config.recentDaysThreshold;
+        let tab = config.activeTab as TabType;
+        if (tab === 'home' || !tab) tab = 'archive';
+        currentTab = tab;
+      } else {
+        currentTab = 'settings';
       }
       if (config.newModsHours !== undefined) {
         newModsHours = config.newModsHours;
@@ -423,9 +188,11 @@
     }).catch(err => {
       error(`Config hydration error: ${err}`);
     }).finally(() => {
-      refreshAll().finally(() => {
+      if (gamePath) {
+        refreshAll().finally(() => dismissSplash());
+      } else {
         dismissSplash();
-      });
+      }
     });
 
     invoke('start_directory_watcher', { gamePath }).catch(() => {});
@@ -434,126 +201,55 @@
       refreshAll();
     });
 
-    async function checkProcess() {
-      try {
-        const running = await invoke<boolean>('check_game_process_running');
-        isGameRunning = running;
-        if (running && isLaunching) {
-          isLaunching = false;
-        }
-        if (!running && isConfirmingKill) {
-          isConfirmingKill = false;
-          if (killConfirmTimer) clearTimeout(killConfirmTimer);
-        }
-      } catch (err) {
-        // non-fatal process check
-      }
-    }
-
-    checkProcess();
-    const processInterval = setInterval(checkProcess, 2500);
-
     return () => {
-      clearInterval(processInterval);
-      if (killConfirmTimer) clearTimeout(killConfirmTimer);
       unlisten.then(f => f());
     };
   });
 </script>
-<svelte:window onclick={closeRecentContextMenu} oncontextmenu={(e) => e.preventDefault()} />
 
-<!-- Recent Mods Context Menu -->
-{#if recentContextMenu.visible && recentContextMenu.entry}
-  <div
-    class="fixed z-50 w-48 rounded-md border border-nvidia-border bg-nvidia-card py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
-    style="left: {recentContextMenu.x}px; top: {recentContextMenu.y}px;"
-    onclick={(e) => e.stopPropagation()}
-    oncontextmenu={(e) => e.preventDefault()}
-  >
-    <div class="px-3 py-1.5 border-b border-nvidia-border/60 bg-nvidia-surface/40 flex items-center gap-2">
-      <span class="font-mono text-[11px] font-bold text-nvidia-text-primary truncate" title={recentContextMenu.entry.name}>
-        {recentContextMenu.entry.name}
-      </span>
-    </div>
-    <div class="p-1 space-y-0.5">
-      <button
-        type="button"
-        onclick={handleRecentShowInExplorer}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
-      >
-        <FolderSearch class="h-3.5 w-3.5 text-nvidia-accent group-hover:brightness-110" />
-        <span>Show in Explorer</span>
-      </button>
-      <button
-        type="button"
-        onclick={handleRecentShowInApp}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
-        title="Switches to the correct tab and copies the mod name to your clipboard"
-      >
-        <ExternalLink class="h-3.5 w-3.5 text-cyan-400" />
-        <span>Show in App</span>
-      </button>
-      <button
-        type="button"
-        onclick={handleRecentCopyName}
-        class="w-full flex items-center justify-between px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
-      >
-        <div class="flex items-center gap-2.5">
-          {#if copiedFeedback}
-            <Check class="h-3.5 w-3.5 text-nvidia-accent" />
-            <span class="text-nvidia-accent font-medium">Copied!</span>
-          {:else}
-            <Copy class="h-3.5 w-3.5 text-nvidia-text-muted group-hover:text-nvidia-text-primary" />
-            <span>Copy Name</span>
-          {/if}
-        </div>
-      </button>
-    </div>
-  </div>
-{/if}
+<svelte:window oncontextmenu={(e) => e.preventDefault()} />
 
 <div class="flex h-screen w-screen overflow-hidden bg-nvidia-bg text-nvidia-text-primary font-sans">
   <!-- Left Navigation Sidebar -->
-  <aside class="w-64 border-r border-nvidia-border flex flex-col justify-between bg-nvidia-surface/40 select-none shrink-0">
+  <aside class="border-r border-nvidia-border flex flex-col justify-between bg-nvidia-surface/40 select-none shrink-0 transition-all duration-300 {isSidebarCollapsed ? 'w-[72px]' : 'w-64'}">
     <div class="flex flex-col h-full overflow-hidden">
-      <!-- Logo Box: h-16 to match HeaderBar -->
-      <div class="h-16 border-b border-nvidia-border px-5 flex items-center gap-3 shrink-0">
-        <div class="h-6 w-6 rounded bg-nvidia-accent flex items-center justify-center text-black font-black text-sm shadow-sm">
-          R4
-        </div>
-        <div>
-          <h1 class="text-xs font-bold tracking-wider uppercase text-nvidia-text-primary">R4 Mod Toolbox</h1>
-          <p class="text-[10px] text-nvidia-text-muted font-mono truncate max-w-[140px]" title="Advanced Mod Manager">
-            ADVANCED MOD MANAGER
-          </p>
-        </div>
+      
+      <!-- Sidebar Header / Toggle -->
+      <div class="h-16 border-b border-nvidia-border flex items-center {isSidebarCollapsed ? 'justify-center' : 'px-5 gap-3'} shrink-0 transition-all duration-300">
+        {#if isSidebarCollapsed}
+          <button onclick={() => isSidebarCollapsed = false} class="p-2 rounded hover:bg-nvidia-surface text-nvidia-text-muted hover:text-nvidia-accent transition cursor-pointer" title="Expand Sidebar">
+            <PanelLeftOpen class="h-5 w-5" />
+          </button>
+        {:else}
+          <div class="h-6 w-6 rounded bg-nvidia-accent flex items-center justify-center text-black font-black text-sm shadow-sm shrink-0">R4</div>
+          <div class="flex flex-col flex-1 min-w-0">
+            <h1 class="text-xs font-bold tracking-wider uppercase text-nvidia-text-primary truncate">R4 Mod Toolbox</h1>
+          </div>
+          <button onclick={() => isSidebarCollapsed = true} class="p-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer shrink-0" title="Collapse Sidebar">
+            <PanelLeftClose class="h-4 w-4" />
+          </button>
+        {/if}
       </div>
 
-      <div class="flex-1 overflow-y-auto">
-        <nav class="p-3 space-y-1">
-          <button
-            type="button"
-            onclick={() => setTab('home')}
-            class="w-full flex items-center gap-3 px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'home' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
-          >
-            <Home class="h-4 w-4" />
-            <span>Home</span>
-          </button>
-
-          <!-- Separator below Home -->
-          <div class="h-px bg-nvidia-border/50 my-1.5 mx-2"></div>
-
+      <div class="flex-1 overflow-y-auto overflow-x-hidden">
+        <nav class="p-3 space-y-1.5">
           <button
             type="button"
             onclick={() => setTab('archive')}
-            class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'archive' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
+            title={isSidebarCollapsed ? 'Archive Mods' : ''}
+            class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'} py-2.5 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'archive' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
           >
+            {#if currentTab === 'archive'}
+              <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md bg-nvidia-accent shadow-[0_0_8px_var(--theme-accent)]"></div>
+            {/if}
             <div class="flex items-center gap-3">
-              <Archive class="h-4 w-4" />
-              <span>Archive</span>
+              <Archive class="h-4 w-4 {currentTab === 'archive' ? 'text-nvidia-accent' : ''}" />
+              {#if !isSidebarCollapsed}
+                <span>Archive</span>
+              {/if}
             </div>
-            {#if scanResult}
-              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
+            {#if !isSidebarCollapsed && scanResult}
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted border border-nvidia-border/50">
                 {scanResult.archive_active}/{scanResult.archive_total}
               </span>
             {/if}
@@ -562,14 +258,20 @@
           <button
             type="button"
             onclick={() => setTab('cet')}
-            class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'cet' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
+            title={isSidebarCollapsed ? 'CET Plugins' : ''}
+            class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'} py-2.5 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'cet' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
           >
+            {#if currentTab === 'cet'}
+              <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md bg-nvidia-accent shadow-[0_0_8px_var(--theme-accent)]"></div>
+            {/if}
             <div class="flex items-center gap-3">
-              <Cpu class="h-4 w-4" />
-              <span>CET</span>
+              <Cpu class="h-4 w-4 {currentTab === 'cet' ? 'text-nvidia-accent' : ''}" />
+              {#if !isSidebarCollapsed}
+                <span>CET</span>
+              {/if}
             </div>
-            {#if scanResult}
-              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
+            {#if !isSidebarCollapsed && scanResult}
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted border border-nvidia-border/50">
                 {scanResult.cet_active}/{scanResult.cet_total}
               </span>
             {/if}
@@ -578,14 +280,20 @@
           <button
             type="button"
             onclick={() => setTab('red4ext')}
-            class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'red4ext' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
+            title={isSidebarCollapsed ? 'RED4ext Plugins' : ''}
+            class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'} py-2.5 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'red4ext' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
           >
+            {#if currentTab === 'red4ext'}
+              <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md bg-nvidia-accent shadow-[0_0_8px_var(--theme-accent)]"></div>
+            {/if}
             <div class="flex items-center gap-3">
-              <Puzzle class="h-4 w-4" />
-              <span>RED4ext</span>
+              <Puzzle class="h-4 w-4 {currentTab === 'red4ext' ? 'text-nvidia-accent' : ''}" />
+              {#if !isSidebarCollapsed}
+                <span>RED4ext</span>
+              {/if}
             </div>
-            {#if scanResult}
-              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
+            {#if !isSidebarCollapsed && scanResult}
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted border border-nvidia-border/50">
                 {scanResult.red4ext_active}/{scanResult.red4ext_total}
               </span>
             {/if}
@@ -594,14 +302,20 @@
           <button
             type="button"
             onclick={() => setTab('redscript')}
-            class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'redscript' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
+            title={isSidebarCollapsed ? 'R6\\Scripts' : ''}
+            class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'} py-2.5 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'redscript' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
           >
+            {#if currentTab === 'redscript'}
+              <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md bg-nvidia-accent shadow-[0_0_8px_var(--theme-accent)]"></div>
+            {/if}
             <div class="flex items-center gap-3">
-              <FileCode2 class="h-4 w-4" />
-              <span>R6\Scripts</span>
+              <FileCode2 class="h-4 w-4 {currentTab === 'redscript' ? 'text-nvidia-accent' : ''}" />
+              {#if !isSidebarCollapsed}
+                <span>R6\Scripts</span>
+              {/if}
             </div>
-            {#if scanResult}
-              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
+            {#if !isSidebarCollapsed && scanResult}
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted border border-nvidia-border/50">
                 {scanResult.redscript_active}/{scanResult.redscript_total}
               </span>
             {/if}
@@ -610,14 +324,20 @@
           <button
             type="button"
             onclick={() => setTab('r6tweaks')}
-            class="w-full flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition cursor-pointer {currentTab === 'r6tweaks' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
+            title={isSidebarCollapsed ? 'R6\\Tweaks' : ''}
+            class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'} py-2.5 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'r6tweaks' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
           >
+            {#if currentTab === 'r6tweaks'}
+              <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md bg-nvidia-accent shadow-[0_0_8px_var(--theme-accent)]"></div>
+            {/if}
             <div class="flex items-center gap-3">
-              <Sliders class="h-4 w-4" />
-              <span>R6\Tweaks</span>
+              <Sliders class="h-4 w-4 {currentTab === 'r6tweaks' ? 'text-nvidia-accent' : ''}" />
+              {#if !isSidebarCollapsed}
+                <span>R6\Tweaks</span>
+              {/if}
             </div>
-            {#if scanResult}
-              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted">
+            {#if !isSidebarCollapsed && scanResult}
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted border border-nvidia-border/50">
                 {scanResult.r6tweaks_active}/{scanResult.r6tweaks_total}
               </span>
             {/if}
@@ -625,367 +345,109 @@
         </nav>
       </div>
 
-      <!-- Launch Game Button -->
-      <div class="p-3 border-t border-nvidia-border/50 bg-nvidia-surface/20 shrink-0">
-        {#if isGameRunning}
-          <!-- Split Running / Force Stop Button (75% / 25%) -->
-          <div class="w-full flex items-stretch rounded overflow-hidden border border-nvidia-border bg-nvidia-card shadow-sm text-xs">
-            <!-- 75% Left: Now Playing Status -->
-            <div class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-nvidia-surface/90 text-nvidia-text-primary select-none">
-              <div class="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse"></div>
-              <span class="font-semibold tracking-wide">Now Playing</span>
-            </div>
-
-            <!-- 25% Right: 2-Step Force Stop Button -->
-            <button
-              type="button"
-              onclick={handleKillClick}
-              class="w-12 flex items-center justify-center border-l border-nvidia-border transition cursor-pointer {isConfirmingKill ? 'bg-red-600 hover:bg-red-500 text-white font-bold animate-pulse' : 'bg-nvidia-surface/50 hover:bg-red-500/20 text-nvidia-text-muted hover:text-red-400'}"
-              title={isConfirmingKill ? 'Click again to confirm force stop (kill process)' : 'Force stop (kill process)'}
-              aria-label={isConfirmingKill ? 'Confirm force stop' : 'Force stop'}
-            >
-              {#if isConfirmingKill}
-                <span class="text-[10px] uppercase font-bold tracking-tighter">Kill?</span>
-              {:else}
-                <X class="h-3.5 w-3.5" />
-              {/if}
-            </button>
-          </div>
-        {:else}
-          <!-- Standard / Launching Button -->
-          <button
-            type="button"
-            onclick={handleLaunchGame}
-            disabled={isLaunching || !scanResult?.is_valid_game_path}
-            class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded bg-nvidia-accent hover:brightness-105 text-black font-semibold text-xs transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            title={!scanResult?.is_valid_game_path ? 'Configure a valid Cyberpunk 2077 game directory to enable launch' : (isLaunching ? 'Game is launching...' : 'Launch Cyberpunk 2077')}
-          >
-            {#if isLaunching}
-              <RefreshCw class="h-3.5 w-3.5 animate-spin" />
-              <span>Loading...</span>
-            {:else}
-              <Play class="h-3.5 w-3.5 fill-black" />
-              <span>Launch Game</span>
-            {/if}
-          </button>
-        {/if}
-      </div>
-
       <!-- Secondary Navigation Cluster -->
-      <div class="px-3 pb-3 space-y-1 bg-nvidia-surface/20 shrink-0">
+      <div class="px-3 pb-3 space-y-1.5 bg-nvidia-surface/20 shrink-0 border-t border-nvidia-border/50 pt-3">
         <button
           type="button"
           onclick={() => setTab('help')}
-          class="w-full flex items-center gap-3 px-3 py-1.5 rounded text-xs font-medium transition cursor-pointer {currentTab === 'help' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
+          title={isSidebarCollapsed ? 'Help & Documentation' : ''}
+          class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'help' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
         >
-          <HelpCircle class="h-4 w-4" />
-          <span>Help</span>
+          {#if currentTab === 'help'}
+            <div class="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-md bg-nvidia-accent shadow-[0_0_8px_var(--theme-accent)]"></div>
+          {/if}
+          <HelpCircle class="h-4 w-4 {currentTab === 'help' ? 'text-nvidia-accent' : ''}" />
+          {#if !isSidebarCollapsed}
+            <span>Help</span>
+          {/if}
         </button>
         <button
           type="button"
           onclick={() => setTab('settings')}
-          class="w-full flex items-center gap-3 px-3 py-1.5 rounded text-xs font-medium transition cursor-pointer {currentTab === 'settings' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
+          title={isSidebarCollapsed ? 'Settings' : ''}
+          class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'settings' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
         >
-          <Settings class="h-4 w-4" />
-          <span>Settings</span>
+          {#if currentTab === 'settings'}
+            <div class="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-md bg-nvidia-accent shadow-[0_0_8px_var(--theme-accent)]"></div>
+          {/if}
+          <Settings class="h-4 w-4 {currentTab === 'settings' ? 'text-nvidia-accent' : ''}" />
+          {#if !isSidebarCollapsed}
+            <span>Settings</span>
+          {/if}
         </button>
         <button
           type="button"
           onclick={() => setTab('about')}
-          class="w-full flex items-center gap-3 px-3 py-1.5 rounded text-xs font-medium transition cursor-pointer {currentTab === 'about' ? 'bg-nvidia-card text-nvidia-accent font-semibold shadow-xs border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary'}"
+          title={isSidebarCollapsed ? 'About R4' : ''}
+          class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'about' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
         >
-          <Info class="h-4 w-4" />
-          <span>About</span>
+          {#if currentTab === 'about'}
+            <div class="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-md bg-nvidia-accent shadow-[0_0_8px_var(--theme-accent)]"></div>
+          {/if}
+          <Info class="h-4 w-4 {currentTab === 'about' ? 'text-nvidia-accent' : ''}" />
+          {#if !isSidebarCollapsed}
+            <span>About</span>
+          {/if}
         </button>
       </div>
     </div>
 
     <!-- Developer Tile -->
-    <div class="p-3 border-t border-nvidia-border bg-nvidia-surface/30 shrink-0">
-      <div class="rounded-lg border border-nvidia-border/70 bg-nvidia-surface/70 p-2 flex items-center justify-between gap-2 shadow-xs select-none">
-        <div class="flex items-center gap-2 min-w-0">
-          <!-- Stylized Hand-Drawn Heart Avatar -->
-          <div class="h-6 w-6 rounded bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
-            <svg viewBox="0 0 100 100" class="h-4 w-4 drop-shadow-sm" fill="none" stroke="#e08528" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M 48 34 C 44 20 22 10 13 26 C 3 44 18 68 49 92 C 80 68 97 44 87 22 C 77 0 54 8 48 34 Z" />
-            </svg>
+    <div class="p-3 border-t border-nvidia-border bg-nvidia-surface/30 shrink-0 flex justify-center">
+      {#if isSidebarCollapsed}
+        <button 
+          type="button" 
+          onclick={() => openExternalLink('https://www.nexusmods.com/profile/Mi55ionary')} 
+          class="h-8 w-8 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center hover:border-amber-500 transition cursor-pointer" 
+          title="Mi55ionary"
+        >
+          <svg viewBox="0 0 100 100" class="h-5 w-5 drop-shadow-sm" fill="none" stroke="#e08528" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M 48 34 C 44 20 22 10 13 26 C 3 44 18 68 49 92 C 80 68 97 44 87 22 C 77 0 54 8 48 34 Z" />
+          </svg>
+        </button>
+      {:else}
+        <div class="w-full rounded-lg border border-nvidia-border/70 bg-nvidia-surface/70 p-2 flex items-center justify-between gap-2 shadow-xs select-none">
+          <div class="flex items-center gap-2 min-w-0">
+            <div class="h-6 w-6 rounded bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
+              <svg viewBox="0 0 100 100" class="h-4 w-4 drop-shadow-sm" fill="none" stroke="#e08528" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M 48 34 C 44 20 22 10 13 26 C 3 44 18 68 49 92 C 80 68 97 44 87 22 C 77 0 54 8 48 34 Z" />
+              </svg>
+            </div>
+            <div class="min-w-0 flex flex-col">
+              <span class="text-[9px] text-nvidia-text-muted uppercase tracking-wider font-semibold leading-tight">Dev</span>
+              <button 
+                type="button" 
+                onclick={() => openExternalLink('https://www.nexusmods.com/profile/Mi55ionary')} 
+                class="text-[11px] font-mono font-bold text-nvidia-text-primary hover:text-nvidia-accent transition-colors truncate leading-tight text-left cursor-pointer" 
+                title="View Mi55ionary on Nexus Mods"
+              >
+                Mi55ionary
+              </button>
+            </div>
           </div>
-          <div class="min-w-0 flex flex-col">
-            <span class="text-[9px] text-nvidia-text-muted uppercase tracking-wider font-semibold leading-tight">Dev</span>
-            <button 
-              type="button" 
-              onclick={() => openExternalLink('https://www.nexusmods.com/profile/Mi55ionary')} 
-              class="text-[11px] font-mono font-bold text-nvidia-text-primary hover:text-nvidia-accent transition-colors truncate leading-tight text-left cursor-pointer" 
-              title="View Mi55ionary on Nexus Mods"
+
+          <div class="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onclick={() => openExternalLink('https://ko-fi.com/themissionary')}
+              class="px-2 py-1 rounded bg-nvidia-card hover:bg-cyan-500/10 text-[10px] font-mono text-nvidia-text-muted hover:text-cyan-400 border border-nvidia-border hover:border-cyan-500/30 transition cursor-pointer flex items-center justify-center gap-1.5"
+              title="Support on Ko-fi"
             >
-              Mi55ionary
+              <Coffee class="h-3 w-3" />
+              <span class="font-bold">Ko-fi</span>
             </button>
           </div>
         </div>
-
-        <div class="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            onclick={() => openExternalLink('https://ko-fi.com/themissionary')}
-            class="px-2 py-1 rounded bg-nvidia-card hover:bg-cyan-500/10 text-[10px] font-mono text-nvidia-text-muted hover:text-cyan-400 border border-nvidia-border hover:border-cyan-500/30 transition cursor-pointer flex items-center justify-center gap-1.5"
-            title="Support on Ko-fi"
-          >
-            <Coffee class="h-3 w-3" />
-            <span class="font-bold">Ko-fi</span>
-          </button>
-        </div>
-      </div>
+      {/if}
     </div>
   </aside>
 
   <!-- Workspace Canvas -->
   <div class="flex-1 flex flex-col h-full overflow-hidden relative">
-    <HeaderBar bind:gamePath onRefresh={refreshAll} {isLoading} {scanResult} />
+    <HeaderBar {gamePath} {currentTab} onRefresh={refreshAll} {isLoading} {scanResult} />
 
     <main class="flex-1 overflow-y-auto {['settings', 'help', 'about'].includes(currentTab) ? 'p-0' : 'p-6'}">
-      <!-- Persistent Tab: Home -->
-      <div class={currentTab === 'home' ? 'space-y-6' : 'hidden'}>
-        {#if !gamePath}
-          <div class="p-6 rounded-lg border border-amber-500/30 bg-nvidia-card relative overflow-hidden">
-            <div class="flex items-center gap-2 text-xs font-mono text-amber-400 mb-2">
-              <AlertTriangle class="h-4 w-4" />
-              <span>NO GAME FOLDER CONFIGURED</span>
-            </div>
-            <h2 class="text-xl font-bold text-nvidia-text-primary mb-1">Welcome to R4 Mod Toolbox</h2>
-            <p class="text-xs text-nvidia-text-muted max-w-xl">
-              Please select your Cyberpunk 2077 root directory using the <span class="text-nvidia-text-primary font-semibold">Change Folder</span> button in the top bar to begin managing mods, load orders, and asset conflicts.
-            </p>
-          </div>
-        {:else if !scanResult?.is_valid_game_path}
-          <div class="p-6 rounded-lg border border-red-500/30 bg-nvidia-card relative overflow-hidden">
-            <div class="flex items-center gap-2 text-xs font-mono text-red-400 mb-2">
-              <AlertCircle class="h-4 w-4" />
-              <span>GAME EXECUTABLE NOT FOUND</span>
-            </div>
-            <h2 class="text-xl font-bold text-nvidia-text-primary mb-1">Game Path Unverified</h2>
-            <p class="text-xs text-nvidia-text-muted max-w-xl">
-              Could not find <span class="font-mono text-nvidia-text-primary">bin\x64\Cyberpunk2077.exe</span> at the selected path. Please use <span class="text-nvidia-text-primary font-semibold">Change Folder</span> to locate your main Cyberpunk 2077 directory.
-            </p>
-          </div>
-        {:else}
-          <div class="p-6 rounded-lg border border-nvidia-border bg-nvidia-card relative overflow-hidden">
-            <div class="flex items-center gap-2 text-xs font-mono text-nvidia-accent mb-2">
-              <CheckCircle2 class="h-4 w-4" />
-              <span>ENGINE CONNECTED</span>
-            </div>
-            <h2 class="text-xl font-bold text-nvidia-text-primary mb-1">R4 Management Engine</h2>
-            <p class="text-xs text-nvidia-text-muted max-w-xl">
-              Master your mod conflicts with real-time archive resolution. Organize your workspace using custom categories, drag-and-drop load ordering, and seamless management across the mod frameworks below.
-            </p>
-          </div>
-        {/if}
-
-        <!-- 6-Column Grid for 5 Cards (3 Top, 2 Bottom) -->
-        <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
-          <!-- Card 1: Archive Mods -->
-          <button
-            type="button"
-            onclick={() => setTab('archive')}
-            class="col-span-1 md:col-span-2 p-4 rounded border border-nvidia-border bg-nvidia-surface/60 hover:bg-nvidia-surface/90 hover:border-nvidia-accent/70 transition-all duration-150 flex flex-col justify-between h-28 text-left cursor-pointer group shadow-xs"
-          >
-            <div class="flex justify-between items-start w-full">
-              <span class="text-xs font-bold uppercase tracking-wider text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">ARCHIVE</span>
-              <div class="flex items-center gap-1 text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">
-                <Archive class="h-4 w-4" />
-                <ArrowUpRight class="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </div>
-            <div>
-              <div class="flex items-baseline gap-1.5">
-                <span class="text-2xl font-bold font-mono text-nvidia-text-primary group-hover:text-nvidia-accent transition-colors">{scanResult?.archive_active ?? 0}</span>
-                <span class="text-xs font-mono text-nvidia-text-muted">of {scanResult?.archive_total ?? 0}</span>
-              </div>
-              <p class="text-[10px] text-nvidia-text-muted font-mono mt-0.5 truncate" title="archive/pc/mod">archive/pc/mod</p>
-            </div>
-          </button>
-
-          <!-- Card 2: CET Plugins -->
-          <button
-            type="button"
-            onclick={() => setTab('cet')}
-            class="col-span-1 md:col-span-2 p-4 rounded border border-nvidia-border bg-nvidia-surface/60 hover:bg-nvidia-surface/90 hover:border-nvidia-accent/70 transition-all duration-150 flex flex-col justify-between h-28 text-left cursor-pointer group shadow-xs"
-          >
-            <div class="flex justify-between items-start w-full">
-              <span class="text-xs font-bold uppercase tracking-wider text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">CET</span>
-              <div class="flex items-center gap-1 text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">
-                <Cpu class="h-4 w-4" />
-                <ArrowUpRight class="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </div>
-            <div>
-              <div class="flex items-baseline gap-1.5">
-                <span class="text-2xl font-bold font-mono text-nvidia-text-primary group-hover:text-nvidia-accent transition-colors">{scanResult?.cet_active ?? 0}</span>
-                <span class="text-xs font-mono text-nvidia-text-muted">of {scanResult?.cet_total ?? 0}</span>
-              </div>
-              <p class="text-[10px] text-nvidia-text-muted font-mono mt-0.5 truncate" title="bin/x64/plugins/cyber_engine_tweaks">bin/x64/plugins/cyber_engine_tweaks</p>
-            </div>
-          </button>
-
-          <!-- Card 3: RED4ext Plugins -->
-          <button
-            type="button"
-            onclick={() => setTab('red4ext')}
-            class="col-span-1 md:col-span-2 p-4 rounded border border-nvidia-border bg-nvidia-surface/60 hover:bg-nvidia-surface/90 hover:border-nvidia-accent/70 transition-all duration-150 flex flex-col justify-between h-28 text-left cursor-pointer group shadow-xs"
-          >
-            <div class="flex justify-between items-start w-full">
-              <span class="text-xs font-bold uppercase tracking-wider text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">RED4EXT</span>
-              <div class="flex items-center gap-1 text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">
-                <Puzzle class="h-4 w-4" />
-                <ArrowUpRight class="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </div>
-            <div>
-              <div class="flex items-baseline gap-1.5">
-                <span class="text-2xl font-bold font-mono text-nvidia-text-primary group-hover:text-nvidia-accent transition-colors">{scanResult?.red4ext_active ?? 0}</span>
-                <span class="text-xs font-mono text-nvidia-text-muted">of {scanResult?.red4ext_total ?? 0}</span>
-              </div>
-              <p class="text-[10px] text-nvidia-text-muted font-mono mt-0.5 truncate" title="red4ext/plugins">red4ext/plugins</p>
-            </div>
-          </button>
-
-          <!-- Card 4: R6\SCRIPTS -->
-          <button
-            type="button"
-            onclick={() => setTab('redscript')}
-            class="col-span-1 md:col-span-3 p-4 rounded border border-nvidia-border bg-nvidia-surface/60 hover:bg-nvidia-surface/90 hover:border-nvidia-accent/70 transition-all duration-150 flex flex-col justify-between h-28 text-left cursor-pointer group shadow-xs"
-          >
-            <div class="flex justify-between items-start w-full">
-              <span class="text-xs font-bold uppercase tracking-wider text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">R6\SCRIPTS</span>
-              <div class="flex items-center gap-1 text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">
-                <FileCode2 class="h-4 w-4" />
-                <ArrowUpRight class="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </div>
-            <div>
-              <div class="flex items-baseline gap-1.5">
-                <span class="text-2xl font-bold font-mono text-nvidia-text-primary group-hover:text-nvidia-accent transition-colors">{scanResult?.redscript_active ?? 0}</span>
-                <span class="text-xs font-mono text-nvidia-text-muted">of {scanResult?.redscript_total ?? 0}</span>
-              </div>
-              <p class="text-[10px] text-nvidia-text-muted font-mono mt-0.5 truncate" title="r6/scripts">r6/scripts</p>
-            </div>
-          </button>
-
-          <!-- Card 5: R6\TWEAKS -->
-          <button
-            type="button"
-            onclick={() => setTab('r6tweaks')}
-            class="col-span-1 md:col-span-3 p-4 rounded border border-nvidia-border bg-nvidia-surface/60 hover:bg-nvidia-surface/90 hover:border-nvidia-accent/70 transition-all duration-150 flex flex-col justify-between h-28 text-left cursor-pointer group shadow-xs"
-          >
-            <div class="flex justify-between items-start w-full">
-              <span class="text-xs font-bold uppercase tracking-wider text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">R6\TWEAKS</span>
-              <div class="flex items-center gap-1 text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors">
-                <Sliders class="h-4 w-4" />
-                <ArrowUpRight class="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </div>
-            <div>
-              <div class="flex items-baseline gap-1.5">
-                <span class="text-2xl font-bold font-mono text-nvidia-text-primary group-hover:text-nvidia-accent transition-colors">{scanResult?.r6tweaks_active ?? 0}</span>
-                <span class="text-xs font-mono text-nvidia-text-muted">of {scanResult?.r6tweaks_total ?? 0}</span>
-              </div>
-              <p class="text-[10px] text-nvidia-text-muted font-mono mt-0.5 truncate" title="r6/tweaks">r6/tweaks</p>
-            </div>
-          </button>
-        </div>
-
-        <!-- Recently Added Mods Ledger -->
-        <div class="rounded-lg border border-nvidia-border bg-nvidia-card overflow-hidden flex flex-col shadow-xs">
-          <div
-            role="button"
-            tabindex="0"
-            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') showRecentMods = !showRecentMods; }}
-            onclick={() => showRecentMods = !showRecentMods}
-            class="px-4 py-3 bg-nvidia-surface/60 hover:bg-nvidia-surface/90 flex items-center justify-between cursor-pointer select-none transition-colors"
-          >
-            <div class="flex items-center gap-2.5">
-              <Clock class="h-4 w-4 text-nvidia-accent" />
-              <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Recently Added Mods</span>
-              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-bg border border-nvidia-border text-nvidia-text-muted">
-                {recentMods.length}
-              </span>
-            </div>
-            <div class="flex items-center gap-4" onclick={(e) => e.stopPropagation()} role="presentation">
-              <div class="flex items-center gap-2">
-                <span class="text-[10px] text-nvidia-text-muted uppercase tracking-wider font-semibold">Days:</span>
-                <input
-                  type="number"
-                  min="1"
-                  max="365"
-                  bind:value={recentDaysThreshold}
-                  oninput={handleThresholdChange}
-                  class="w-16 px-2 py-1 bg-nvidia-bg border border-nvidia-border rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent text-center font-mono"
-                  title="Number of days to track"
-                />
-              </div>
-              <button
-                type="button"
-                onclick={() => showRecentMods = !showRecentMods}
-                class="p-1 rounded hover:bg-nvidia-surface text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer"
-              >
-                {#if showRecentMods}
-                  <ChevronDown class="h-4 w-4" />
-                {:else}
-                  <ChevronRight class="h-4 w-4" />
-                {/if}
-              </button>
-            </div>
-          </div>
-
-          {#if showRecentMods}
-            <div class="border-t border-nvidia-border bg-nvidia-bg/50 flex flex-col max-h-96">
-              <!-- Table Header -->
-              <div class="grid grid-cols-[160px_120px_1fr] gap-4 px-4 py-2 border-b border-nvidia-border/60 bg-nvidia-surface/40 text-[10px] font-bold text-nvidia-text-muted uppercase tracking-wider select-none shrink-0">
-                <div class="flex items-center gap-1 cursor-pointer hover:text-nvidia-text-primary transition" onclick={() => handleSort('date')} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter') handleSort('date'); }}>
-                  <span>Date Added</span>
-                  <ArrowUpDown class="h-3 w-3 {sortColumn === 'date' ? 'text-nvidia-accent' : 'opacity-50'}" />
-                </div>
-                <div class="flex items-center gap-1 cursor-pointer hover:text-nvidia-text-primary transition" onclick={() => handleSort('type')} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter') handleSort('type'); }}>
-                  <span>Mod Type</span>
-                  <ArrowUpDown class="h-3 w-3 {sortColumn === 'type' ? 'text-nvidia-accent' : 'opacity-50'}" />
-                </div>
-                <div class="flex items-center gap-1 cursor-pointer hover:text-nvidia-text-primary transition" onclick={() => handleSort('name')} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter') handleSort('name'); }}>
-                  <span>File Name</span>
-                  <ArrowUpDown class="h-3 w-3 {sortColumn === 'name' ? 'text-nvidia-accent' : 'opacity-50'}" />
-                </div>
-              </div>
-
-              <!-- Table Body -->
-              <div class="overflow-y-auto flex-1 p-1 space-y-0.5">
-                {#if sortedRecentMods.length === 0}
-                  <div class="p-6 text-center text-xs text-nvidia-text-muted font-mono">
-                    No new mods detected in the last {recentDaysThreshold || 30} days.
-                  </div>
-                {:else}
-                  {#each sortedRecentMods as entry (entry.path)}
-                    <div
-                      oncontextmenu={(e) => openRecentContextMenu(e, entry)}
-                      class="grid grid-cols-[160px_120px_1fr] gap-4 px-3 rounded hover:bg-nvidia-surface/80 transition items-center cursor-context-menu density-row"
-                    >
-                      <div class="text-[11px] font-mono text-nvidia-text-muted">
-                        {formatTimestamp(entry.first_seen)}
-                      </div>
-                      <div>
-                        <span class="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border bg-nvidia-accent/15 border-nvidia-accent/30 text-nvidia-accent">
-                          {MOD_TYPE_LABELS[entry.mod_type] || entry.mod_type}
-                        </span>
-                      </div>
-                      <div class="text-xs font-mono text-nvidia-text-primary truncate" title={entry.name}>
-                        {entry.name}
-                      </div>
-                    </div>
-                  {/each}
-                {/if}
-              </div>
-            </div>
-          {/if}
-        </div>
-      </div>
-
+      
       <!-- Persistent Tab Views -->
       <div class={currentTab === 'archive' ? 'h-full' : 'hidden'}>
         <ArchiveView
@@ -1049,9 +511,9 @@
         />
       </div>
 
-      <!-- New Full-Screen Views -->
+      <!-- Full-Screen Views -->
       <div class={currentTab === 'settings' ? 'h-full' : 'hidden'}>
-        <SettingsView />
+        <SettingsView bind:gamePath onRefresh={refreshAll} />
       </div>
 
       <div class={currentTab === 'help' ? 'h-full' : 'hidden'}>

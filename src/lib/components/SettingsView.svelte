@@ -1,7 +1,7 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
-  import { open } from '@tauri-apps/plugin-dialog';
+  import { open, message } from '@tauri-apps/plugin-dialog';
   import {
     APP_FONT_PRESETS,
     MOD_FONT_PRESETS,
@@ -27,8 +27,17 @@
     FileCode,
     Palette,
     Play,
-    Trash2
+    Trash2,
+    FolderSearch
   } from 'lucide-svelte';
+
+  let { 
+    gamePath = $bindable(''),
+    onRefresh 
+  }: { 
+    gamePath?: string;
+    onRefresh?: () => void;
+  } = $props();
 
   let draft = $state<ThemeSettings>(loadThemeSettings());
   let currentAccentHex = $state('#76B900');
@@ -77,6 +86,39 @@
       customLaunchPath = config.customLaunchPath || '';
     });
   });
+
+  async function chooseDirectory() {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: 'Select Cyberpunk 2077 Root Folder',
+        defaultPath: gamePath || undefined
+      });
+      
+      if (typeof selected === 'string') {
+        const resolved = await invoke<string | null>('validate_and_resolve_game_path', { candidatePath: selected });
+        if (resolved) {
+          gamePath = resolved;
+          try {
+            const config = await loadConfigFromDisk();
+            config.targetGamePath = resolved;
+            await saveConfigToDisk(config);
+          } catch (e) {
+            console.error('Failed to save updated gamePath:', e);
+          }
+          if (onRefresh) onRefresh();
+        } else {
+          await message(
+            'The selected directory does not appear to be a valid Cyberpunk 2077 root folder (bin\\x64\\Cyberpunk2077.exe was not found).\n\nPlease select the main Cyberpunk 2077 game directory.',
+            { title: 'Invalid Game Directory', kind: 'error' }
+          );
+        }
+      }
+    } catch (err) {
+      console.error('Directory picker failed:', err);
+    }
+  }
 
   function setAccentColor(hex: string) {
     currentAccentHex = hex.toUpperCase();
@@ -256,6 +298,32 @@
   </div>
 
   <div class="flex-1 overflow-y-auto px-6 pb-6 space-y-6">
+    
+    <!-- Game Directory Configuration -->
+    <div class="max-w-4xl">
+      <div class="p-4 rounded-xl border border-nvidia-border bg-nvidia-surface/50 space-y-3">
+        <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-nvidia-text-muted">
+          <FolderSearch class="h-4 w-4 text-nvidia-accent" />
+          <span>Game Directory</span>
+        </div>
+        <p class="text-xs text-nvidia-text-muted leading-tight">
+          Select the root installation folder for Cyberpunk 2077. This is required for the toolbox to function.
+        </p>
+        <div class="flex items-center gap-3">
+          <div class="flex-1 px-3 py-2 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary font-mono truncate select-all">
+            {gamePath || 'No folder selected'}
+          </div>
+          <button
+            type="button"
+            onclick={chooseDirectory}
+            class="px-4 py-2 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs font-semibold text-nvidia-text-primary transition cursor-pointer shrink-0 shadow-xs"
+          >
+            Change Folder...
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Mode Switch -->
     <div class="flex items-center justify-start">
       <div class="flex items-center p-0.5 rounded-lg border border-nvidia-border bg-nvidia-surface/60">

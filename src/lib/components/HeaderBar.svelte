@@ -1,254 +1,233 @@
-<script lang="ts">
+﻿<script lang="ts">
+  import { onMount, onDestroy } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
+  import { info, error } from '@tauri-apps/plugin-log';
+  import { loadConfigFromDisk } from '$lib/theme';
   import { 
     RefreshCw, 
-    FolderSearch, 
-    FolderOpen, 
-    Copy, 
-    Check, 
-    ChevronDown, 
     CheckCircle2, 
     AlertTriangle, 
-    AlertCircle 
+    AlertCircle,
+    Play,
+    X
   } from 'lucide-svelte';
-  import { open, message } from '@tauri-apps/plugin-dialog';
-  import { openPath } from '@tauri-apps/plugin-opener';
-  import { invoke } from '@tauri-apps/api/core';
-  import { loadConfigFromDisk, saveConfigToDisk } from '$lib/theme';
   import type { ScanResult } from '$lib/types';
 
   let { 
-    gamePath = $bindable(''), 
+    gamePath = '', 
     isLoading = false,
     scanResult = null,
+    currentTab = 'archive',
     onRefresh 
   }: { 
     gamePath: string; 
     isLoading: boolean;
     scanResult?: ScanResult | null;
+    currentTab?: string;
     onRefresh: () => void;
   } = $props();
 
-  let isPopoverOpen = $state(false);
-  let copiedFeedback = $state(false);
-  let chipContainerEl = $state<HTMLDivElement | null>(null);
-
   let isValid = $derived(scanResult ? scanResult.is_valid_game_path : (gamePath.length > 0));
 
-  let folderDisplayName = $derived.by(() => {
-    if (!gamePath) return 'No Game Folder Configured';
-    const cleaned = gamePath.replace(/[\\/]+$/, '');
-    const parts = cleaned.split(/[\\/]/);
-    return parts[parts.length - 1] || cleaned;
-  });
+  const tabNames: Record<string, string> = {
+    'archive': 'Archive Mods',
+    'cet': 'CET Plugins',
+    'red4ext': 'RED4ext Plugins',
+    'redscript': 'R6\\Scripts',
+    'r6tweaks': 'R6\\Tweaks',
+    'settings': 'Application Settings',
+    'help': 'Help & Documentation',
+    'about': 'About R4'
+  };
 
-  async function chooseDirectory() {
-    isPopoverOpen = false;
+  let pageTitle = $derived(tabNames[currentTab] || 'R4 Mod Toolbox');
+
+  // Process & Launch State
+  let isLaunching = $state(false);
+  let isEngineSpinningUp = $state(false);
+  let isGameRunning = $state(false);
+  let isConfirmingKill = $state(false);
+  let killConfirmTimer: ReturnType<typeof setTimeout> | null = null;
+  let processInterval: ReturnType<typeof setInterval>;
+
+  async function checkProcess() {
     try {
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        title: 'Select Cyberpunk 2077 Root Folder',
-        defaultPath: gamePath || undefined
-      });
-      
-      if (typeof selected === 'string') {
-        const resolved = await invoke<string | null>('validate_and_resolve_game_path', { candidatePath: selected });
-        if (resolved) {
-          gamePath = resolved;
-          try {
-            const config = await loadConfigFromDisk();
-            config.targetGamePath = resolved;
-            await saveConfigToDisk(config);
-          } catch (e) {
-            console.error('Failed to save updated gamePath:', e);
-          }
-          if (onRefresh) onRefresh();
-        } else {
-          await message(
-            'The selected directory does not appear to be a valid Cyberpunk 2077 root folder (bin\\x64\\Cyberpunk2077.exe was not found).\n\nPlease select the main Cyberpunk 2077 game directory.',
-            { title: 'Invalid Game Directory', kind: 'error' }
-          );
+      const running = await invoke<boolean>('check_game_process_running');
+      if (!running) {
+        isGameRunning = false;
+        isEngineSpinningUp = false;
+        if (isConfirmingKill) {
+          isConfirmingKill = false;
+          if (killConfirmTimer) clearTimeout(killConfirmTimer);
+        }
+      } else {
+        // If running but we aren't tracking it (e.g., launched externally)
+        if (!isGameRunning && !isEngineSpinningUp && !isLaunching) {
+          isGameRunning = true;
         }
       }
     } catch (err) {
-      console.error('Directory picker failed:', err);
+      // non-fatal
     }
   }
 
-  async function handleCopyPath() {
-    if (!gamePath) return;
+  onMount(() => {
+    checkProcess();
+    processInterval = setInterval(checkProcess, 2500);
+  });
+
+  onDestroy(() => {
+    if (processInterval) clearInterval(processInterval);
+    if (killConfirmTimer) clearTimeout(killConfirmTimer);
+  });
+
+  async function handleLaunchGame() {
+    if (!gamePath || isLaunching || isGameRunning || isEngineSpinningUp) return;
+    isLaunching = true;
+    info('Initiating game launch sequence...');
     try {
-      await navigator.clipboard.writeText(gamePath);
-      copiedFeedback = true;
-      setTimeout(() => { copiedFeedback = false; }, 1500);
+      const config = await loadConfigFromDisk();
+      await invoke('launch_game', { gamePath, customLaunchPath: config.customLaunchPath });
+      
+      let attempts = 0;
+      const pollInterval = setInterval(async () => {
+        attempts++;
+        try {
+          const running = await invoke<boolean>('check_game_process_running');
+          if (running) {
+            clearInterval(pollInterval);
+            isLaunching = false;
+            isEngineSpinningUp = true;
+            info('Process detected. Initiating 15s psychological engine load delay...');
+            
+            setTimeout(() => {
+              // Only transition to Now Playing if the process didn't crash during the 15s
+              if (isEngineSpinningUp) {
+                isEngineSpinningUp = false;
+                isGameRunning = true;
+                info('Engine load delay complete. Game is now playing.');
+              }
+            }, 15000);
+          } else if (attempts > 30) {
+            clearInterval(pollInterval);
+            isLaunching = false;
+            error('Launch timeout: Process not detected after 30 seconds.');
+          }
+        } catch {
+          if (attempts > 30) {
+            clearInterval(pollInterval);
+            isLaunching = false;
+          }
+        }
+      }, 1000);
     } catch (err) {
-      console.error('Failed to copy path:', err);
+      error(`Failed to launch game: ${err}`);
+      isLaunching = false;
     }
   }
 
-  async function handleOpenFolder() {
-    if (!gamePath) return;
-    try {
-      await openPath(gamePath);
-    } catch (err) {
-      console.error('Failed to open game path in Explorer:', err);
-    }
-  }
-
-  function handleHardRefresh() {
-    window.location.reload();
-  }
-
-  function handleWindowClick(e: MouseEvent) {
-    if (!isPopoverOpen) return;
-    const target = e.target as Node | null;
-    if (chipContainerEl && target && !chipContainerEl.contains(target)) {
-      isPopoverOpen = false;
+  async function handleKillClick() {
+    if (!isConfirmingKill) {
+      isConfirmingKill = true;
+      if (killConfirmTimer) clearTimeout(killConfirmTimer);
+      killConfirmTimer = setTimeout(() => {
+        isConfirmingKill = false;
+      }, 3500);
+    } else {
+      if (killConfirmTimer) clearTimeout(killConfirmTimer);
+      isConfirmingKill = false;
+      info('User confirmed force kill of Cyberpunk2077.exe');
+      try {
+        await invoke('kill_game_process');
+        setTimeout(checkProcess, 600);
+      } catch (err) {
+        error(`Failed to kill game process: ${err}`);
+      }
     }
   }
 </script>
 
-<svelte:window onclick={handleWindowClick} />
+<header data-tauri-drag-region class="h-16 border-b border-nvidia-border bg-nvidia-bg flex items-center justify-between px-6 select-none shrink-0">
+  <!-- Left: Context Title and Status -->
+  <div class="flex items-center gap-6 pointer-events-none">
+    <!-- Dynamic Breadcrumb Title -->
+    <div class="flex items-center gap-3">
+      <h1 class="text-sm font-bold tracking-wider uppercase text-nvidia-text-primary leading-tight">
+        {pageTitle}
+      </h1>
+    </div>
 
-<header data-tauri-drag-region class="h-16 border-b border-nvidia-border bg-nvidia-bg flex items-center justify-between px-8 select-none">
-  <!-- Left: Compact Status Chip & Dropdown Popover -->
-  <div class="relative" bind:this={chipContainerEl}>
-    <button
-      type="button"
-      onclick={() => isPopoverOpen = !isPopoverOpen}
-      class="flex items-center gap-2.5 px-3 py-1.5 rounded-md border text-xs transition cursor-pointer shadow-xs {isPopoverOpen ? 'bg-nvidia-card border-nvidia-accent/60' : 'bg-nvidia-surface/80 hover:bg-nvidia-card border-nvidia-border hover:border-nvidia-border/90'}"
-      title={gamePath ? `Target: ${gamePath} (Click for details)` : 'Click to configure game folder'}
-    >
-      <!-- Status Dot -->
-      <div class="flex items-center justify-center">
-        {#if !gamePath}
-          <div class="h-2 w-2 rounded-full bg-amber-400"></div>
-        {:else if !isValid}
-          <div class="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.7)]"></div>
-        {:else}
-          <div class="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]"></div>
-        {/if}
-      </div>
+    <!-- Vertical Divider -->
+    <div class="h-8 w-px bg-nvidia-border/60"></div>
 
-      <!-- Main Label -->
-      <span class="font-semibold text-xs {isValid && gamePath ? 'text-nvidia-text-primary' : (gamePath ? 'text-red-400' : 'text-nvidia-text-muted')}">
-        {folderDisplayName}
-      </span>
-
-      <!-- Status Pill -->
+    <!-- Status Indicator -->
+    <div class="flex items-center gap-2">
       {#if !gamePath}
-        <span class="text-[10px] font-mono px-1.5 py-0.2 rounded border bg-amber-500/15 border-amber-500/30 text-amber-400 font-semibold">
-          Setup
-        </span>
+        <AlertTriangle class="h-4 w-4 text-amber-400" />
+        <span class="text-xs font-bold text-amber-400 uppercase tracking-wider">Setup Required</span>
       {:else if !isValid}
-        <span class="text-[10px] font-mono px-1.5 py-0.2 rounded border bg-red-500/15 border-red-500/30 text-red-400 font-semibold">
-          Unverified
-        </span>
+        <AlertCircle class="h-4 w-4 text-red-400" />
+        <span class="text-xs font-bold text-red-400 uppercase tracking-wider">Unverified Path</span>
       {:else}
-        <span class="text-[10px] font-mono px-1.5 py-0.2 rounded border bg-emerald-500/15 border-emerald-500/30 text-emerald-400 font-semibold">
-          Connected
-        </span>
+        <CheckCircle2 class="h-4 w-4 text-emerald-400" />
+        <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider">Cyberpunk 2077 Connected</span>
       {/if}
-
-      <ChevronDown class="h-3 w-3 text-nvidia-text-muted transition-transform duration-200 {isPopoverOpen ? 'rotate-180 text-nvidia-accent' : ''}" />
-    </button>
-
-    <!-- Dropdown Popover -->
-    {#if isPopoverOpen}
-      <div class="absolute left-0 top-full mt-2 w-[420px] rounded-lg bg-nvidia-card border border-nvidia-border shadow-2xl p-4 z-50 text-xs backdrop-blur-md">
-        <!-- Popover Title Row -->
-        <div class="flex items-center justify-between pb-2.5 mb-2.5 border-b border-nvidia-border/60">
-          <div class="flex items-center gap-2">
-            {#if !gamePath}
-              <AlertTriangle class="h-4 w-4 text-amber-400" />
-              <span class="font-bold text-nvidia-text-primary uppercase tracking-wider text-[11px]">No Game Path Configured</span>
-            {:else if !isValid}
-              <AlertCircle class="h-4 w-4 text-red-400" />
-              <span class="font-bold text-red-400 uppercase tracking-wider text-[11px]">Unverified Game Directory</span>
-            {:else}
-              <CheckCircle2 class="h-4 w-4 text-emerald-400" />
-              <span class="font-bold text-nvidia-text-primary uppercase tracking-wider text-[11px]">Cyberpunk 2077 Target</span>
-            {/if}
-          </div>
-          <span class="text-[10px] font-mono text-nvidia-text-muted">
-            {isValid ? 'Ready' : 'Attention'}
-          </span>
-        </div>
-
-        <!-- Full Path Display -->
-        <div class="mb-3">
-          <div class="text-[10px] uppercase tracking-wider text-nvidia-text-muted font-semibold mb-1">
-            Full Game Path
-          </div>
-          <div class="p-2.5 rounded bg-nvidia-bg border border-nvidia-border font-mono text-[11px] text-nvidia-text-primary break-all select-all">
-            {gamePath || 'No folder selected'}
-          </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="flex items-center justify-between pt-1 gap-2">
-          <div class="flex items-center gap-1.5">
-            <button
-              type="button"
-              onclick={handleCopyPath}
-              disabled={!gamePath}
-              class="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
-              title="Copy full path to clipboard"
-            >
-              {#if copiedFeedback}
-                <Check class="h-3.5 w-3.5 text-nvidia-accent" />
-                <span class="text-nvidia-accent font-medium">Copied!</span>
-              {:else}
-                <Copy class="h-3.5 w-3.5 text-nvidia-text-muted" />
-                <span>Copy</span>
-              {/if}
-            </button>
-
-            <button
-              type="button"
-              onclick={handleOpenFolder}
-              disabled={!gamePath}
-              class="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
-              title="Open folder in File Explorer"
-            >
-              <FolderOpen class="h-3.5 w-3.5 text-nvidia-text-muted" />
-              <span>Explorer</span>
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onclick={chooseDirectory}
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs font-semibold text-nvidia-text-primary transition cursor-pointer shadow-xs"
-          >
-            <FolderSearch class="h-3.5 w-3.5 text-nvidia-text-muted" />
-            <span>Change Folder...</span>
-          </button>
-        </div>
-      </div>
-    {/if}
+    </div>
   </div>
 
-  <!-- Right Actions Container -->
-  <div class="flex items-center gap-2.5 shrink-0">
+  <!-- Right: Global Actions -->
+  <div class="flex items-center gap-3 shrink-0">
     <button 
       type="button"
-      onclick={chooseDirectory}
-      class="flex items-center gap-2 px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0 whitespace-nowrap shadow-xs"
-      title="Select or change game installation directory"
-    >
-      <FolderSearch class="h-3.5 w-3.5 text-nvidia-text-muted" />
-      <span>Change Folder</span>
-    </button>
-
-    <button 
-      type="button"
-      onclick={handleHardRefresh}
+      onclick={onRefresh}
       disabled={!gamePath || isLoading}
-      class="flex items-center gap-2 px-3.5 py-1.5 rounded bg-nvidia-accent hover:brightness-105 text-black font-semibold text-xs transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0 whitespace-nowrap shadow-xs"
+      class="flex items-center gap-2 px-4 h-8 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-nvidia-text-primary font-semibold text-xs transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-xs"
     >
-      <RefreshCw class="h-3.5 w-3.5 {isLoading ? 'animate-spin' : ''}" />
+      <RefreshCw class="h-3.5 w-3.5 {isLoading ? 'animate-spin text-nvidia-accent' : 'text-nvidia-text-muted'}" />
       <span>{isLoading ? 'Analyzing...' : 'Sync & Rescan'}</span>
     </button>
+
+    <div class="w-px h-6 bg-nvidia-border/60 mx-1"></div>
+
+    <!-- Launch Game / Process Control -->
+    {#if isGameRunning}
+      <div class="flex items-stretch rounded overflow-hidden border border-nvidia-border bg-nvidia-card shadow-sm text-xs h-8">
+        <div class="flex items-center justify-center gap-2 px-3 bg-nvidia-surface/90 text-nvidia-text-primary select-none">
+          <div class="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse"></div>
+          <span class="font-semibold tracking-wide">Now Playing</span>
+        </div>
+        <button
+          type="button"
+          onclick={handleKillClick}
+          class="w-10 flex items-center justify-center border-l border-nvidia-border transition cursor-pointer {isConfirmingKill ? 'bg-red-600 hover:bg-red-500 text-white font-bold animate-pulse' : 'bg-nvidia-surface/50 hover:bg-red-500/20 text-nvidia-text-muted hover:text-red-400'}"
+          title={isConfirmingKill ? 'Click again to confirm force stop' : 'Force stop (kill process)'}
+        >
+          {#if isConfirmingKill}
+            <span class="text-[9px] uppercase font-bold tracking-tighter">Kill?</span>
+          {:else}
+            <X class="h-3.5 w-3.5" />
+          {/if}
+        </button>
+      </div>
+    {:else if isEngineSpinningUp || isLaunching}
+      <button
+        disabled
+        class="flex items-center justify-center gap-2 px-4 h-8 rounded bg-amber-500/15 border border-amber-500/40 text-amber-400 font-semibold text-xs shadow-sm cursor-wait"
+      >
+        <RefreshCw class="h-3.5 w-3.5 animate-spin" />
+        <span>{isEngineSpinningUp ? 'Loading Engine...' : 'Starting...'}</span>
+      </button>
+    {:else}
+      <button
+        type="button"
+        onclick={handleLaunchGame}
+        disabled={!isValid}
+        class="flex items-center justify-center gap-2 px-4 h-8 rounded bg-nvidia-accent hover:brightness-105 text-black font-semibold text-xs transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+        title={!isValid ? 'Configure a valid game directory to enable launch' : 'Launch Cyberpunk 2077'}
+      >
+        <Play class="h-3.5 w-3.5 fill-black" />
+        <span>Launch Game</span>
+      </button>
+    {/if}
   </div>
 </header>
