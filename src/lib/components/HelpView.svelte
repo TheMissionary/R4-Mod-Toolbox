@@ -1,9 +1,9 @@
-﻿<script lang="ts">
+<script lang="ts">
+  import { invoke } from '@tauri-apps/api/core';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { slide } from 'svelte/transition';
   import {
     HelpCircle,
-    BookOpen,
     Link2,
     AlertTriangle,
     ExternalLink,
@@ -12,10 +12,15 @@
     ChevronDown,
     ChevronRight,
     Star,
-    Code
+    Code,
+    FolderOpen,
+    Trash2,
+    Check
   } from 'lucide-svelte';
 
-  let openSection = $state<string | null>(null);
+  // Default to having the support section open
+  let openSection = $state<string | null>('support');
+  let clearedFeedback = $state(false);
 
   function toggleSection(section: string) {
     openSection = openSection === section ? null : section;
@@ -26,6 +31,24 @@
       await openUrl(url);
     } catch (err) {
       console.error('Failed to open URL:', err);
+    }
+  }
+
+  async function handleOpenLogs() {
+    try {
+      await invoke('open_log_folder');
+    } catch (err) {
+      console.error('Failed to open log folder:', err);
+    }
+  }
+
+  async function handleClearLogs() {
+    try {
+      await invoke('clear_user_log');
+      clearedFeedback = true;
+      setTimeout(() => { clearedFeedback = false; }, 2000);
+    } catch (err) {
+      console.error('Failed to clear logs:', err);
     }
   }
 </script>
@@ -208,114 +231,118 @@
         {/if}
       </div>
 
-    </div>
+      <!-- Accordion 5: Support & Feedback (Open by Default, Moved to Bottom) -->
+      <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col">
+        <button 
+          type="button"
+          onclick={() => toggleSection('support')}
+          class="w-full px-4 py-3 flex items-center justify-between bg-nvidia-surface/60 hover:bg-nvidia-surface/90 transition-colors cursor-pointer"
+        >
+          <div class="flex items-center gap-2.5">
+            <Star class="h-4 w-4 text-amber-500" />
+            <h3 class="text-sm font-bold uppercase tracking-wider">Support & Feedback</h3>
+          </div>
+          {#if openSection === 'support'}
+            <ChevronDown class="h-4 w-4 text-nvidia-text-muted" />
+          {:else}
+            <ChevronRight class="h-4 w-4 text-nvidia-text-muted" />
+          {/if}
+        </button>
+        
+        {#if openSection === 'support'}
+          <div transition:slide={{ duration: 200 }} class="border-t border-nvidia-border/60 bg-nvidia-bg/30">
+            <div class="p-5 space-y-6">
+              
+              <!-- Community Links -->
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onclick={() => handleOpenLink('https://www.nexusmods.com/cyberpunk2077/mods/34691')}
+                  class="flex items-center justify-between p-3 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border hover:border-amber-500/50 transition cursor-pointer group"
+                >
+                  <div class="flex items-center gap-3">
+                    <div class="h-8 w-8 rounded bg-nvidia-card border border-nvidia-border flex items-center justify-center shrink-0 group-hover:border-amber-500/50 transition-colors">
+                      <Star class="h-4 w-4 text-nvidia-text-muted group-hover:text-amber-500 transition-colors" />
+                    </div>
+                    <div class="text-left">
+                      <div class="text-xs font-bold text-nvidia-text-primary">Nexus Mods</div>
+                      <div class="text-[10px] text-nvidia-text-muted">Download updates</div>
+                    </div>
+                  </div>
+                  <ExternalLink class="h-3.5 w-3.5 text-nvidia-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
 
-    <!-- Official R4 Community & Support -->
-    <div class="max-w-4xl mt-8">
-      <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden">
-        <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center gap-2.5">
-          <Star class="h-4 w-4 text-amber-500" />
-          <h3 class="text-sm font-bold uppercase tracking-wider">Official R4 Community & Support</h3>
-        </div>
-        <div class="p-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <button
-            type="button"
-            onclick={() => handleOpenLink('https://www.nexusmods.com/cyberpunk2077/mods/34691')}
-            class="flex items-center justify-between p-3 rounded hover:bg-nvidia-surface border border-transparent hover:border-nvidia-border transition cursor-pointer group"
-          >
-            <div class="flex items-center gap-3">
-              <div class="h-8 w-8 rounded bg-nvidia-card border border-nvidia-border flex items-center justify-center shrink-0 group-hover:border-amber-500/50 transition-colors">
-                <Star class="h-4 w-4 text-nvidia-text-muted group-hover:text-amber-500 transition-colors" />
-              </div>
-              <div class="text-left">
-                <div class="text-xs font-bold text-nvidia-text-primary">Nexus Mods Page</div>
-                <div class="text-[10px] text-nvidia-text-muted">Download updates & join discussions</div>
-              </div>
-            </div>
-            <ExternalLink class="h-3.5 w-3.5 text-nvidia-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
-          </button>
+                <button
+                  type="button"
+                  onclick={() => handleOpenLink('https://github.com/TheMissionary/R4-Mod-Toolbox')}
+                  class="flex items-center justify-between p-3 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border hover:border-nvidia-accent/50 transition cursor-pointer group"
+                >
+                  <div class="flex items-center gap-3">
+                    <div class="h-8 w-8 rounded bg-nvidia-card border border-nvidia-border flex items-center justify-center shrink-0 group-hover:border-nvidia-accent transition-colors">
+                      <Code class="h-4 w-4 text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors" />
+                    </div>
+                    <div class="text-left">
+                      <div class="text-xs font-bold text-nvidia-text-primary">GitHub Repo</div>
+                      <div class="text-[10px] text-nvidia-text-muted">View source code</div>
+                    </div>
+                  </div>
+                  <ExternalLink class="h-3.5 w-3.5 text-nvidia-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
 
-          <button
-            type="button"
-            onclick={() => handleOpenLink('https://github.com/TheMissionary/R4-Mod-Toolbox')}
-            class="flex items-center justify-between p-3 rounded hover:bg-nvidia-surface border border-transparent hover:border-nvidia-border transition cursor-pointer group"
-          >
-            <div class="flex items-center gap-3">
-              <div class="h-8 w-8 rounded bg-nvidia-card border border-nvidia-border flex items-center justify-center shrink-0 group-hover:border-nvidia-accent transition-colors">
-                <Code class="h-4 w-4 text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors" />
+                <button
+                  type="button"
+                  onclick={() => handleOpenLink('https://github.com/TheMissionary/R4-Mod-Toolbox/issues')}
+                  class="flex items-center justify-between p-3 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border hover:border-red-400/50 transition cursor-pointer group"
+                >
+                  <div class="flex items-center gap-3">
+                    <div class="h-8 w-8 rounded bg-nvidia-card border border-nvidia-border flex items-center justify-center shrink-0 group-hover:border-red-400/50 transition-colors">
+                      <AlertTriangle class="h-4 w-4 text-nvidia-text-muted group-hover:text-red-400 transition-colors" />
+                    </div>
+                    <div class="text-left">
+                      <div class="text-xs font-bold text-nvidia-text-primary">Report Issue</div>
+                      <div class="text-[10px] text-nvidia-text-muted">Submit bug reports</div>
+                    </div>
+                  </div>
+                  <ExternalLink class="h-3.5 w-3.5 text-nvidia-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
               </div>
-              <div class="text-left">
-                <div class="text-xs font-bold text-nvidia-text-primary">GitHub Repository</div>
-                <div class="text-[10px] text-nvidia-text-muted">View source code & track development</div>
-              </div>
-            </div>
-            <ExternalLink class="h-3.5 w-3.5 text-nvidia-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
-          </button>
 
-          <button
-            type="button"
-            onclick={() => handleOpenLink('https://github.com/TheMissionary/R4-Mod-Toolbox/issues')}
-            class="flex items-center justify-between p-3 rounded hover:bg-nvidia-surface border border-transparent hover:border-nvidia-border transition cursor-pointer group"
-          >
-            <div class="flex items-center gap-3">
-              <div class="h-8 w-8 rounded bg-nvidia-card border border-nvidia-border flex items-center justify-center shrink-0 group-hover:border-red-400/50 transition-colors">
-                <AlertTriangle class="h-4 w-4 text-nvidia-text-muted group-hover:text-red-400 transition-colors" />
+              <div class="h-px bg-nvidia-border/50"></div>
+
+              <!-- Diagnostic Logs -->
+              <div>
+                <h4 class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider mb-1">Diagnostic Logs</h4>
+                <p class="text-[11px] text-nvidia-text-muted mb-3">Application logs are saved automatically. Use these files when reporting issues to the developer.</p>
+                <div class="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onclick={handleOpenLogs}
+                    class="flex items-center gap-2 px-4 py-2 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shadow-xs"
+                  >
+                    <FolderOpen class="h-4 w-4 text-nvidia-text-muted" />
+                    <span>Open Log Folder</span>
+                  </button>
+                  <button
+                    type="button"
+                    onclick={handleClearLogs}
+                    class="flex items-center gap-2 px-4 py-2 rounded bg-nvidia-surface hover:bg-red-500/10 border border-nvidia-border hover:border-red-500/30 text-xs text-nvidia-text-primary hover:text-red-400 transition cursor-pointer shadow-xs"
+                  >
+                    {#if clearedFeedback}
+                      <Check class="h-4 w-4 text-nvidia-accent" />
+                      <span class="text-nvidia-accent">Cleared!</span>
+                    {:else}
+                      <Trash2 class="h-4 w-4" />
+                      <span>Clear User Logs</span>
+                    {/if}
+                  </button>
+                </div>
               </div>
-              <div class="text-left">
-                <div class="text-xs font-bold text-nvidia-text-primary">Report an Issue</div>
-                <div class="text-[10px] text-nvidia-text-muted">Submit bug reports to the developer</div>
-              </div>
+
             </div>
-            <ExternalLink class="h-3.5 w-3.5 text-nvidia-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
-          </button>
-        </div>
+          </div>
+        {/if}
       </div>
+
     </div>
-
-    <!-- General Modding Resources -->
-    <div class="max-w-4xl mt-6">
-      <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden">
-        <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center gap-2.5">
-          <BookOpen class="h-4 w-4 text-nvidia-accent" />
-          <h3 class="text-sm font-bold uppercase tracking-wider">General Modding Resources</h3>
-        </div>
-        <div class="p-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <button
-            type="button"
-            onclick={() => handleOpenLink('https://wiki.redmodding.org/')}
-            class="flex items-center justify-between p-3 rounded hover:bg-nvidia-surface border border-transparent hover:border-nvidia-border transition cursor-pointer group"
-          >
-            <div class="flex items-center gap-3">
-              <div class="h-8 w-8 rounded bg-nvidia-card border border-nvidia-border flex items-center justify-center shrink-0 group-hover:border-nvidia-accent transition-colors">
-                <BookOpen class="h-4 w-4 text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors" />
-              </div>
-              <div class="text-left">
-                <div class="text-xs font-bold text-nvidia-text-primary">REDmodding Wiki</div>
-                <div class="text-[10px] text-nvidia-text-muted">Official modding documentation</div>
-              </div>
-            </div>
-            <ExternalLink class="h-3.5 w-3.5 text-nvidia-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
-          </button>
-
-          <button
-            type="button"
-            onclick={() => handleOpenLink('https://wiki.redmodding.org/cyber-engine-tweaks/')}
-            class="flex items-center justify-between p-3 rounded hover:bg-nvidia-surface border border-transparent hover:border-nvidia-border transition cursor-pointer group"
-          >
-            <div class="flex items-center gap-3">
-              <div class="h-8 w-8 rounded bg-nvidia-card border border-nvidia-border flex items-center justify-center shrink-0 group-hover:border-nvidia-accent transition-colors">
-                <Cpu class="h-4 w-4 text-nvidia-text-muted group-hover:text-nvidia-accent transition-colors" />
-              </div>
-              <div class="text-left">
-                <div class="text-xs font-bold text-nvidia-text-primary">CET Wiki</div>
-                <div class="text-[10px] text-nvidia-text-muted">Cyber Engine Tweaks guide</div>
-              </div>
-            </div>
-            <ExternalLink class="h-3.5 w-3.5 text-nvidia-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
-          </button>
-        </div>
-      </div>
-    </div>
-
   </div>
 </div>

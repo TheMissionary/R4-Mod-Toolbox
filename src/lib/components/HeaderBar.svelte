@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { info, error } from '@tauri-apps/plugin-log';
@@ -28,20 +28,6 @@
   } = $props();
 
   let isValid = $derived(scanResult ? scanResult.is_valid_game_path : (gamePath.length > 0));
-
-  const tabNames: Record<string, string> = {
-    'archive': 'Archive Mods',
-    'cet': 'CET Plugins',
-    'red4ext': 'RED4ext Plugins',
-    'redscript': 'R6\\Scripts',
-    'r6tweaks': 'R6\\Tweaks',
-    'history': 'Mod History & Ledger',
-    'settings': 'Application Settings',
-    'help': 'Help & Documentation',
-    'about': 'About R4'
-  };
-
-  let pageTitle = $derived(tabNames[currentTab] || 'R4 Mod Toolbox');
 
   // Process & Launch State
   let isLaunching = $state(false);
@@ -151,10 +137,10 @@
 <header data-tauri-drag-region class="h-16 border-b border-nvidia-border bg-nvidia-bg flex items-center justify-between px-6 select-none shrink-0">
   <!-- Left: Context Title and Status -->
   <div class="flex items-center gap-6 pointer-events-none">
-    <!-- Dynamic Breadcrumb Title -->
+    <!-- Static App Title -->
     <div class="flex items-center gap-3">
       <h1 class="text-sm font-bold tracking-wider uppercase text-nvidia-text-primary leading-tight">
-        {pageTitle}
+        R4 MOD TOOLBOX
       </h1>
     </div>
 

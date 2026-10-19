@@ -18,20 +18,16 @@
     Settings,
     Sun,
     Moon,
-    GripVertical,
     Type,
     Sparkles,
-    FolderOpen,
-    FileCode,
     Palette,
-    Play,
-    Trash2,
     FolderSearch,
-    Folder,
     ChevronDown,
     ChevronRight,
-    MoreVertical,
-    Crown
+    Wrench,
+    GripVertical,
+    Folder,
+    FileCode
   } from 'lucide-svelte';
 
   let { 
@@ -51,7 +47,8 @@
   let customEditorPath = $state('');
   let customLaunchPath = $state('');
   let isDirty = $state(false);
-  let clearedFeedback = $state(false);
+  
+  let showAdvancedIntegrations = $state(false);
 
   let activeColors = $derived(draft.mode === 'light' ? draft.lightColors : draft.darkColors);
 
@@ -268,24 +265,6 @@
       console.error('Failed to save config:', err);
     }
   }
-
-  async function handleOpenLogs() {
-    try {
-      await invoke('open_log_folder');
-    } catch (err) {
-      console.error('Failed to open log folder:', err);
-    }
-  }
-
-  async function handleClearLogs() {
-    try {
-      await invoke('clear_user_log');
-      clearedFeedback = true;
-      setTimeout(() => { clearedFeedback = false; }, 2000);
-    } catch (err) {
-      console.error('Failed to clear logs:', err);
-    }
-  }
 </script>
 
 <div class="flex flex-col h-full overflow-hidden bg-nvidia-bg text-nvidia-text-primary">
@@ -304,22 +283,18 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl">
       
       <!-- Left Column: Directories & Integrations -->
-      <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 flex flex-col h-fit">
-        <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center gap-2.5">
-          <FolderSearch class="h-4 w-4 text-nvidia-accent" />
-          <h3 class="text-sm font-bold uppercase tracking-wider">Directories & Integrations</h3>
-        </div>
-        
-        <div class="p-5 space-y-6">
-          <!-- Game Directory -->
-          <div class="space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-semibold text-nvidia-text-primary">Game Directory <span class="text-red-400">*</span></span>
-            </div>
+      <div class="flex flex-col gap-4">
+        <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 flex flex-col h-fit">
+          <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center gap-2.5">
+            <FolderSearch class="h-4 w-4 text-nvidia-accent" />
+            <h3 class="text-sm font-bold uppercase tracking-wider">Game Directory</h3>
+          </div>
+          
+          <div class="p-5 space-y-2">
             <p class="text-[11px] text-nvidia-text-muted leading-tight">
               The root installation folder for Cyberpunk 2077. Required for the toolbox to function.
             </p>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 pt-1">
               <div class="flex-1 px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary font-mono truncate select-all">
                 {gamePath || 'No folder selected'}
               </div>
@@ -332,94 +307,119 @@
               </button>
             </div>
           </div>
+        </div>
 
-          <div class="h-px bg-nvidia-border/50"></div>
-
-          <!-- Custom Launch Path -->
-          <div class="space-y-2">
-            <span class="text-xs font-semibold text-nvidia-text-primary">Custom Launch Path</span>
-            <p class="text-[11px] text-nvidia-text-muted leading-tight">
-              Select a custom executable or shortcut (.lnk) to launch instead of the default Cyberpunk2077.exe.
-            </p>
-            <div class="flex items-center gap-2">
-              <input
-                type="text"
-                bind:value={customLaunchPath}
-                oninput={markDirty}
-                placeholder="Leave blank for default"
-                class="flex-1 px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/50 focus:outline-none focus:border-nvidia-accent font-mono"
-              />
-              <button
-                type="button"
-                onclick={handleBrowseLaunchPath}
-                class="px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0"
-              >
-                Browse...
-              </button>
+        <!-- Advanced Integrations Collapsible -->
+        <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 flex flex-col h-fit overflow-hidden transition-all">
+          <button
+            type="button"
+            onclick={() => showAdvancedIntegrations = !showAdvancedIntegrations}
+            class="w-full px-4 py-3 bg-nvidia-surface/60 hover:bg-nvidia-surface/90 flex items-center justify-between cursor-pointer transition-colors"
+          >
+            <div class="flex items-center gap-2.5">
+              <Wrench class="h-4 w-4 text-nvidia-text-muted" />
+              <h3 class="text-sm font-bold uppercase tracking-wider">Advanced Integrations</h3>
             </div>
-          </div>
+            {#if showAdvancedIntegrations}
+              <ChevronDown class="h-4 w-4 text-nvidia-text-muted" />
+            {:else}
+              <ChevronRight class="h-4 w-4 text-nvidia-text-muted" />
+            {/if}
+          </button>
 
-          <div class="h-px bg-nvidia-border/50"></div>
+          {#if showAdvancedIntegrations}
+            <div class="p-5 space-y-6 border-t border-nvidia-border/60 bg-nvidia-bg/30">
+              <!-- Custom Launch Path -->
+              <div class="space-y-2">
+                <span class="text-xs font-semibold text-nvidia-text-primary">Custom Launch Path</span>
+                <p class="text-[11px] text-nvidia-text-muted leading-tight">
+                  Select a custom executable or shortcut (.lnk) to launch instead of the default Cyberpunk2077.exe.
+                </p>
+                <div class="flex items-center gap-2">
+                  <input
+                    type="text"
+                    bind:value={customLaunchPath}
+                    oninput={markDirty}
+                    placeholder="Leave blank for default"
+                    class="flex-1 px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/50 focus:outline-none focus:border-nvidia-accent font-mono"
+                  />
+                  <button
+                    type="button"
+                    onclick={handleBrowseLaunchPath}
+                    class="px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0"
+                  >
+                    Browse...
+                  </button>
+                </div>
+              </div>
 
-          <!-- Custom Text Editor -->
-          <div class="space-y-2">
-            <span class="text-xs font-semibold text-nvidia-text-primary">Custom Text Editor</span>
-            <p class="text-[11px] text-nvidia-text-muted leading-tight">
-              Select an executable (e.g., VS Code, Notepad++) to open configuration files.
-            </p>
-            <div class="flex items-center gap-2">
-              <input
-                type="text"
-                bind:value={customEditorPath}
-                oninput={markDirty}
-                placeholder="Leave blank for Notepad"
-                class="flex-1 px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/50 focus:outline-none focus:border-nvidia-accent font-mono"
-              />
-              <button
-                type="button"
-                onclick={handleBrowseEditor}
-                class="px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0"
-              >
-                Browse...
-              </button>
+              <div class="h-px bg-nvidia-border/50"></div>
+
+              <!-- Custom Text Editor -->
+              <div class="space-y-2">
+                <span class="text-xs font-semibold text-nvidia-text-primary">Custom Text Editor</span>
+                <p class="text-[11px] text-nvidia-text-muted leading-tight">
+                  Select an executable (e.g., VS Code, Notepad++) to open configuration files.
+                </p>
+                <div class="flex items-center gap-2">
+                  <input
+                    type="text"
+                    bind:value={customEditorPath}
+                    oninput={markDirty}
+                    placeholder="Leave blank for Notepad"
+                    class="flex-1 px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/50 focus:outline-none focus:border-nvidia-accent font-mono"
+                  />
+                  <button
+                    type="button"
+                    onclick={handleBrowseEditor}
+                    class="px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0"
+                  >
+                    Browse...
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          {/if}
         </div>
       </div>
 
-      <!-- Right Column: Appearance & Preview -->
-      <div class="flex flex-col gap-6">
-        
-        <!-- Appearance & Typography -->
-        <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 flex flex-col h-fit">
-          <div class="px-4 py-2.5 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center justify-between">
-            <div class="flex items-center gap-2.5">
-              <Palette class="h-4 w-4 text-nvidia-accent" />
-              <h3 class="text-sm font-bold uppercase tracking-wider">Appearance & Typography</h3>
-            </div>
-            
-            <!-- Integrated Mode Switch -->
-            <div class="flex items-center p-0.5 rounded border border-nvidia-border bg-nvidia-bg">
-              <button
-                type="button"
-                onclick={() => handleModeToggle('dark')}
-                class="flex items-center gap-1.5 px-2 py-1 rounded-sm text-[10px] font-bold uppercase tracking-wider transition cursor-pointer {draft.mode === 'dark' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
-              >
-                <Moon class="h-3 w-3 text-nvidia-accent" />
-                <span>Dark</span>
-              </button>
-              <button
-                type="button"
-                onclick={() => handleModeToggle('light')}
-                class="flex items-center gap-1.5 px-2 py-1 rounded-sm text-[10px] font-bold uppercase tracking-wider transition cursor-pointer {draft.mode === 'light' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
-              >
-                <Sun class="h-3 w-3 text-amber-500" />
-                <span>Light</span>
-              </button>
-            </div>
-          </div>
+      <!-- Right Column: Unified Theme Engine -->
+      <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 flex flex-col h-fit">
+        <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center gap-2.5">
+          <Palette class="h-4 w-4 text-nvidia-accent" />
+          <h3 class="text-sm font-bold uppercase tracking-wider">Appearance & Theming</h3>
+        </div>
 
-          <div class="p-5 space-y-5">
+        <div class="p-5 space-y-6">
+          
+          <!-- Top Row: Mode & Accent -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <!-- Mode Switch -->
+            <div class="space-y-2">
+              <div class="flex items-center gap-2 text-xs font-semibold text-nvidia-text-primary">
+                <Sun class="h-3.5 w-3.5 text-nvidia-text-muted" />
+                <span>Color Mode</span>
+              </div>
+              <div class="flex items-center p-0.5 rounded border border-nvidia-border bg-nvidia-bg w-fit">
+                <button
+                  type="button"
+                  onclick={() => handleModeToggle('dark')}
+                  class="flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider transition cursor-pointer {draft.mode === 'dark' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
+                >
+                  <Moon class="h-3.5 w-3.5 text-nvidia-accent" />
+                  <span>Dark</span>
+                </button>
+                <button
+                  type="button"
+                  onclick={() => handleModeToggle('light')}
+                  class="flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider transition cursor-pointer {draft.mode === 'light' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
+                >
+                  <Sun class="h-3.5 w-3.5 text-amber-500" />
+                  <span>Light</span>
+                </button>
+              </div>
+            </div>
+
             <!-- Accent Color -->
             <div class="space-y-2">
               <div class="flex items-center gap-2 text-xs font-semibold text-nvidia-text-primary">
@@ -442,201 +442,148 @@
                   oninput={handleManualHexInput}
                   placeholder="#76B900"
                   maxlength="7"
-                  class="w-32 px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs font-mono text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent uppercase text-center font-bold tracking-wider"
+                  class="w-28 px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs font-mono text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent uppercase text-center font-bold tracking-wider"
                 />
               </div>
             </div>
+          </div>
 
-            <div class="h-px bg-nvidia-border/50"></div>
+          <div class="h-px bg-nvidia-border/50"></div>
 
-            <!-- Typography Grid -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div class="space-y-2">
-                <div class="flex items-center gap-2 text-xs font-semibold text-nvidia-text-primary">
-                  <Type class="h-3.5 w-3.5 text-nvidia-accent" />
-                  <span>App Font</span>
-                </div>
-                <select
-                  onchange={handleBasePresetChange}
-                  class="w-full px-2 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent cursor-pointer font-sans"
-                >
-                  {#each APP_FONT_PRESETS as preset}
-                    <option value={preset.value} selected={selectedBasePreset === preset.value} class="bg-nvidia-surface text-nvidia-text-primary">
-                      {preset.label}
-                    </option>
-                  {/each}
-                  <option value="custom" selected={selectedBasePreset === 'custom'} class="bg-nvidia-surface text-nvidia-accent font-semibold">
-                    + Custom Font...
+          <!-- Typography Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <div class="flex items-center gap-2 text-xs font-semibold text-nvidia-text-primary">
+                <Type class="h-3.5 w-3.5 text-nvidia-accent" />
+                <span>App Font</span>
+              </div>
+              <select
+                onchange={handleBasePresetChange}
+                class="w-full px-2 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent cursor-pointer font-sans"
+              >
+                {#each APP_FONT_PRESETS as preset}
+                  <option value={preset.value} selected={selectedBasePreset === preset.value} class="bg-nvidia-surface text-nvidia-text-primary">
+                    {preset.label}
                   </option>
-                </select>
-                {#if selectedBasePreset === 'custom'}
-                  <input
-                    type="text"
-                    bind:value={customBaseInput}
-                    oninput={handleCustomBaseInput}
-                    placeholder="Font name..."
-                    class="w-full px-2 py-1.5 bg-nvidia-surface border border-nvidia-accent/60 rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent"
-                  />
-                {/if}
-              </div>
+                {/each}
+                <option value="custom" selected={selectedBasePreset === 'custom'} class="bg-nvidia-surface text-nvidia-accent font-semibold">
+                  + Custom Font...
+                </option>
+              </select>
+              {#if selectedBasePreset === 'custom'}
+                <input
+                  type="text"
+                  bind:value={customBaseInput}
+                  oninput={handleCustomBaseInput}
+                  placeholder="Font name..."
+                  class="w-full px-2 py-1.5 bg-nvidia-surface border border-nvidia-accent/60 rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent"
+                />
+              {/if}
+            </div>
 
-              <div class="space-y-2">
-                <div class="flex items-center gap-2 text-xs font-semibold text-nvidia-text-primary">
-                  <FileCode class="h-3.5 w-3.5 text-cyan-400" />
-                  <span>Mod Font</span>
-                </div>
-                <select
-                  onchange={handleModsPresetChange}
-                  class="w-full px-2 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-cyan-400 cursor-pointer font-sans"
-                >
-                  {#each MOD_FONT_PRESETS as preset}
-                    <option value={preset.value} selected={selectedModsPreset === preset.value} class="bg-nvidia-surface text-nvidia-text-primary">
-                      {preset.label}
-                    </option>
-                  {/each}
-                  <option value="custom" selected={selectedModsPreset === 'custom'} class="bg-nvidia-surface text-cyan-400 font-semibold">
-                    + Custom Font...
+            <div class="space-y-2">
+              <div class="flex items-center gap-2 text-xs font-semibold text-nvidia-text-primary">
+                <FileCode class="h-3.5 w-3.5 text-cyan-400" />
+                <span>Mod Font</span>
+              </div>
+              <select
+                onchange={handleModsPresetChange}
+                class="w-full px-2 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-cyan-400 cursor-pointer font-sans"
+              >
+                {#each MOD_FONT_PRESETS as preset}
+                  <option value={preset.value} selected={selectedModsPreset === preset.value} class="bg-nvidia-surface text-nvidia-text-primary">
+                    {preset.label}
                   </option>
-                </select>
-                {#if selectedModsPreset === 'custom'}
-                  <input
-                    type="text"
-                    bind:value={customModsInput}
-                    oninput={handleCustomModsInput}
-                    placeholder="Font name..."
-                    class="w-full px-2 py-1.5 bg-nvidia-surface border border-cyan-500/60 rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-cyan-400"
-                  />
-                {/if}
+                {/each}
+                <option value="custom" selected={selectedModsPreset === 'custom'} class="bg-nvidia-surface text-cyan-400 font-semibold">
+                  + Custom Font...
+                </option>
+              </select>
+              {#if selectedModsPreset === 'custom'}
+                <input
+                  type="text"
+                  bind:value={customModsInput}
+                  oninput={handleCustomModsInput}
+                  placeholder="Font name..."
+                  class="w-full px-2 py-1.5 bg-nvidia-surface border border-cyan-500/60 rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-cyan-400"
+                />
+              {/if}
+            </div>
+          </div>
+
+          <!-- Live Preview Mockup -->
+          <div class="pt-2">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-nvidia-text-muted mb-2">Live Preview</div>
+            <div
+              class="rounded-lg border overflow-hidden flex flex-col shadow-inner"
+              style="
+                background-color: {activeColors.bg};
+                border-color: {activeColors.border};
+                font-family: {draft.fontFamilyBase};
+              "
+            >
+              <!-- Mini Header -->
+              <div class="px-3 py-2 border-b flex items-center justify-between" style="background-color: {activeColors.surface}; border-color: {activeColors.border};">
+                <div class="flex items-center gap-2">
+                  <div class="h-4 w-4 rounded flex items-center justify-center text-[8px] font-black" style="background-color: {activeColors.accent}; color: var(--theme-accent-contrast);">R4</div>
+                  <span class="text-[10px] font-bold tracking-wider uppercase" style="color: {activeColors.textPrimary};">R4 Mod Toolbox</span>
+                </div>
+                <div class="h-4 w-16 rounded" style="background-color: {activeColors.card}; border: 1px solid {activeColors.border};"></div>
+              </div>
+              
+              <!-- Mini Body -->
+              <div class="p-3 space-y-1.5">
+                <!-- Category -->
+                <div class="rounded border px-2 py-1 flex items-center gap-2 relative overflow-hidden" style="background-color: {activeColors.accent}14; border-color: {activeColors.accent}59;">
+                  <div class="absolute left-0 top-0 bottom-0 w-0.5" style="background-color: {activeColors.accent};"></div>
+                  <ChevronDown class="h-3 w-3" style="color: {activeColors.textMuted};" />
+                  <Folder class="h-3 w-3" style="color: {activeColors.textMuted};" />
+                  <span class="text-[9px] font-bold uppercase tracking-wider" style="color: {activeColors.textPrimary};">Core Framework</span>
+                </div>
+                
+                <!-- Mod -->
+                <div class="rounded border px-2 py-1 flex items-center justify-between ml-2" style="background-color: {activeColors.surface}; border-color: {activeColors.border};">
+                  <div class="flex items-center gap-1.5">
+                    <GripVertical class="h-3 w-3" style="color: {activeColors.textMuted};" />
+                    <div class="w-5 h-3 rounded-full relative p-0.5" style="background-color: {activeColors.accent};">
+                      <div class="h-2 w-2 rounded-full bg-black translate-x-2"></div>
+                    </div>
+                    <span class="text-[10px]" style="color: {activeColors.textPrimary}; font-family: {draft.fontFamilyMods};">EquipmentEx.archive</span>
+                    <span class="text-[7px] font-bold px-1 py-0.5 rounded border" style="background-color: #083344cc; color: #22d3ee; border-color: #0e749099; font-family: {draft.fontFamilyMods};">XL</span>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <div class="h-1.5 w-1.5 rounded-full bg-[#22c55e]" style="box-shadow: 0 0 4px rgba(34,197,94,0.7);"></div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+
         </div>
-
-        <!-- Live Preview Mockup -->
-        <div
-          class="rounded-xl border shadow-inner p-4 space-y-3 transition-colors duration-200"
-          style="
-            background-color: {activeColors.bg};
-            border-color: {activeColors.border};
-            font-family: {draft.fontFamilyBase};
-            color: {activeColors.textPrimary};
-          "
-        >
-          <div class="flex items-center gap-1.5 opacity-60 mb-2" style="color: {activeColors.textPrimary};">
-            <Palette class="h-3.5 w-3.5" style="color: {activeColors.accent};" />
-            <span class="text-[10px] font-bold uppercase tracking-wider">Theme Preview</span>
-          </div>
-
-          <!-- Mock Category Row -->
-          <div
-            class="rounded-lg border flex items-center justify-between px-3 py-1.5 relative overflow-hidden"
-            style="background-color: {activeColors.accent}14; border-color: {activeColors.accent}59;"
-          >
-            <div class="absolute left-0 top-0 bottom-0 w-1" style="background-color: {activeColors.accent};"></div>
-            <div class="flex items-center gap-3 pl-1">
-              <GripVertical class="h-4 w-4" style="color: {activeColors.textMuted};" />
-              <div class="w-7 h-4 rounded-full relative p-0.5 shrink-0" style="background-color: #3f3f46; border: 1px solid #52525b;">
-                <div class="h-2.5 w-2.5 rounded-full bg-zinc-100 translate-x-3"></div>
-              </div>
-              <div class="flex items-center gap-1.5">
-                <ChevronDown class="h-4 w-4" style="color: {activeColors.textMuted};" />
-                <Folder class="h-4 w-4" style="color: {activeColors.textMuted};" />
-                <span class="font-bold uppercase tracking-wider text-xs">CORE FRAMEWORK</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Mock Mod Row -->
-          <div
-            class="rounded border flex items-center justify-between px-3 ml-3"
-            style="
-              background-color: {activeColors.surface};
-              border-color: {activeColors.border};
-              height: 1.75rem;
-            "
-          >
-            <div class="flex items-center gap-2.5 min-w-0">
-              <GripVertical class="h-3.5 w-3.5 shrink-0" style="color: {activeColors.textMuted};" />
-              <div class="w-7 h-4 rounded-full relative p-0.5 shrink-0" style="background-color: #3f3f46; border: 1px solid #52525b;">
-                <div class="h-2.5 w-2.5 rounded-full bg-zinc-100 translate-x-3"></div>
-              </div>
-              <span class="text-[10px] px-1 py-0.2 rounded border shrink-0" style="background-color: {activeColors.card}; color: {activeColors.textMuted}; border-color: {activeColors.border}; font-family: {draft.fontFamilyMods};">
-                #1
-              </span>
-              <span class="text-[11px] font-medium truncate" style="color: {activeColors.textPrimary}; font-family: {draft.fontFamilyMods};">
-                EquipmentEx.archive
-              </span>
-              <span class="text-[9px] font-bold px-1.5 py-0.2 rounded border shrink-0" style="background-color: #083344cc; color: #22d3ee; border-color: #0e749099; font-family: {draft.fontFamilyMods};">
-                XL
-              </span>
-            </div>
-
-            <div class="flex items-center gap-2 shrink-0">
-              <div class="w-3 flex items-center justify-center shrink-0">
-                <div class="h-2.5 w-2.5 rounded-full bg-[#22c55e]" style="box-shadow: 0 0 6px rgba(34,197,94,0.7);"></div>
-              </div>
-              <div class="flex items-center gap-1 px-1 py-0.5 rounded text-[11px]" style="color: {activeColors.textMuted}; font-family: {draft.fontFamilyMods};">
-                <span class="font-medium">2</span>
-                <ChevronRight class="h-3 w-3" />
-              </div>
-              <MoreVertical class="h-3.5 w-3.5" style="color: {activeColors.textMuted};" />
-            </div>
-          </div>
-        </div>
-
       </div>
     </div>
   </div>
 
   <!-- Footer Action Bar -->
-  <div class="px-6 py-4 border-t border-nvidia-border bg-nvidia-surface/40 flex items-center justify-between shrink-0">
-    
-    <!-- Diagnostics moved to footer -->
-    <div class="flex items-center gap-2">
-      <button
-        type="button"
-        onclick={handleClearLogs}
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded hover:bg-red-500/10 border border-transparent hover:border-red-500/30 text-xs text-nvidia-text-muted hover:text-red-400 transition cursor-pointer"
-      >
-        {#if clearedFeedback}
-          <Check class="h-3.5 w-3.5 text-nvidia-accent" />
-          <span class="text-nvidia-accent">Cleared!</span>
-        {:else}
-          <Trash2 class="h-3.5 w-3.5" />
-          <span>Clear Logs</span>
-        {/if}
-      </button>
-      <div class="w-px h-4 bg-nvidia-border/60"></div>
-      <button
-        type="button"
-        onclick={handleOpenLogs}
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded hover:bg-nvidia-surface border border-transparent hover:border-nvidia-border text-xs text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer"
-      >
-        <FolderOpen class="h-3.5 w-3.5" />
-        <span>Open Log Folder</span>
-      </button>
-    </div>
+  <div class="px-6 py-4 border-t border-nvidia-border bg-nvidia-surface/40 flex items-center justify-end shrink-0 gap-3">
+    <button
+      type="button"
+      onclick={handleResetDefault}
+      class="flex items-center gap-2 px-4 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer"
+      title="Restore factory default for active mode"
+    >
+      <RotateCcw class="h-3.5 w-3.5 text-nvidia-text-muted" />
+      <span>Reset {draft.mode === 'light' ? 'Light' : 'Dark'} Defaults</span>
+    </button>
 
-    <div class="flex items-center gap-3">
-      <button
-        type="button"
-        onclick={handleResetDefault}
-        class="flex items-center gap-2 px-4 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer"
-        title="Restore factory default for active mode"
-      >
-        <RotateCcw class="h-3.5 w-3.5 text-nvidia-text-muted" />
-        <span>Reset {draft.mode === 'light' ? 'Light' : 'Dark'} Defaults</span>
-      </button>
-
-      <button
-        type="button"
-        onclick={handleApply}
-        disabled={!isDirty}
-        class="flex items-center gap-2 px-6 py-1.5 rounded font-semibold text-xs transition shadow-sm cursor-pointer {isDirty ? 'bg-nvidia-accent hover:brightness-105 text-black' : 'bg-nvidia-surface text-nvidia-text-muted border border-nvidia-border cursor-not-allowed'}"
-      >
-        <Check class="h-4 w-4 {isDirty ? 'stroke-[2.5]' : ''}" />
-        <span>{isDirty ? 'Apply Settings' : 'Settings Saved'}</span>
-      </button>
-    </div>
+    <button
+      type="button"
+      onclick={handleApply}
+      disabled={!isDirty}
+      class="flex items-center gap-2 px-6 py-1.5 rounded font-semibold text-xs transition shadow-sm cursor-pointer {isDirty ? 'bg-nvidia-accent hover:brightness-105 text-black' : 'bg-nvidia-surface text-nvidia-text-muted border border-nvidia-border cursor-not-allowed'}"
+    >
+      <Check class="h-4 w-4 {isDirty ? 'stroke-[2.5]' : ''}" />
+      <span>{isDirty ? 'Apply Settings' : 'Settings Saved'}</span>
+    </button>
   </div>
 </div>
