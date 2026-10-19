@@ -34,7 +34,6 @@
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { tick } from 'svelte';
-  import { isModNew } from '$lib/theme';
 
   let {
     archives = $bindable([]),
@@ -43,9 +42,6 @@
     onScanRequested,
     onStateChanged,
     targetHighlightMod = null,
-    newModsHours = $bindable(6),
-    showNewMods = $bindable(false),
-    onNewModsConfigChanged,
     onRouteToHistory
   }: {
     archives: ArchiveItem[];
@@ -54,9 +50,6 @@
     onScanRequested?: () => void;
     onStateChanged?: () => void;
     targetHighlightMod?: string | null;
-    newModsHours?: number;
-    showNewMods?: boolean;
-    onNewModsConfigChanged?: () => void;
     onRouteToHistory?: () => void;
   } = $props();
 
@@ -1163,25 +1156,6 @@
     </div>
 
     <div class="flex items-center gap-2.5">
-      
-      <!-- Vanishing Global Highlight Button -->
-      {#if showNewMods}
-        <button
-          type="button"
-          onclick={() => { showNewMods = false; }}
-          class="flex items-center gap-2 px-3 py-1.5 rounded border border-nvidia-accent/60 bg-nvidia-accent/10 hover:bg-nvidia-accent/20 transition cursor-pointer shadow-sm"
-          title="Clear new mod highlights"
-        >
-          <span
-            class="inline-flex items-center justify-center px-1.5 py-0.2 rounded text-[9px] font-mono font-bold tracking-wider uppercase shrink-0 shadow-xs"
-            style="background-color: var(--theme-accent); color: var(--theme-accent-contrast);"
-          >
-            NEW
-          </span>
-          <EyeOff class="h-3.5 w-3.5 text-nvidia-accent" />
-        </button>
-      {/if}
-
       <button
         onclick={toggleAllCategories}
         disabled={totalCategories === 0}
@@ -1306,16 +1280,6 @@
                     <span class="text-[10px] font-mono px-1 py-0.2 min-w-[34px] text-center rounded bg-nvidia-card text-nvidia-text-muted border border-nvidia-border shrink-0">
                       #{archiveRank}
                     </span>
-
-                    {#if showNewMods && isModNew(archive.created_at_ms, newModsHours)}
-                      <span
-                        class="inline-flex items-center justify-center px-1.5 py-0.2 rounded text-[9px] font-mono font-bold tracking-wider uppercase shrink-0 shadow-xs"
-                        style="background-color: var(--theme-accent); color: var(--theme-accent-contrast);"
-                        title="Installed/modified in the last {newModsHours} hours"
-                      >
-                        NEW
-                      </span>
-                    {/if}
 
                     <span class="font-mono font-medium text-nvidia-text-primary truncate max-w-md">
                       {archive.file_name}
