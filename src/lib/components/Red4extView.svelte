@@ -1,28 +1,24 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { Red4extPluginItem, FileNode } from '$lib/types';
-  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen, EyeOff } from 'lucide-svelte';
+  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { tick } from 'svelte';
-  import { loadConfigFromDisk, isModNew } from '$lib/theme';
+  import { loadConfigFromDisk } from '$lib/theme';
 
   let {
     plugins = $bindable([]),
     gamePath = '',
     onStateChanged,
     targetHighlightMod = null,
-    newModsHours = $bindable(6),
-    showNewMods = $bindable(false),
-    onNewModsConfigChanged
+    onRouteToHistory
   }: {
     plugins: Red4extPluginItem[];
     gamePath: string;
     onStateChanged?: () => void;
     targetHighlightMod?: string | null;
-    newModsHours?: number;
-    showNewMods?: boolean;
-    onNewModsConfigChanged?: () => void;
+    onRouteToHistory?: () => void;
   } = $props();
 
   let searchQuery = $state('');
@@ -474,24 +470,6 @@
     </div>
     
     <div class="flex items-center gap-2.5 shrink-0">
-      <!-- Vanishing Global Highlight Button -->
-      {#if showNewMods}
-        <button
-          type="button"
-          onclick={() => { showNewMods = false; }}
-          class="flex items-center gap-2 px-3 py-1.5 rounded border border-nvidia-accent/60 bg-nvidia-accent/10 hover:bg-nvidia-accent/20 transition cursor-pointer shadow-sm"
-          title="Clear new mod highlights"
-        >
-          <span
-            class="inline-flex items-center justify-center px-1.5 py-0.2 rounded text-[9px] font-mono font-bold tracking-wider uppercase shrink-0 shadow-xs"
-            style="background-color: var(--theme-accent); color: var(--theme-accent-contrast);"
-          >
-            NEW
-          </span>
-          <EyeOff class="h-3.5 w-3.5 text-nvidia-accent" />
-        </button>
-      {/if}
-
       <button
         type="button"
         onclick={toggleAllFolders}
@@ -566,16 +544,6 @@
                 <FileCode class="h-4 w-4 text-nvidia-text-muted shrink-0" />
                 <span class="font-mono truncate {plugin.enabled ? 'text-nvidia-text-primary' : 'line-through text-nvidia-text-muted'}">
                   {plugin.name}
-                </span>
-              {/if}
-
-              {#if showNewMods && isModNew(plugin.created_at_ms, newModsHours)}
-                <span
-                  class="inline-flex items-center justify-center px-1.5 py-0.2 rounded text-[9px] font-mono font-bold tracking-wider uppercase shrink-0 shadow-xs"
-                  style="background-color: var(--theme-accent); color: var(--theme-accent-contrast);"
-                  title="Installed/modified in the last {newModsHours} hours"
-                >
-                  NEW
                 </span>
               {/if}
             </div>

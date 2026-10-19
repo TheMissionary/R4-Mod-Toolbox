@@ -22,6 +22,17 @@
 
   const changelog = [
     {
+      version: "0.38.0 (Beta 3)",
+      date: "October 2026",
+      changes: [
+        "Responsive UI Overhaul: Mod rows across all framework views now utilize progressive disclosure, gracefully hiding secondary metadata on smaller screens to maximize file name visibility.",
+        "Settings Bento Layout: Completely redesigned the Settings page into a zero-scroll, multi-column grid layout with consolidated path configurations and a modernized live theme preview.",
+        "Sidebar Navigation: The collapsed sidebar now features a prominent, clickable R4 logo to maintain brand anchoring and improve expand/collapse UX.",
+        "Support Centralization: Migrated diagnostic log controls into a dedicated 'Support & Feedback' section on the Help page.",
+        "Header Refinement: Dynamic header text that adapts to the sidebar's collapsed state to eliminate redundancy."
+      ]
+    },
+    {
       version: "0.37.0 (Beta 2)",
       date: "October 2026",
       changes: [
@@ -109,7 +120,7 @@
               </div>
               <div>
                 <div class="text-lg font-bold text-nvidia-text-primary">R4 Mod Toolbox</div>
-                <div class="text-xs font-mono text-nvidia-text-muted mt-0.5">Version 0.37.0 (Beta 2)</div>
+                <div class="text-xs font-mono text-nvidia-text-muted mt-0.5">Version 0.38.0 (Beta 3)</div>
               </div>
             </div>
             

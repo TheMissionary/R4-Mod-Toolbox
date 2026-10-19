@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -15,12 +15,10 @@
 
   let {
     gamePath = '',
-    showNewMods = $bindable(false),
     newModsHours = $bindable(6),
     onNavigateToMod
   }: {
     gamePath: string;
-    showNewMods: boolean;
     newModsHours: number;
     onNavigateToMod: (tab: string, modName: string) => void;
   } = $props();
@@ -95,26 +93,6 @@
       config.newModsHours = newModsHours;
       saveConfigToDisk(config);
     });
-  }
-
-  let newModsSaveTimeout: ReturnType<typeof setTimeout>;
-  function handleNewModsConfigChange() {
-    clearTimeout(newModsSaveTimeout);
-    newModsSaveTimeout = setTimeout(async () => {
-      try {
-        const config = await loadConfigFromDisk();
-        config.newModsHours = newModsHours;
-        // showNewMods is volatile, do not save to disk
-        await saveConfigToDisk(config);
-      } catch (err) {
-        console.error(`Failed to save new mods config: ${err}`);
-      }
-    }, 200);
-  }
-
-  function toggleShowNewMods() {
-    showNewMods = !showNewMods;
-    handleNewModsConfigChange();
   }
 
   onMount(() => {
@@ -265,47 +243,26 @@
     <div class="rounded-lg border border-nvidia-border bg-nvidia-card flex flex-col h-full shadow-sm overflow-hidden">
       
       <!-- Table Toolbar -->
-      <div class="px-4 py-3 bg-nvidia-surface/60 border-b border-nvidia-border flex items-start justify-between shrink-0">
-        <div class="flex items-center gap-2 mt-1.5">
+      <div class="px-4 py-3 bg-nvidia-surface/60 border-b border-nvidia-border flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3">
           <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Ledger Entries</span>
+          
+          <select
+            bind:value={newModsHours}
+            onchange={handleTimeframeChange}
+            class="py-1 px-2 bg-nvidia-bg border border-nvidia-border rounded text-xs font-bold text-nvidia-text-primary focus:outline-none cursor-pointer"
+          >
+            <option value={1}>Last 1 Hour</option>
+            <option value={6}>Last 6 Hours</option>
+            <option value={24}>Last 24 Hours</option>
+            <option value={72}>Last 3 Days</option>
+            <option value={168}>Last 7 Days</option>
+            <option value={720}>Last 30 Days</option>
+          </select>
+
           <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-bg border border-nvidia-border text-nvidia-text-muted">
             {recentMods.length}
           </span>
-        </div>
-        
-        <div class="flex flex-col items-end gap-1.5">
-          <div class="flex items-center gap-2">
-            <select
-              bind:value={newModsHours}
-              onchange={handleTimeframeChange}
-              class="py-1.5 px-2 bg-nvidia-bg border border-nvidia-border rounded text-xs font-bold text-nvidia-text-primary focus:outline-none cursor-pointer"
-            >
-              <option value={1}>Last 1 Hour</option>
-              <option value={6}>Last 6 Hours</option>
-              <option value={24}>Last 24 Hours</option>
-              <option value={72}>Last 3 Days</option>
-              <option value={168}>Last 7 Days</option>
-              <option value={720}>Last 30 Days</option>
-            </select>
-
-            <button
-              type="button"
-              onclick={toggleShowNewMods}
-              class="flex items-center gap-2 px-3 py-1.5 rounded border transition-colors cursor-pointer {showNewMods ? 'border-nvidia-accent/60 bg-nvidia-accent/10 font-semibold' : 'border-nvidia-border bg-nvidia-surface hover:bg-nvidia-card text-nvidia-text-muted hover:text-nvidia-text-primary font-medium'}"
-              style={showNewMods ? 'background-color: var(--theme-accent); color: var(--theme-accent-contrast);' : ''}
-            >
-              <span
-                class="inline-flex items-center justify-center px-1.5 py-0.2 rounded text-[9px] font-mono font-bold tracking-wider uppercase shrink-0 shadow-xs"
-                style={showNewMods ? 'background-color: rgba(0,0,0,0.25); color: var(--theme-accent-contrast);' : 'background-color: var(--theme-accent); color: var(--theme-accent-contrast);'}
-              >
-                NEW
-              </span>
-              <span>{showNewMods ? 'Highlights Active' : 'Apply Label'}</span>
-            </button>
-          </div>
-          <div class="text-[9px] text-nvidia-text-muted leading-tight">
-            Temporarily applies label to the mods shown below
-          </div>
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-﻿mod archive;
+mod archive;
 
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
@@ -990,18 +990,22 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
-                if let (Ok(size), Ok(pos)) = (window.inner_size(), window.outer_position()) {
-                    let scale = window.scale_factor().unwrap_or(1.0);
-                    let logical_size = size.to_logical::<f64>(scale);
-                    let logical_pos = pos.to_logical::<f64>(scale);
-                    
-                    if logical_pos.x >= -1000.0 && logical_pos.y >= -1000.0 {
-                        let mut config = load_app_config().unwrap_or_default();
-                        config.window_width = Some(logical_size.width);
-                        config.window_height = Some(logical_size.height);
-                        config.window_x = Some(logical_pos.x as i32);
-                        config.window_y = Some(logical_pos.y as i32);
-                        let _ = save_app_config(config);
+                if let Ok(is_maximized) = window.is_maximized() {
+                    if !is_maximized {
+                        if let (Ok(size), Ok(pos)) = (window.inner_size(), window.outer_position()) {
+                            let scale = window.scale_factor().unwrap_or(1.0);
+                            let logical_size = size.to_logical::<f64>(scale);
+                            let logical_pos = pos.to_logical::<f64>(scale);
+                            
+                            if logical_pos.x >= -1000.0 && logical_pos.y >= -1000.0 {
+                                let mut config = load_app_config().unwrap_or_default();
+                                config.window_width = Some(logical_size.width);
+                                config.window_height = Some(logical_size.height);
+                                config.window_x = Some(logical_pos.x as i32);
+                                config.window_y = Some(logical_pos.y as i32);
+                                let _ = save_app_config(config);
+                            }
+                        }
                     }
                 }
             }

@@ -85,25 +85,9 @@
   let redscriptPackages = $state<RedScriptItem[]>([]);
   let r6tweaks = $state<R6TweaksItem[]>([]);
 
-  // New Mods Badge System State (Volatile, per-session only)
+  // History Timeframe State
   let newModsHours = $state(6);
-  let showNewMods = $state(false);
   let targetHighlightMod = $state<string | null>(null);
-
-  let newModsSaveTimeout: ReturnType<typeof setTimeout>;
-  function handleNewModsConfigChange() {
-    clearTimeout(newModsSaveTimeout);
-    newModsSaveTimeout = setTimeout(async () => {
-      try {
-        const config = await loadConfigFromDisk();
-        config.newModsHours = newModsHours;
-        // We intentionally DO NOT save showNewMods to disk so it defaults to false on boot
-        await saveConfigToDisk(config);
-      } catch (err) {
-        error(`Failed to save new mods config: ${err}`);
-      }
-    }, 200);
-  }
 
   function handleNavigateToMod(tab: string, modName: string) {
     setTab(tab as TabType);
@@ -201,7 +185,6 @@
       if (config.newModsHours !== undefined) {
         newModsHours = config.newModsHours;
       }
-      // showNewMods is intentionally ignored here to ensure it boots as false
     }).catch(err => {
       error(`Config hydration error: ${err}`);
     }).finally(() => {
@@ -479,7 +462,7 @@
 
   <!-- Workspace Canvas -->
   <div class="flex-1 flex flex-col h-full overflow-hidden relative">
-    <HeaderBar {gamePath} {currentTab} onRefresh={refreshAll} {isLoading} {scanResult} />
+    <HeaderBar {gamePath} {currentTab} onRefresh={refreshAll} {isLoading} {scanResult} {isSidebarCollapsed} />
 
     <main class="flex-1 overflow-y-auto {['settings', 'help', 'about', 'history'].includes(currentTab) ? 'p-0' : 'p-6'}">
       
@@ -492,9 +475,6 @@
           onScanRequested={refreshAll}
           onStateChanged={refreshCountsOnly}
           {targetHighlightMod}
-          bind:newModsHours
-          bind:showNewMods
-          onNewModsConfigChanged={handleNewModsConfigChange}
           onRouteToHistory={() => setTab('history')}
         />
       </div>
@@ -505,9 +485,6 @@
           {gamePath}
           onStateChanged={refreshCountsOnly}
           {targetHighlightMod}
-          bind:newModsHours
-          bind:showNewMods
-          onNewModsConfigChanged={handleNewModsConfigChange}
           onRouteToHistory={() => setTab('history')}
         />
       </div>
@@ -518,9 +495,6 @@
           {gamePath}
           onStateChanged={refreshCountsOnly}
           {targetHighlightMod}
-          bind:newModsHours
-          bind:showNewMods
-          onNewModsConfigChanged={handleNewModsConfigChange}
           onRouteToHistory={() => setTab('history')}
         />
       </div>
@@ -531,9 +505,6 @@
           {gamePath}
           onStateChanged={refreshCountsOnly}
           {targetHighlightMod}
-          bind:newModsHours
-          bind:showNewMods
-          onNewModsConfigChanged={handleNewModsConfigChange}
           onRouteToHistory={() => setTab('history')}
         />
       </div>
@@ -544,9 +515,6 @@
           {gamePath}
           onStateChanged={refreshCountsOnly}
           {targetHighlightMod}
-          bind:newModsHours
-          bind:showNewMods
-          onNewModsConfigChanged={handleNewModsConfigChange}
           onRouteToHistory={() => setTab('history')}
         />
       </div>
@@ -555,7 +523,6 @@
       <div class={currentTab === 'history' ? 'h-full' : 'hidden'}>
         <HistoryView
           {gamePath}
-          bind:showNewMods
           bind:newModsHours
           onNavigateToMod={handleNavigateToMod}
         />

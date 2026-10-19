@@ -18,12 +18,14 @@
     isLoading = false,
     scanResult = null,
     currentTab = 'archive',
+    isSidebarCollapsed = false,
     onRefresh 
   }: { 
     gamePath: string; 
     isLoading: boolean;
     scanResult?: ScanResult | null;
     currentTab?: string;
+    isSidebarCollapsed?: boolean;
     onRefresh: () => void;
   } = $props();
 
@@ -137,15 +139,18 @@
 <header data-tauri-drag-region class="h-16 border-b border-nvidia-border bg-nvidia-bg flex items-center justify-between px-6 select-none shrink-0">
   <!-- Left: Context Title and Status -->
   <div class="flex items-center gap-6 pointer-events-none">
-    <!-- Static App Title -->
-    <div class="flex items-center gap-3">
-      <h1 class="text-sm font-bold tracking-wider uppercase text-nvidia-text-primary leading-tight">
-        R4 MOD TOOLBOX
-      </h1>
-    </div>
+    
+    {#if isSidebarCollapsed}
+      <!-- Static App Title -->
+      <div class="flex items-center gap-3">
+        <h1 class="text-sm font-bold tracking-wider uppercase text-nvidia-text-primary leading-tight">
+          R4 MOD TOOLBOX
+        </h1>
+      </div>
 
-    <!-- Vertical Divider -->
-    <div class="h-8 w-px bg-nvidia-border/60"></div>
+      <!-- Vertical Divider -->
+      <div class="h-8 w-px bg-nvidia-border/60"></div>
+    {/if}
 
     <!-- Status Indicator -->
     <div class="flex items-center gap-2">
