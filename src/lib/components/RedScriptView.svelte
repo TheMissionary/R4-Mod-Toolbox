@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { onMount } from 'svelte';
   import type { RedScriptItem, FileNode } from '$lib/types';
   import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen, EyeOff } from 'lucide-svelte';
@@ -406,15 +406,15 @@
             </button>
           {:else}
             <div class="w-[18px] shrink-0"></div>
-            <FileCode class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+            <FileCode class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
             <span class="font-mono text-nvidia-text-primary truncate text-[11px]">{node.name}</span>
           {/if}
         </div>
         
         <!-- Fixed-Width Laser-Aligned Right Column for Inner Files -->
         <div class="flex items-center gap-2 shrink-0">
-          <div class="w-20"></div> <!-- Empty space for file count alignment -->
-          <div class="w-16 flex justify-end text-[10px] font-mono text-nvidia-text-muted">
+          <div class="w-20 hidden lg:block"></div> <!-- Empty space for file count alignment -->
+          <div class="w-16 justify-end text-[10px] font-mono text-nvidia-text-muted hidden lg:flex">
             {#if !node.is_dir}{formatBytes(node.size_bytes)}{/if}
           </div>
           <div class="w-6 flex justify-end">
@@ -582,12 +582,12 @@
 
             <!-- Fixed-Width Laser-Aligned Right Column -->
             <div class="flex items-center gap-2 shrink-0">
-              <div class="w-20 flex justify-end">
+              <div class="w-20 justify-end hidden lg:flex">
                 <span class="px-1.5 py-0.2 rounded bg-nvidia-accent/15 border border-nvidia-accent/30 text-[10px] text-nvidia-accent font-semibold truncate">
                   {pkg.file_count} {pkg.file_count === 1 ? 'file' : 'files'}
                 </span>
               </div>
-              <div class="w-16 flex justify-end text-[11px] font-mono text-nvidia-text-muted">
+              <div class="w-16 justify-end text-[11px] font-mono text-nvidia-text-muted hidden lg:flex">
                 {formatBytes(pkg.size_bytes)}
               </div>
               <div class="w-6 flex justify-end">

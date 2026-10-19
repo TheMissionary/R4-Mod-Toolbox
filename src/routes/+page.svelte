@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
@@ -41,7 +41,6 @@
     Settings,
     Info,
     Coffee,
-    PanelLeftOpen,
     PanelLeftClose,
     Clock
   } from 'lucide-svelte';
@@ -232,11 +231,15 @@
   <aside class="border-r border-nvidia-border flex flex-col justify-between bg-nvidia-surface/40 select-none shrink-0 transition-all duration-300 {isSidebarCollapsed ? 'w-[72px]' : 'w-64'}">
     <div class="flex flex-col h-full overflow-hidden">
       
-      <!-- Sidebar Header / Toggle -->
+      <!-- Sidebar Header / Toggle (Option C) -->
       <div class="h-16 border-b border-nvidia-border flex items-center {isSidebarCollapsed ? 'justify-center' : 'px-5 gap-3'} shrink-0 transition-all duration-300">
         {#if isSidebarCollapsed}
-          <button onclick={() => isSidebarCollapsed = false} class="p-2 rounded hover:bg-nvidia-surface text-nvidia-text-muted hover:text-nvidia-accent transition cursor-pointer" title="Expand Sidebar">
-            <PanelLeftOpen class="h-5 w-5" />
+          <button 
+            onclick={() => isSidebarCollapsed = false} 
+            class="h-9 w-9 rounded-xl bg-nvidia-accent flex items-center justify-center text-black font-black text-base shadow-md shrink-0 hover:brightness-110 hover:scale-105 transition-all cursor-pointer" 
+            title="Expand Sidebar"
+          >
+            R4
           </button>
         {:else}
           <div class="h-6 w-6 rounded bg-nvidia-accent flex items-center justify-center text-black font-black text-sm shadow-sm shrink-0">R4</div>

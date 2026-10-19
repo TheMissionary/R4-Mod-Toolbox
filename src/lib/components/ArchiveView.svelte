@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import type { ArchiveItem, ArchiveScanReport, XlItem } from '$lib/types';
   import CategoryDelimiterRow from '$lib/components/CategoryDelimiterRow.svelte';
   import DialogModal from '$lib/components/DialogModal.svelte';
@@ -1334,7 +1334,7 @@
                       </span>
                     {/if}
 
-                    <div class="flex items-center gap-1.5 text-[11px] text-nvidia-text-muted shrink-0 opacity-80">
+                    <div class="flex items-center gap-1.5 text-[11px] text-nvidia-text-muted shrink-0 opacity-80 hidden lg:flex">
                       <span>({archive.file_count} assets)</span>
                       <span>•</span>
                       <span>{formatBytes(archive.size_bytes)}</span>
@@ -1482,7 +1482,7 @@
                 <div class="flex items-center gap-2.5 min-w-0">
                   <FileCode class="h-3.5 w-3.5 text-cyan-400 shrink-0" />
                   <span class="font-mono text-nvidia-text-primary font-medium truncate">{xl.file_name}</span>
-                  <span class="text-[11px] font-mono text-nvidia-text-muted shrink-0">
+                  <span class="text-[11px] font-mono text-nvidia-text-muted shrink-0 hidden sm:block">
                     {formatBytes(xl.size_bytes)}
                   </span>
                 </div>
@@ -1567,31 +1567,3 @@
     {/if}
   </div>
 </div>
-
-<!-- Modals -->
-<DialogModal
-  bind:isOpen={dialogState.isOpen}
-  title={dialogState.title}
-  message={dialogState.message}
-  mode={dialogState.mode}
-  initialValue={dialogState.initialValue}
-  confirmText={dialogState.confirmText}
-  isDanger={dialogState.isDanger}
-  onConfirm={dialogState.onConfirm}
-  onCancel={() => dialogState.isOpen = false}
-/>
-
-<MoveCategoryModal
-  bind:isOpen={isMoveModalOpen}
-  categories={availableCategories}
-  onConfirm={handleMoveToCategory}
-  onCancel={() => isMoveModalOpen = false}
-/>
-
-<LinkXlModal
-  bind:isOpen={isLinkModalOpen}
-  xlName={targetXlToLink || ''}
-  archives={availableArchivesForLink}
-  onConfirm={handleLinkXl}
-  onCancel={() => isLinkModalOpen = false}
-/>

@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { onMount } from 'svelte';
   import type { CetPluginItem, FileNode } from '$lib/types';
   import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen, EyeOff } from 'lucide-svelte';
@@ -415,8 +415,8 @@
         
         <!-- Fixed-Width Laser-Aligned Right Column for Inner Files -->
         <div class="flex items-center gap-2 shrink-0">
-          <div class="w-20"></div> <!-- Empty space for file count alignment -->
-          <div class="w-16 flex justify-end text-[10px] font-mono text-nvidia-text-muted">
+          <div class="w-20 hidden lg:block"></div> <!-- Empty space for file count alignment -->
+          <div class="w-16 justify-end text-[10px] font-mono text-nvidia-text-muted hidden lg:flex">
             {#if !node.is_dir}{formatBytes(node.size_bytes)}{/if}
           </div>
           <div class="w-6 flex justify-end">
@@ -584,12 +584,12 @@
 
             <!-- Fixed-Width Laser-Aligned Right Column -->
             <div class="flex items-center gap-2 shrink-0">
-              <div class="w-20 flex justify-end">
+              <div class="w-20 justify-end hidden lg:flex">
                 <span class="px-1.5 py-0.2 rounded bg-nvidia-accent/15 border border-nvidia-accent/30 text-[10px] text-nvidia-accent font-semibold truncate">
                   {plugin.file_count} {plugin.file_count === 1 ? 'file' : 'files'}
                 </span>
               </div>
-              <div class="w-16 flex justify-end text-[11px] font-mono text-nvidia-text-muted">
+              <div class="w-16 justify-end text-[11px] font-mono text-nvidia-text-muted hidden lg:flex">
                 {formatBytes(plugin.size_bytes)}
               </div>
               <div class="w-6 flex justify-end">
