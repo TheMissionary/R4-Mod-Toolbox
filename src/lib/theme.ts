@@ -149,6 +149,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   showNewMods: false,
   customTextEditorPath: '',
   customLaunchPath: '',
+  customPhotoPath: '',
   theme: { ...DEFAULT_THEME_SETTINGS },
 };
 
@@ -270,6 +271,9 @@ export async function loadConfigFromDisk(): Promise<AppConfig> {
       }
       if (config.customLaunchPath === undefined) {
         config.customLaunchPath = '';
+      }
+      if (config.customPhotoPath === undefined) {
+        config.customPhotoPath = '';
       }
 
       if (typeof localStorage !== 'undefined') {

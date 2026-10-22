@@ -149,5 +149,6 @@ export interface AppConfig {
   showNewMods?: boolean;
   customTextEditorPath?: string;
   customLaunchPath?: string;
+  customPhotoPath?: string;
   theme: ThemeSettings;
 }

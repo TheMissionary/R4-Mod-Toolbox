@@ -98,6 +98,8 @@ pub struct AppConfig {
     pub custom_text_editor_path: Option<String>,
     #[serde(default)]
     pub custom_launch_path: Option<String>,
+    #[serde(default)]
+    pub custom_photo_path: Option<String>,
     pub theme: ThemeConfig,
 }
 
@@ -116,6 +118,7 @@ impl Default for AppConfig {
             show_new_mods: Some(false),
             custom_text_editor_path: None,
             custom_launch_path: None,
+            custom_photo_path: None,
             theme: ThemeConfig::default(),
         }
     }
@@ -957,6 +960,19 @@ fn kill_game_process() -> Result<bool, String> {
     }
 }
 
+#[tauri::command]
+fn open_custom_folder(folder_path: String) -> Result<(), String> {
+    let path = PathBuf::from(&folder_path);
+    if !path.exists() || !path.is_dir() {
+        return Err("Invalid folder path".to_string());
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer").arg(&path).spawn().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1038,7 +1054,8 @@ pub fn run() {
             clear_user_log,
             launch_game,
             check_game_process_running,
-            kill_game_process
+            kill_game_process,
+            open_custom_folder
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

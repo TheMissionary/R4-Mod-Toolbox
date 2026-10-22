@@ -137,9 +137,8 @@
 </script>
 
 <header data-tauri-drag-region class="h-16 border-b border-nvidia-border bg-nvidia-bg flex items-center justify-between px-6 select-none shrink-0">
-  <!-- Left: Context Title and Status -->
+  <!-- Left: Context Title -->
   <div class="flex items-center gap-6 pointer-events-none">
-    
     {#if isSidebarCollapsed}
       <!-- Static App Title -->
       <div class="flex items-center gap-3">
@@ -147,28 +146,28 @@
           R4 MOD TOOLBOX
         </h1>
       </div>
-
       <!-- Vertical Divider -->
       <div class="h-8 w-px bg-nvidia-border/60"></div>
     {/if}
+  </div>
 
-    <!-- Status Indicator -->
-    <div class="flex items-center gap-2">
+  <!-- Right: Global Actions & Status -->
+  <div class="flex items-center gap-4 shrink-0">
+    
+    <!-- Status Indicator (Relocated & Recolored) -->
+    <div class="flex items-center gap-2 mr-2">
       {#if !gamePath}
         <AlertTriangle class="h-4 w-4 text-amber-400" />
         <span class="text-xs font-bold text-amber-400 uppercase tracking-wider">Setup Required</span>
       {:else if !isValid}
-        <AlertCircle class="h-4 w-4 text-red-400" />
-        <span class="text-xs font-bold text-red-400 uppercase tracking-wider">Unverified Path</span>
+        <AlertCircle class="h-4 w-4 text-red-500" />
+        <span class="text-xs font-bold text-red-500 uppercase tracking-wider">Disconnected</span>
       {:else}
-        <CheckCircle2 class="h-4 w-4 text-emerald-400" />
-        <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider">Cyberpunk 2077 Connected</span>
+        <CheckCircle2 class="h-4 w-4 text-nvidia-accent" />
+        <span class="text-xs font-bold text-nvidia-accent uppercase tracking-wider">Connected</span>
       {/if}
     </div>
-  </div>
 
-  <!-- Right: Global Actions -->
-  <div class="flex items-center gap-3 shrink-0">
     <button 
       type="button"
       onclick={onRefresh}

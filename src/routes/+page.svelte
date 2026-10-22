@@ -42,7 +42,8 @@
     Info,
     Coffee,
     PanelLeftClose,
-    Clock
+    Clock,
+    Camera
   } from 'lucide-svelte';
 
   type TabType = 'archive' | 'cet' | 'red4ext' | 'redscript' | 'r6tweaks' | 'history' | 'settings' | 'help' | 'about';
@@ -62,12 +63,15 @@
     wasBelowThreshold = isBelow;
   });
 
+  let customPhotoPath = $state('');
+
   async function setTab(tab: TabType) {
     currentTab = tab;
     info(`Navigated to tab: ${tab}`);
     try {
       const config = await loadConfigFromDisk();
       config.activeTab = tab;
+      customPhotoPath = config.customPhotoPath || ''; // Refresh photo path state when navigating
       await saveConfigToDisk(config);
     } catch (err) {
       warn(`Failed to save active tab state: ${err}`);
@@ -101,6 +105,15 @@
       await openUrl(url);
     } catch (err) {
       error(`Failed to open URL ${url}: ${err}`);
+    }
+  }
+
+  async function handleOpenPhotos() {
+    if (!customPhotoPath) return;
+    try {
+      await invoke('open_custom_folder', { folderPath: customPhotoPath });
+    } catch (err) {
+      error(`Failed to open photo folder: ${err}`);
     }
   }
 
@@ -185,6 +198,9 @@
       if (config.newModsHours !== undefined) {
         newModsHours = config.newModsHours;
       }
+      if (config.customPhotoPath) {
+        customPhotoPath = config.customPhotoPath;
+      }
     }).catch(err => {
       error(`Config hydration error: ${err}`);
     }).finally(() => {
@@ -214,7 +230,7 @@
   <aside class="border-r border-nvidia-border flex flex-col justify-between bg-nvidia-surface/40 select-none shrink-0 transition-all duration-300 {isSidebarCollapsed ? 'w-[72px]' : 'w-64'}">
     <div class="flex flex-col h-full overflow-hidden">
       
-      <!-- Sidebar Header / Toggle (Option C) -->
+      <!-- Sidebar Header / Toggle -->
       <div class="h-16 border-b border-nvidia-border flex items-center {isSidebarCollapsed ? 'justify-center' : 'px-5 gap-3'} shrink-0 transition-all duration-300">
         {#if isSidebarCollapsed}
           <button 
@@ -225,7 +241,13 @@
             R4
           </button>
         {:else}
-          <div class="h-6 w-6 rounded bg-nvidia-accent flex items-center justify-center text-black font-black text-sm shadow-sm shrink-0">R4</div>
+          <button 
+            onclick={() => isSidebarCollapsed = true} 
+            class="h-6 w-6 rounded bg-nvidia-accent flex items-center justify-center text-black font-black text-sm shadow-sm shrink-0 hover:brightness-110 hover:scale-105 transition-all cursor-pointer"
+            title="Collapse Sidebar"
+          >
+            R4
+          </button>
           <div class="flex flex-col flex-1 min-w-0">
             <h1 class="text-xs font-bold tracking-wider uppercase text-nvidia-text-primary truncate">R4 Mod Toolbox</h1>
           </div>
@@ -365,6 +387,21 @@
             <span>History</span>
           {/if}
         </button>
+
+        {#if customPhotoPath}
+          <button
+            type="button"
+            onclick={handleOpenPhotos}
+            title={isSidebarCollapsed ? 'Cyberpunk 2077 Photos' : ''}
+            class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2 rounded-lg text-xs font-medium transition cursor-pointer text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent"
+          >
+            <Camera class="h-4 w-4" />
+            {#if !isSidebarCollapsed}
+              <span>Photos</span>
+            {/if}
+          </button>
+        {/if}
+
         <button
           type="button"
           onclick={() => setTab('help')}
@@ -529,7 +566,14 @@
       </div>
 
       <div class={currentTab === 'settings' ? 'h-full' : 'hidden'}>
-        <SettingsView bind:gamePath onRefresh={refreshAll} />
+        <SettingsView 
+          bind:gamePath 
+          onRefresh={refreshAll} 
+          onSettingsSaved={async () => {
+            const config = await loadConfigFromDisk();
+            customPhotoPath = config.customPhotoPath || '';
+          }}
+        />
       </div>
 
       <div class={currentTab === 'help' ? 'h-full' : 'hidden'}>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { loadConfigFromDisk, saveConfigToDisk } from '$lib/theme';
@@ -10,7 +10,9 @@
     ExternalLink,
     Copy,
     Check,
-    CalendarDays
+    CalendarDays,
+    Search,
+    X
   } from 'lucide-svelte';
 
   let {
@@ -25,6 +27,7 @@
 
   let recentMods = $state<LedgerEntry[]>([]);
   let copiedFeedback = $state(false);
+  let searchQuery = $state('');
 
   let contextMenu = $state<{
     visible: boolean;
@@ -46,10 +49,25 @@
     'r6tweaks': 'R6\\Tweaks'
   };
 
-  // Group mods by exact timestamp
+  // Auto-switch to "All Time" when searching
+  $effect(() => {
+    if (searchQuery.trim() !== '' && newModsHours !== 999999) {
+      untrack(() => {
+        newModsHours = 999999;
+        handleTimeframeChange();
+      });
+    }
+  });
+
+  // Group mods by exact timestamp and filter by search query
   let groupedMods = $derived.by(() => {
+    const query = searchQuery.toLowerCase().trim();
+    const filtered = query 
+      ? recentMods.filter(m => m.name.toLowerCase().includes(query))
+      : recentMods;
+
     const groups = new Map<number, LedgerEntry[]>();
-    for (const mod of recentMods) {
+    for (const mod of filtered) {
       if (!groups.has(mod.first_seen)) {
         groups.set(mod.first_seen, []);
       }
@@ -233,7 +251,7 @@
       </div>
       <h2 class="text-xl font-bold text-nvidia-text-primary mb-1">Recently Added Mods</h2>
       <p class="text-xs text-nvidia-text-muted max-w-2xl">
-        Track mods added to your workspace over time.
+        Track all mods by R4's "First Seen" date.
       </p>
     </div>
   </div>
@@ -243,14 +261,36 @@
     <div class="rounded-lg border border-nvidia-border bg-nvidia-card flex flex-col h-full shadow-sm overflow-hidden">
       
       <!-- Table Toolbar -->
-      <div class="px-4 py-3 bg-nvidia-surface/60 border-b border-nvidia-border flex items-center justify-between shrink-0">
-        <div class="flex items-center gap-3">
-          <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Ledger Entries</span>
+      <div class="px-4 py-3 bg-nvidia-surface/60 border-b border-nvidia-border flex items-center justify-between shrink-0 gap-4">
+        <div class="flex items-center gap-3 flex-1">
+          <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider shrink-0">Ledger Entries</span>
           
+          <div class="relative max-w-md flex-1 ml-2">
+            <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-nvidia-text-muted" />
+            <input
+              type="text"
+              bind:value={searchQuery}
+              placeholder="Search All Mods..."
+              class="w-full pl-9 pr-8 py-1.5 rounded border border-nvidia-border bg-nvidia-bg text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/60 focus:outline-hidden focus:border-nvidia-accent font-sans"
+            />
+            {#if searchQuery !== ''}
+              <button
+                type="button"
+                onclick={() => searchQuery = ''}
+                class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer"
+                title="Clear search"
+              >
+                <X class="h-3.5 w-3.5" />
+              </button>
+            {/if}
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 shrink-0">
           <select
             bind:value={newModsHours}
             onchange={handleTimeframeChange}
-            class="py-1 px-2 bg-nvidia-bg border border-nvidia-border rounded text-xs font-bold text-nvidia-text-primary focus:outline-none cursor-pointer"
+            class="py-1.5 px-2 bg-nvidia-bg border border-nvidia-border rounded text-xs font-bold text-nvidia-text-primary focus:outline-none cursor-pointer"
           >
             <option value={1}>Last 1 Hour</option>
             <option value={6}>Last 6 Hours</option>
@@ -258,10 +298,11 @@
             <option value={72}>Last 3 Days</option>
             <option value={168}>Last 7 Days</option>
             <option value={720}>Last 30 Days</option>
+            <option value={999999}>All Time</option>
           </select>
 
           <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-bg border border-nvidia-border text-nvidia-text-muted">
-            {recentMods.length}
+            {searchQuery ? groupedMods.reduce((acc, g) => acc + g.mods.length, 0) : recentMods.length}
           </span>
         </div>
       </div>
@@ -271,7 +312,9 @@
         {#if groupedMods.length === 0}
           <div class="p-10 flex flex-col items-center justify-center text-center text-nvidia-text-muted h-full">
             <Clock class="h-8 w-8 mb-3 opacity-20" />
-            <p class="text-xs font-mono">No new mods detected in the selected timeframe.</p>
+            <p class="text-xs font-mono">
+              {searchQuery ? 'No mods match your search query.' : 'No new mods detected in the selected timeframe.'}
+            </p>
           </div>
         {:else}
           {#each groupedMods as group (group.timestamp)}

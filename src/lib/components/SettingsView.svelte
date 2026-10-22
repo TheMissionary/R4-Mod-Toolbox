@@ -32,10 +32,12 @@
 
   let { 
     gamePath = $bindable(''),
-    onRefresh 
+    onRefresh,
+    onSettingsSaved
   }: { 
     gamePath?: string;
     onRefresh?: () => void;
+    onSettingsSaved?: () => void;
   } = $props();
 
   let draft = $state<ThemeSettings>(loadThemeSettings());
@@ -46,6 +48,7 @@
   let customModsInput = $state('');
   let customEditorPath = $state('');
   let customLaunchPath = $state('');
+  let customPhotoPath = $state('');
   let isDirty = $state(false);
   
   let showAdvancedIntegrations = $state(false);
@@ -84,6 +87,7 @@
     loadConfigFromDisk().then(config => {
       customEditorPath = config.customTextEditorPath || '';
       customLaunchPath = config.customLaunchPath || '';
+      customPhotoPath = config.customPhotoPath || '';
     });
   });
 
@@ -222,6 +226,22 @@
     }
   }
 
+  async function handleBrowsePhotoPath() {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: 'Select Cyberpunk 2077 Photo Folder'
+      });
+      if (typeof selected === 'string') {
+        customPhotoPath = selected;
+        markDirty();
+      }
+    } catch (err) {
+      console.error('Failed to select photo folder:', err);
+    }
+  }
+
   function handleResetDefault() {
     if (draft.mode === 'light') {
       draft.lightColors = generateThemeColors('light', '#5A8F00');
@@ -238,6 +258,7 @@
     customModsInput = '';
     customEditorPath = '';
     customLaunchPath = '';
+    customPhotoPath = '';
     markDirty();
   }
 
@@ -259,8 +280,10 @@
       config.theme = plainPayload;
       config.customTextEditorPath = customEditorPath.trim();
       config.customLaunchPath = customLaunchPath.trim();
+      config.customPhotoPath = customPhotoPath.trim();
       await saveConfigToDisk(config);
       isDirty = false;
+      if (onSettingsSaved) onSettingsSaved();
     } catch (err) {
       console.error('Failed to save config:', err);
     }
@@ -282,108 +305,7 @@
   <div class="flex-1 overflow-y-auto px-6 pb-6">
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl">
       
-      <!-- Left Column: Directories & Integrations -->
-      <div class="flex flex-col gap-4">
-        <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 flex flex-col h-fit">
-          <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center gap-2.5">
-            <FolderSearch class="h-4 w-4 text-nvidia-accent" />
-            <h3 class="text-sm font-bold uppercase tracking-wider">Game Directory</h3>
-          </div>
-          
-          <div class="p-5 space-y-2">
-            <p class="text-[11px] text-nvidia-text-muted leading-tight">
-              The root installation folder for Cyberpunk 2077. Required for the toolbox to function.
-            </p>
-            <div class="flex items-center gap-2 pt-1">
-              <div class="flex-1 px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary font-mono truncate select-all">
-                {gamePath || 'No folder selected'}
-              </div>
-              <button
-                type="button"
-                onclick={chooseDirectory}
-                class="px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs font-semibold text-nvidia-text-primary transition cursor-pointer shrink-0 shadow-xs"
-              >
-                Change...
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Advanced Integrations Collapsible -->
-        <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 flex flex-col h-fit overflow-hidden transition-all">
-          <button
-            type="button"
-            onclick={() => showAdvancedIntegrations = !showAdvancedIntegrations}
-            class="w-full px-4 py-3 bg-nvidia-surface/60 hover:bg-nvidia-surface/90 flex items-center justify-between cursor-pointer transition-colors"
-          >
-            <div class="flex items-center gap-2.5">
-              <Wrench class="h-4 w-4 text-nvidia-text-muted" />
-              <h3 class="text-sm font-bold uppercase tracking-wider">Advanced Integrations</h3>
-            </div>
-            {#if showAdvancedIntegrations}
-              <ChevronDown class="h-4 w-4 text-nvidia-text-muted" />
-            {:else}
-              <ChevronRight class="h-4 w-4 text-nvidia-text-muted" />
-            {/if}
-          </button>
-
-          {#if showAdvancedIntegrations}
-            <div class="p-5 space-y-6 border-t border-nvidia-border/60 bg-nvidia-bg/30">
-              <!-- Custom Launch Path -->
-              <div class="space-y-2">
-                <span class="text-xs font-semibold text-nvidia-text-primary">Custom Launch Path</span>
-                <p class="text-[11px] text-nvidia-text-muted leading-tight">
-                  Select a custom executable or shortcut (.lnk) to launch instead of the default Cyberpunk2077.exe.
-                </p>
-                <div class="flex items-center gap-2">
-                  <input
-                    type="text"
-                    bind:value={customLaunchPath}
-                    oninput={markDirty}
-                    placeholder="Leave blank for default"
-                    class="flex-1 px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/50 focus:outline-none focus:border-nvidia-accent font-mono"
-                  />
-                  <button
-                    type="button"
-                    onclick={handleBrowseLaunchPath}
-                    class="px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0"
-                  >
-                    Browse...
-                  </button>
-                </div>
-              </div>
-
-              <div class="h-px bg-nvidia-border/50"></div>
-
-              <!-- Custom Text Editor -->
-              <div class="space-y-2">
-                <span class="text-xs font-semibold text-nvidia-text-primary">Custom Text Editor</span>
-                <p class="text-[11px] text-nvidia-text-muted leading-tight">
-                  Select an executable (e.g., VS Code, Notepad++) to open configuration files.
-                </p>
-                <div class="flex items-center gap-2">
-                  <input
-                    type="text"
-                    bind:value={customEditorPath}
-                    oninput={markDirty}
-                    placeholder="Leave blank for Notepad"
-                    class="flex-1 px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/50 focus:outline-none focus:border-nvidia-accent font-mono"
-                  />
-                  <button
-                    type="button"
-                    onclick={handleBrowseEditor}
-                    class="px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0"
-                  >
-                    Browse...
-                  </button>
-                </div>
-              </div>
-            </div>
-          {/if}
-        </div>
-      </div>
-
-      <!-- Right Column: Unified Theme Engine -->
+      <!-- Left Column: Unified Theme Engine -->
       <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 flex flex-col h-fit">
         <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center gap-2.5">
           <Palette class="h-4 w-4 text-nvidia-accent" />
@@ -561,6 +483,135 @@
 
         </div>
       </div>
+
+      <!-- Right Column: Directories & Integrations -->
+      <div class="flex flex-col gap-4">
+        <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 flex flex-col h-fit">
+          <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center gap-2.5">
+            <FolderSearch class="h-4 w-4 text-nvidia-accent" />
+            <h3 class="text-sm font-bold uppercase tracking-wider">Game Directory</h3>
+          </div>
+          
+          <div class="p-5 space-y-2">
+            <p class="text-[11px] text-nvidia-text-muted leading-tight">
+              The root installation folder for Cyberpunk 2077. Required for the toolbox to function.
+            </p>
+            <div class="flex items-center gap-2 pt-1">
+              <div class="flex-1 px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary font-mono truncate select-all">
+                {gamePath || 'No folder selected'}
+              </div>
+              <button
+                type="button"
+                onclick={chooseDirectory}
+                class="px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs font-semibold text-nvidia-text-primary transition cursor-pointer shrink-0 shadow-xs"
+              >
+                Change...
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Advanced Integrations Collapsible -->
+        <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 flex flex-col h-fit overflow-hidden transition-all">
+          <button
+            type="button"
+            onclick={() => showAdvancedIntegrations = !showAdvancedIntegrations}
+            class="w-full px-4 py-3 bg-nvidia-surface/60 hover:bg-nvidia-surface/90 flex items-center justify-between cursor-pointer transition-colors"
+          >
+            <div class="flex items-center gap-2.5">
+              <Wrench class="h-4 w-4 text-nvidia-text-muted" />
+              <h3 class="text-sm font-bold uppercase tracking-wider">Advanced Integrations</h3>
+            </div>
+            {#if showAdvancedIntegrations}
+              <ChevronDown class="h-4 w-4 text-nvidia-text-muted" />
+            {:else}
+              <ChevronRight class="h-4 w-4 text-nvidia-text-muted" />
+            {/if}
+          </button>
+
+          {#if showAdvancedIntegrations}
+            <div class="p-5 space-y-6 border-t border-nvidia-border/60 bg-nvidia-bg/30">
+              <!-- Custom Launch Path -->
+              <div class="space-y-2">
+                <span class="text-xs font-semibold text-nvidia-text-primary">Custom Launch Path</span>
+                <p class="text-[11px] text-nvidia-text-muted leading-tight">
+                  Select a custom executable or shortcut (.lnk) to launch instead of the default Cyberpunk2077.exe.
+                </p>
+                <div class="flex items-center gap-2">
+                  <input
+                    type="text"
+                    bind:value={customLaunchPath}
+                    oninput={markDirty}
+                    placeholder="Leave blank for default"
+                    class="flex-1 px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/50 focus:outline-none focus:border-nvidia-accent font-mono"
+                  />
+                  <button
+                    type="button"
+                    onclick={handleBrowseLaunchPath}
+                    class="px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0"
+                  >
+                    Browse...
+                  </button>
+                </div>
+              </div>
+
+              <div class="h-px bg-nvidia-border/50"></div>
+
+              <!-- Custom Text Editor -->
+              <div class="space-y-2">
+                <span class="text-xs font-semibold text-nvidia-text-primary">Custom Text Editor</span>
+                <p class="text-[11px] text-nvidia-text-muted leading-tight">
+                  Select an executable (e.g., VS Code, Notepad++) to open configuration files.
+                </p>
+                <div class="flex items-center gap-2">
+                  <input
+                    type="text"
+                    bind:value={customEditorPath}
+                    oninput={markDirty}
+                    placeholder="Leave blank for Notepad"
+                    class="flex-1 px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/50 focus:outline-none focus:border-nvidia-accent font-mono"
+                  />
+                  <button
+                    type="button"
+                    onclick={handleBrowseEditor}
+                    class="px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0"
+                  >
+                    Browse...
+                  </button>
+                </div>
+              </div>
+
+              <div class="h-px bg-nvidia-border/50"></div>
+
+              <!-- Custom Photo Folder -->
+              <div class="space-y-2">
+                <span class="text-xs font-semibold text-nvidia-text-primary">Cyberpunk 2077 Photo Folder</span>
+                <p class="text-[11px] text-nvidia-text-muted leading-tight">
+                  Select your in-game photo mode screenshot directory to enable quick access from the sidebar.
+                </p>
+                <div class="flex items-center gap-2">
+                  <input
+                    type="text"
+                    bind:value={customPhotoPath}
+                    oninput={markDirty}
+                    placeholder="Leave blank to disable"
+                    class="flex-1 px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/50 focus:outline-none focus:border-nvidia-accent font-mono"
+                  />
+                  <button
+                    type="button"
+                    onclick={handleBrowsePhotoPath}
+                    class="px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0"
+                  >
+                    Browse...
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          {/if}
+        </div>
+      </div>
+
     </div>
   </div>
 

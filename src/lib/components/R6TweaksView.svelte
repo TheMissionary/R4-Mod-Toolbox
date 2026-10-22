@@ -377,7 +377,7 @@
 <!-- Recursive Folder Snippet -->
 {#snippet folderTree(parentPath: string, depth: number)}
   {#if loadingFolders[parentPath]}
-    <div class="flex items-center px-3 py-1 text-[10px] font-mono text-nvidia-text-muted" style="padding-left: {depth * 1.25 + 1}rem">
+    <div class="flex items-center pr-3 py-1 text-[10px] font-mono text-nvidia-text-muted" style="padding-left: {4.5 + (depth - 1) * 1.375}rem">
       <div class="h-3 w-3 rounded-full border-2 border-nvidia-surface border-t-nvidia-accent animate-spin mr-2"></div>
       Loading contents...
     </div>
@@ -385,8 +385,8 @@
     {#each folderContents[parentPath] as node}
       <div
         oncontextmenu={(e) => openContextMenu(e, node, 'file')}
-        class="group flex items-center justify-between px-3 rounded border-b border-nvidia-border/30 hover:bg-nvidia-surface/70 transition density-row cursor-context-menu"
-        style="padding-left: {depth * 1.25 + 1}rem"
+        class="group flex items-center justify-between pr-3 rounded border-b border-nvidia-border/30 hover:bg-nvidia-surface/70 transition density-row cursor-context-menu"
+        style="padding-left: {4.5 + (depth - 1) * 1.375}rem"
       >
         <div class="flex items-center gap-2.5 min-w-0 flex-1">
           {#if node.is_dir}
@@ -405,9 +405,11 @@
               <span class="font-bold truncate text-[11px]">{node.name}</span>
             </button>
           {:else}
-            <div class="w-[18px] shrink-0"></div>
-            <FileCode class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
-            <span class="font-mono text-nvidia-text-primary truncate text-[11px]">{node.name}</span>
+            <div class="flex items-center gap-1.5 min-w-0">
+              <div class="w-4 shrink-0"></div>
+              <FileCode class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+              <span class="font-mono text-nvidia-text-primary truncate text-[11px]">{node.name}</span>
+            </div>
           {/if}
         </div>
         
@@ -562,11 +564,13 @@
                   <span class="font-bold truncate {tweak.enabled ? '' : 'opacity-50'}">{tweak.name}</span>
                 </button>
               {:else}
-                <div class="w-[18px] shrink-0"></div>
-                <FileCode class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
-                <span class="font-mono truncate {tweak.enabled ? 'text-nvidia-text-primary' : 'line-through text-nvidia-text-muted'}">
-                  {tweak.name}
-                </span>
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <div class="w-4 shrink-0"></div>
+                  <FileCode class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+                  <span class="font-mono truncate {tweak.enabled ? 'text-nvidia-text-primary' : 'line-through text-nvidia-text-muted'}">
+                    {tweak.name}
+                  </span>
+                </div>
               {/if}
 
               {#if showNewMods && isModNew(tweak.created_at_ms, newModsHours)}
