@@ -148,7 +148,6 @@ export interface AppConfig {
   newModsHours?: number;
   showNewMods?: boolean;
   customTextEditorPath?: string;
-  customLaunchPath?: string;
   customPhotoPath?: string;
   theme: ThemeSettings;
 }

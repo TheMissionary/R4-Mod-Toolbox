@@ -1203,7 +1203,7 @@
           No matches found.
         </div>
       {:else}
-        {#each visibleItems as { archive, originalIndex, archiveRank, inCategory } (archive.file_name)}
+        {#each visibleItems as { archive, originalIndex, archiveRank, inCategory } (archive.file_name + '_' + archive.enabled)}
           {@const isSource = activeDragIndex !== null && originalIndex >= activeDragIndex && originalIndex < activeDragIndex + dragBlockSize}
           {@const showLineBefore = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'before' && !isSource}
           {@const showLineAfter = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'after' && !isSource}
@@ -1438,7 +1438,7 @@
           {/if}
 
           <div class="space-y-1">
-            {#each unassociatedXlFiles as xl (xl.file_name)}
+            {#each unassociatedXlFiles as xl (xl.file_name + '_' + xl.enabled)}
               <div
                 oncontextmenu={(e) => openContextMenu(e, xl, 'unassociated_xl')}
                 class="rounded border border-nvidia-border bg-nvidia-surface/80 hover:bg-nvidia-surface px-3 flex items-center justify-between density-row cursor-context-menu"
@@ -1486,7 +1486,7 @@
               No load order conflicts detected.
             </div>
           {:else}
-            {#each conflictingArchives as archive (archive.file_name)}
+            {#each conflictingArchives as archive (archive.file_name + '_' + archive.enabled)}
               {@const isLosing = archive.loses.length > 0}
               {@const isDragged = draggedEntry?.file_name === archive.file_name}
               <button

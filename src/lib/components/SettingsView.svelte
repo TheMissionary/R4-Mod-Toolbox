@@ -47,7 +47,6 @@
   let selectedModsPreset = $state<string>(MOD_FONT_PRESETS[0].value);
   let customModsInput = $state('');
   let customEditorPath = $state('');
-  let customLaunchPath = $state('');
   let customPhotoPath = $state('');
   let isDirty = $state(false);
   
@@ -86,7 +85,6 @@
 
     loadConfigFromDisk().then(config => {
       customEditorPath = config.customTextEditorPath || '';
-      customLaunchPath = config.customLaunchPath || '';
       customPhotoPath = config.customPhotoPath || '';
     });
   });
@@ -209,23 +207,6 @@
     }
   }
 
-  async function handleBrowseLaunchPath() {
-    try {
-      const selected = await open({
-        multiple: false,
-        directory: false,
-        filters: [{ name: 'Executables & Shortcuts', extensions: ['exe', 'lnk'] }],
-        title: 'Select Custom Launch Target'
-      });
-      if (typeof selected === 'string') {
-        customLaunchPath = selected;
-        markDirty();
-      }
-    } catch (err) {
-      console.error('Failed to select launch path:', err);
-    }
-  }
-
   async function handleBrowsePhotoPath() {
     try {
       const selected = await open({
@@ -257,7 +238,6 @@
     customBaseInput = '';
     customModsInput = '';
     customEditorPath = '';
-    customLaunchPath = '';
     customPhotoPath = '';
     markDirty();
   }
@@ -279,7 +259,6 @@
       let config = await loadConfigFromDisk();
       config.theme = plainPayload;
       config.customTextEditorPath = customEditorPath.trim();
-      config.customLaunchPath = customLaunchPath.trim();
       config.customPhotoPath = customPhotoPath.trim();
       await saveConfigToDisk(config);
       isDirty = false;
@@ -531,32 +510,7 @@
 
           {#if showAdvancedIntegrations}
             <div class="p-5 space-y-6 border-t border-nvidia-border/60 bg-nvidia-bg/30">
-              <!-- Custom Launch Path -->
-              <div class="space-y-2">
-                <span class="text-xs font-semibold text-nvidia-text-primary">Custom Launch Path</span>
-                <p class="text-[11px] text-nvidia-text-muted leading-tight">
-                  Select a custom executable or shortcut (.lnk) to launch instead of the default Cyberpunk2077.exe.
-                </p>
-                <div class="flex items-center gap-2">
-                  <input
-                    type="text"
-                    bind:value={customLaunchPath}
-                    oninput={markDirty}
-                    placeholder="Leave blank for default"
-                    class="flex-1 px-3 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/50 focus:outline-none focus:border-nvidia-accent font-mono"
-                  />
-                  <button
-                    type="button"
-                    onclick={handleBrowseLaunchPath}
-                    class="px-3 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shrink-0"
-                  >
-                    Browse...
-                  </button>
-                </div>
-              </div>
-
-              <div class="h-px bg-nvidia-border/50"></div>
-
+              
               <!-- Custom Text Editor -->
               <div class="space-y-2">
                 <span class="text-xs font-semibold text-nvidia-text-primary">Custom Text Editor</span>

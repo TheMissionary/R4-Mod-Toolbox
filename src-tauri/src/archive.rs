@@ -263,8 +263,18 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
         }
     }
 
-    let mut all_archive_files = active_archive_files.clone();
-    all_archive_files.extend(disabled_archive_files.clone());
+    // Deduplicate: Prioritize active files over disabled files with the same clean name
+    let mut unique_archives = std::collections::HashMap::new();
+    for p in active_archive_files {
+        unique_archives.insert(clean_path_name(&p), p);
+    }
+    for p in disabled_archive_files {
+        let clean = clean_path_name(&p);
+        if !unique_archives.contains_key(&clean) {
+            unique_archives.insert(clean, p);
+        }
+    }
+    let mut all_archive_files: Vec<PathBuf> = unique_archives.into_values().collect();
 
     all_archive_files.sort_by(|a, b| {
         let clean_a = clean_path_name(a);

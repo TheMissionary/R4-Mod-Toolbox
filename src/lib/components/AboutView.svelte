@@ -23,6 +23,16 @@
 
   const changelog = [
     {
+      version: "0.40.0 (Beta 5)",
+      date: "October 2026",
+      changes: [
+        "Critical Fix: Duplicate Mod Crash: Resolved a fatal UI rendering halt that occurred when both an active and .disabled version of the exact same mod existed in the folder. The backend now strictly deduplicates files to ensure flawless rendering regardless of your total mod count.",
+        "Antivirus Compliance (Clean Slate): Completely excised background process monitoring (tasklist/taskkill) to eliminate false-positive heuristic flags from antivirus engines. R4 is now a pure, native file-management tool.",
+        "Display Scaling Fix: Adjusted the minimum window resolution to 1000x650. This permanently resolves the UI clipping and mouse-freeze bugs on 1080p monitors utilizing 125%+ Windows Display Scaling.",
+        "Feature Removal: Removed the \"Custom Launch Path\" option to support native, command-prompt-free game launching, further reducing AV suspicion."
+      ]
+    },
+    {
       version: "0.39.0 (Beta 4)",
       date: "October 2026",
       changes: [
@@ -132,7 +142,7 @@
               </div>
               <div>
                 <div class="text-lg font-bold text-nvidia-text-primary">R4 Mod Toolbox</div>
-                <div class="text-xs font-mono text-nvidia-text-muted mt-0.5">Version 0.39.0 (Beta 4)</div>
+                <div class="text-xs font-mono text-nvidia-text-muted mt-0.5">Version 0.40.0 (Beta 5)</div>
               </div>
             </div>
             

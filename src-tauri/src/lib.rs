@@ -97,8 +97,6 @@ pub struct AppConfig {
     #[serde(default)]
     pub custom_text_editor_path: Option<String>,
     #[serde(default)]
-    pub custom_launch_path: Option<String>,
-    #[serde(default)]
     pub custom_photo_path: Option<String>,
     pub theme: ThemeConfig,
 }
@@ -117,7 +115,6 @@ impl Default for AppConfig {
             new_mods_hours: Some(6),
             show_new_mods: Some(false),
             custom_text_editor_path: None,
-            custom_launch_path: None,
             custom_photo_path: None,
             theme: ThemeConfig::default(),
         }
@@ -907,57 +904,17 @@ fn clear_user_log(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn launch_game(game_path: String, custom_launch_path: Option<String>) -> Result<(), String> {
+fn launch_game(game_path: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        let target = if let Some(cp) = custom_launch_path.filter(|s| !s.trim().is_empty()) {
-            cp
-        } else {
-            PathBuf::from(&game_path).join("bin").join("x64").join("Cyberpunk2077.exe").to_string_lossy().to_string()
-        };
-
-        std::process::Command::new("cmd").args(["/C", "start", "", &target]).spawn().map_err(|e| e.to_string())?;
+        let target = PathBuf::from(&game_path).join("bin").join("x64").join("Cyberpunk2077.exe");
+        let working_dir = target.parent().unwrap_or(Path::new(""));
+        std::process::Command::new(&target)
+            .current_dir(working_dir)
+            .spawn()
+            .map_err(|e| e.to_string())?;
     }
     Ok(())
-}
-
-#[tauri::command]
-fn check_game_process_running() -> Result<bool, String> {
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        let output = std::process::Command::new("tasklist")
-            .args(["/FI", "IMAGENAME eq Cyberpunk2077.exe", "/FO", "CSV", "/NH"])
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-            .map_err(|e| e.to_string())?;
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        Ok(stdout.to_lowercase().contains("cyberpunk2077.exe"))
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        Ok(false)
-    }
-}
-
-#[tauri::command]
-fn kill_game_process() -> Result<bool, String> {
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        let output = std::process::Command::new("taskkill")
-            .args(["/F", "/IM", "Cyberpunk2077.exe", "/T"])
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-            .map_err(|e| e.to_string())?;
-        Ok(output.status.success())
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        Ok(false)
-    }
 }
 
 #[tauri::command]
@@ -995,7 +952,7 @@ pub fn run() {
                 let width = config.window_width.unwrap_or(1600.0);
                 let height = config.window_height.unwrap_or(1000.0);
                 let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }));
-                let _ = window.set_min_size(Some(tauri::Size::Logical(tauri::LogicalSize { width: 1200.0, height: 800.0 })));
+                let _ = window.set_min_size(Some(tauri::Size::Logical(tauri::LogicalSize { width: 1000.0, height: 650.0 })));
                 if let (Some(x), Some(y)) = (config.window_x, config.window_y) {
                     let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: x as f64, y: y as f64 }));
                 } else {
@@ -1053,8 +1010,6 @@ pub fn run() {
             open_log_folder,
             clear_user_log,
             launch_game,
-            check_game_process_running,
-            kill_game_process,
             open_custom_folder
         ])
         .run(tauri::generate_context!())

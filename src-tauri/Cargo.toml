@@ -1,6 +1,6 @@
 [package]
 name = "r4-mod-toolbox"
-version = "0.39.0"
+version = "0.40.0"
 description = "Cyberpunk 2077 Mod and Conflict Management Tool"
 authors = ["Jason"]
 edition = "2021"
