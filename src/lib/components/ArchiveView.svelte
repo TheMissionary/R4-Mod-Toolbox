@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { ArchiveItem, ArchiveScanReport, XlItem } from '$lib/types';
-  import CategoryDelimiterRow from '$lib/components/CategoryDelimiterRow.svelte';
+  import FolderDelimiterRow from '$lib/components/FolderDelimiterRow.svelte';
   import DialogModal from '$lib/components/DialogModal.svelte';
-  import MoveCategoryModal from '$lib/components/MoveCategoryModal.svelte';
+  import MoveFolderModal from '$lib/components/MoveFolderModal.svelte';
   import LinkXlModal from '$lib/components/LinkXlModal.svelte';
   import {
     GripVertical,
@@ -59,6 +59,7 @@
   let localArchives = $state<ArchiveItem[]>([]);
   let scrollContainer = $state<HTMLElement | null>(null);
   let showXlHelp = $state(false);
+  let showUnassociatedXl = $state(false);
 
   // Multi-Select State
   let selectedMods = $state<Set<string>>(new Set());
@@ -89,16 +90,16 @@
     onConfirm: () => {}
   });
 
-  let collapsedCategories = $state<Record<string, boolean>>({});
+  let collapsedFolders = $state<Record<string, boolean>>({});
   let preDragCollapseState = $state<Record<string, boolean> | null>(null);
 
-  let totalCategories = $derived(localArchives.filter(a => a.is_delimiter).length);
-  let collapsedCount = $derived(Object.keys(collapsedCategories).filter(k => collapsedCategories[k]).length);
-  let isAllCollapsed = $derived(totalCategories > 0 && collapsedCount === totalCategories);
+  let totalFolders = $derived(localArchives.filter(a => a.is_delimiter).length);
+  let collapsedCount = $derived(Object.keys(collapsedFolders).filter(k => collapsedFolders[k]).length);
+  let isAllCollapsed = $derived(totalFolders > 0 && collapsedCount === totalFolders);
 
-  function toggleAllCategories() {
+  function toggleAllFolders() {
     if (isAllCollapsed) {
-      collapsedCategories = {};
+      collapsedFolders = {};
     } else {
       const newState: Record<string, boolean> = {};
       for (const a of localArchives) {
@@ -106,12 +107,12 @@
           newState[a.file_name] = true;
         }
       }
-      collapsedCategories = newState;
+      collapsedFolders = newState;
     }
   }
 
-  function toggleCategoryCollapse(categoryFileName: string) {
-    collapsedCategories[categoryFileName] = !collapsedCategories[categoryFileName];
+  function toggleFolderCollapse(folderFileName: string) {
+    collapsedFolders[folderFileName] = !collapsedFolders[folderFileName];
   }
 
   let contextMenu = $state<{
@@ -206,46 +207,46 @@
     }
   }
 
-  function addCategory() {
+  function addFolder() {
     dialogState = {
       isOpen: true,
-      title: 'Create Category',
-      message: 'Enter a name for the new category delimiter (symbols like [], (), hyphens allowed):',
+      title: 'Create Folder',
+      message: 'Enter a name for the new physical folder delimiter (symbols like [], (), hyphens allowed):',
       mode: 'prompt',
-      initialValue: 'New Category',
-      confirmText: 'Create Category',
+      initialValue: 'New Folder',
+      confirmText: 'Create Folder',
       isDanger: false,
       onConfirm: async (name: string) => {
         dialogState.isOpen = false;
         if (!name || name.trim() === '') return;
         
         try {
-          const report = await invoke<ArchiveScanReport>('create_physical_category', {
+          const report = await invoke<ArchiveScanReport>('create_physical_folder', {
             gamePath,
-            categoryName: name.trim()
+            folderName: name.trim()
           });
           if (report && Array.isArray(report.archives)) {
             archives = report.archives;
             if (onStateChanged) onStateChanged();
             
-            const newFileName = `[CAT] ${name.trim()}.txt`;
+            const newFileName = `[DIR] ${name.trim()}.txt`;
             setTimeout(() => {
               focusModInMainList(newFileName);
             }, 100);
           }
         } catch (err) {
-          console.error("Failed to create physical category:", err);
+          console.error("Failed to create physical folder:", err);
         }
       }
     };
   }
 
-  function handleRenameCategory(archive: ArchiveItem) {
-    const currentName = archive.category_name || archive.file_name.replace('[CAT] ', '').replace('.txt', '');
+  function handleRenameFolder(archive: ArchiveItem) {
+    const currentName = archive.category_name || archive.file_name.replace('[DIR] ', '').replace('.txt', '');
     dialogState = {
       isOpen: true,
-      title: 'Rename Category',
-      message: 'Enter a new name for this category delimiter (symbols like [], (), hyphens allowed):',
+      title: 'Rename Folder',
+      message: 'Enter a new name for this folder delimiter (symbols like [], (), hyphens allowed):',
       mode: 'prompt',
       initialValue: currentName,
       confirmText: 'Rename',
@@ -255,52 +256,52 @@
         if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
 
         try {
-          const report = await invoke<ArchiveScanReport>('rename_physical_category', {
+          const report = await invoke<ArchiveScanReport>('rename_physical_folder', {
             gamePath,
             oldFileName: archive.file_name,
-            newCategoryName: newName.trim()
+            newFolderName: newName.trim()
           });
           if (report && Array.isArray(report.archives)) {
-            const wasCollapsed = !!collapsedCategories[archive.file_name];
-            delete collapsedCategories[archive.file_name];
-            const newFileName = `[CAT] ${newName.trim()}.txt`;
+            const wasCollapsed = !!collapsedFolders[archive.file_name];
+            delete collapsedFolders[archive.file_name];
+            const newFileName = `[DIR] ${newName.trim()}.txt`;
             if (wasCollapsed) {
-              collapsedCategories[newFileName] = true;
+              collapsedFolders[newFileName] = true;
             }
 
             archives = report.archives;
             if (onStateChanged) onStateChanged();
           }
         } catch (err) {
-          console.error("Failed to rename physical category:", err);
+          console.error("Failed to rename physical folder:", err);
         }
       }
     };
   }
 
-  function handleDeleteCategory(archive: ArchiveItem) {
+  function handleDeleteFolder(archive: ArchiveItem) {
     dialogState = {
       isOpen: true,
-      title: 'Delete Category',
-      message: 'Are you sure you wish to delete this category? The category marker will be removed, but all contained mods will remain preserved in their exact sequential order.',
+      title: 'Delete Folder',
+      message: 'Are you sure you wish to delete this folder? The folder marker will be removed, but all contained mods will remain preserved in their exact sequential order.',
       mode: 'confirm',
       initialValue: '',
-      confirmText: 'Delete Category',
+      confirmText: 'Delete Folder',
       isDanger: true,
       onConfirm: async () => {
         dialogState.isOpen = false;
         try {
-          const report = await invoke<ArchiveScanReport>('delete_physical_category', {
+          const report = await invoke<ArchiveScanReport>('delete_physical_folder', {
             gamePath,
-            categoryFileName: archive.file_name
+            folderFileName: archive.file_name
           });
           if (report && Array.isArray(report.archives)) {
-            delete collapsedCategories[archive.file_name];
+            delete collapsedFolders[archive.file_name];
             archives = report.archives;
             if (onStateChanged) onStateChanged();
           }
         } catch (err) {
-          console.error("Failed to delete physical category:", err);
+          console.error("Failed to delete physical folder:", err);
         }
       }
     };
@@ -339,7 +340,7 @@
       persistState();
       if (onStateChanged) onStateChanged();
     } catch (err) {
-      console.error('Failed to toggle mod/category:', err);
+      console.error('Failed to toggle mod/folder:', err);
     }
   }
 
@@ -353,8 +354,8 @@
       for (let i = targetIndex - 1; i >= 0; i--) {
         const item = localArchives[i];
         if (item.is_delimiter) {
-          if (collapsedCategories[item.file_name]) {
-            collapsedCategories[item.file_name] = false;
+          if (collapsedFolders[item.file_name]) {
+            collapsedFolders[item.file_name] = false;
           }
           break;
         }
@@ -409,11 +410,11 @@
         size++;
       }
 
-      preDragCollapseState = { ...collapsedCategories };
+      preDragCollapseState = { ...collapsedFolders };
 
       if (size > 1) {
-        collapsedCategories = {
-          ...collapsedCategories,
+        collapsedFolders = {
+          ...collapsedFolders,
           [localArchives[index].file_name]: true
         };
       }
@@ -471,7 +472,7 @@
       
       if (dropPlacement === 'after') {
         const targetItem = localArchives[dropTargetIndex];
-        if (targetItem.is_delimiter && collapsedCategories[targetItem.file_name]) {
+        if (targetItem.is_delimiter && collapsedFolders[targetItem.file_name]) {
           let targetBlockEnd = dropTargetIndex;
           for (let i = dropTargetIndex + 1; i < localArchives.length; i++) {
             if (localArchives[i].is_delimiter) break;
@@ -502,7 +503,7 @@
     }
     
     if (preDragCollapseState !== null) {
-      collapsedCategories = { ...preDragCollapseState };
+      collapsedFolders = { ...preDragCollapseState };
       preDragCollapseState = null;
     }
 
@@ -546,15 +547,15 @@
     selectedMods = new Set(selectedMods);
   }
 
-  function handleMoveToCategory(targetCategoryFileName: string) {
+  function handleMoveToFolder(targetFolderFileName: string) {
     isMoveModalOpen = false;
     
-    if (targetCategoryFileName.startsWith('[CREATE_NEW]')) {
-      const prefill = targetCategoryFileName.split(':')[1] || 'New Category';
+    if (targetFolderFileName.startsWith('[CREATE_NEW]')) {
+      const prefill = targetFolderFileName.split(':')[1] || 'New Folder';
       dialogState = {
         isOpen: true,
-        title: 'Create & Move to Category',
-        message: 'Enter a name for the new category delimiter:',
+        title: 'Create & Move to Folder',
+        message: 'Enter a name for the new folder delimiter:',
         mode: 'prompt',
         initialValue: prefill,
         confirmText: 'Create & Move',
@@ -564,16 +565,16 @@
           if (!name || name.trim() === '') return;
           
           try {
-            const report = await invoke<ArchiveScanReport>('create_physical_category', {
+            const report = await invoke<ArchiveScanReport>('create_physical_folder', {
               gamePath,
-              categoryName: name.trim()
+              folderName: name.trim()
             });
             if (report && Array.isArray(report.archives)) {
               archives = report.archives;
               localArchives = [...archives];
               
-              const newFileName = `[CAT] ${name.trim()}.txt`;
-              executeMoveToCategory(newFileName);
+              const newFileName = `[DIR] ${name.trim()}.txt`;
+              executeMoveToFolder(newFileName);
               
               if (onStateChanged) onStateChanged();
               setTimeout(() => {
@@ -581,17 +582,17 @@
               }, 100);
             }
           } catch (err) {
-            console.error("Failed to create physical category:", err);
+            console.error("Failed to create physical folder:", err);
           }
         }
       };
       return;
     }
 
-    executeMoveToCategory(targetCategoryFileName);
+    executeMoveToFolder(targetFolderFileName);
   }
 
-  function executeMoveToCategory(targetCategoryFileName: string) {
+  function executeMoveToFolder(targetFolderFileName: string) {
     if (selectedMods.size === 0) return;
 
     const updated = [...localArchives];
@@ -604,8 +605,8 @@
     }
 
     let insertIndex = 0;
-    if (targetCategoryFileName !== '[TOP]') {
-      const catIndex = updated.findIndex(a => a.file_name === targetCategoryFileName);
+    if (targetFolderFileName !== '[TOP]') {
+      const catIndex = updated.findIndex(a => a.file_name === targetFolderFileName);
       if (catIndex !== -1) {
         insertIndex = catIndex + 1;
         while (insertIndex < updated.length && !updated[insertIndex].is_delimiter) {
@@ -787,9 +788,9 @@
     }
   }
 
-  let availableCategories = $derived.by(() => {
+  let availableFolders = $derived.by(() => {
     return localArchives.filter(a => a.is_delimiter).map(a => ({
-      name: a.category_name || a.file_name.replace('[CAT] ', '').replace('.txt', ''),
+      name: a.category_name || a.file_name.replace('[DIR] ', '').replace('.txt', ''),
       file_name: a.file_name
     }));
   });
@@ -801,7 +802,7 @@
     }));
   });
 
-  let categoryCounts = $derived.by(() => {
+  let folderCounts = $derived.by(() => {
     const counts = new Map<string, number>();
     let currentCat: string | null = null;
     let currentCount = 0;
@@ -832,7 +833,7 @@
     
     if (dropPlacement === 'after') {
       const targetItem = localArchives[dropTargetIndex];
-      if (targetItem.is_delimiter && collapsedCategories[targetItem.file_name]) {
+      if (targetItem.is_delimiter && collapsedFolders[targetItem.file_name]) {
         let targetBlockEnd = dropTargetIndex;
         for (let i = dropTargetIndex + 1; i < localArchives.length; i++) {
           if (localArchives[i].is_delimiter) break;
@@ -900,7 +901,7 @@
       const archive = localArchives[i];
 
       if (archive.is_delimiter) {
-        currentCategoryCollapsed = !!collapsedCategories[archive.file_name];
+        currentCategoryCollapsed = !!collapsedFolders[archive.file_name];
         inCategory = true;
         if (searchQuery === '' || archive.name.toLowerCase().includes(searchQuery.toLowerCase())) {
           result.push({ 
@@ -970,7 +971,7 @@
     {#if draggedEntry.is_delimiter}
       <Folder class="h-3.5 w-3.5 text-nvidia-accent" />
       <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">
-        {draggedEntry.category_name || draggedEntry.file_name.replace('[CAT] ', '').replace('.txt', '')}
+        {draggedEntry.category_name || draggedEntry.file_name.replace('[DIR] ', '').replace('.txt', '')}
         {#if dragBlockSize > 1}
           <span class="text-nvidia-accent ml-1 font-mono">({dragBlockSize - 1} mods)</span>
         {/if}
@@ -1043,7 +1044,7 @@
           {#if contextMenu.targetType === 'archive' && !contextMenu.archive?.is_delimiter && selectedMods.size > 1 && contextMenu.archive?.file_name && selectedMods.has(contextMenu.archive.file_name)}
             <span>{isActive ? 'Disable ' + selectedMods.size + ' Mods' : 'Enable ' + selectedMods.size + ' Mods'}</span>
           {:else}
-            <span>{isActive ? (contextMenu.archive?.is_delimiter ? 'Disable Category' : 'Disable Mod') : (contextMenu.archive?.is_delimiter ? 'Enable Category' : 'Enable Mod')}</span>
+            <span>{isActive ? (contextMenu.archive?.is_delimiter ? 'Disable Folder' : 'Disable Mod') : (contextMenu.archive?.is_delimiter ? 'Enable Folder' : 'Enable Mod')}</span>
           {/if}
         </button>
       {/if}
@@ -1051,20 +1052,20 @@
       {#if contextMenu.targetType === 'archive' && contextMenu.archive?.is_delimiter}
         <button
           type="button"
-          onclick={() => { const item = contextMenu.archive; closeContextMenu(); if (item) handleRenameCategory(item); }}
+          onclick={() => { const item = contextMenu.archive; closeContextMenu(); if (item) handleRenameFolder(item); }}
           class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
         >
           <Pencil class="h-3.5 w-3.5 text-nvidia-accent" />
-          <span>Rename Category</span>
+          <span>Rename Folder</span>
         </button>
 
         <button
           type="button"
-          onclick={() => { const item = contextMenu.archive; closeContextMenu(); if (item) handleDeleteCategory(item); }}
+          onclick={() => { const item = contextMenu.archive; closeContextMenu(); if (item) handleDeleteFolder(item); }}
           class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-red-500/10 text-red-400 transition text-left cursor-pointer group"
         >
           <Trash2 class="h-3.5 w-3.5 text-red-400" />
-          <span>Delete Category</span>
+          <span>Delete Folder</span>
         </button>
       {/if}
 
@@ -1075,12 +1076,12 @@
           class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
         >
           <FolderInput class="h-3.5 w-3.5 text-nvidia-accent" />
-          <span>Move {selectedMods.size} Mods to Category...</span>
+          <span>Move {selectedMods.size} Mods to Folder...</span>
         </button>
 
         <button
           type="button"
-          onclick={() => { closeContextMenu(); handleMoveToCategory('[TOP]'); }}
+          onclick={() => { closeContextMenu(); handleMoveToFolder('[TOP]'); }}
           class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
         >
           <ArrowUp class="h-3.5 w-3.5 text-nvidia-accent" />
@@ -1125,7 +1126,7 @@
     <h2 class="text-lg font-bold text-nvidia-text-primary uppercase tracking-wider">Archive Mods</h2>
     <div class="flex items-center gap-2 text-xs text-nvidia-text-muted mt-1">
       <span class="font-mono bg-nvidia-surface px-1.5 py-0.5 rounded border border-nvidia-border">archive\pc\mod</span>
-      <span>Standard REDengine archive modifications and physical load order categories.</span>
+      <span>Standard REDengine archive modifications and physical load order folders.</span>
     </div>
   </div>
 
@@ -1136,7 +1137,7 @@
         <input
           type="text"
           bind:value={searchQuery}
-          placeholder="Filter mods or categories..."
+          placeholder="Filter mods or folders..."
           class="w-full pl-9 pr-8 py-1.5 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary placeholder-nvidia-text-muted focus:outline-none focus:border-nvidia-accent"
         />
         {#if searchQuery !== ''}
@@ -1157,8 +1158,8 @@
 
     <div class="flex items-center gap-2.5">
       <button
-        onclick={toggleAllCategories}
-        disabled={totalCategories === 0}
+        onclick={toggleAllFolders}
+        disabled={totalFolders === 0}
         class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {#if isAllCollapsed}
@@ -1171,11 +1172,11 @@
       </button>
 
       <button
-        onclick={addCategory}
+        onclick={addFolder}
         class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary font-medium transition cursor-pointer"
       >
         <FolderPlus class="h-3.5 w-3.5 text-nvidia-accent" />
-        <span>Add Category</span>
+        <span>Add Folder</span>
       </button>
 
       <button
@@ -1221,20 +1222,20 @@
             {/if}
 
             {#if archive.is_delimiter}
-              <CategoryDelimiterRow
+              <FolderDelimiterRow
                 {archive}
                 {originalIndex}
                 {isSource}
-                collapsed={!!collapsedCategories[archive.file_name]}
-                modCount={categoryCounts.get(archive.file_name) ?? 0}
-                onToggleCollapse={toggleCategoryCollapse}
+                collapsed={!!collapsedFolders[archive.file_name]}
+                modCount={folderCounts.get(archive.file_name) ?? 0}
+                onToggleCollapse={toggleFolderCollapse}
                 isHighlighted={highlightedModName === archive.file_name}
                 onDragStart={startDrag}
                 onPointerMove={onRowPointerMove}
                 onToggle={toggleMod}
                 onContextMenu={openContextMenu}
-                onRenameCategory={handleRenameCategory}
-                onDeleteCategory={handleDeleteCategory}
+                onRenameFolder={handleRenameFolder}
+                onDeleteFolder={handleDeleteFolder}
                 registerNode={registerModNode}
               />
             {:else}
@@ -1394,8 +1395,19 @@
       <!-- Dedicated Bottom Section: Unassociated .xl Files -->
       {#if unassociatedXlFiles.length > 0}
         <div class="mt-6 pt-4 border-t border-nvidia-border/60 space-y-2">
-          <div class="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 flex items-center justify-between">
+          <div 
+            role="button"
+            tabindex="0"
+            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') showUnassociatedXl = !showUnassociatedXl; }}
+            onclick={() => showUnassociatedXl = !showUnassociatedXl}
+            class="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 flex items-center justify-between cursor-pointer hover:bg-cyan-500/20 transition-colors"
+          >
             <div class="flex items-center gap-2 min-w-0">
+              {#if showUnassociatedXl}
+                <ChevronDown class="h-4 w-4 text-cyan-400 shrink-0" />
+              {:else}
+                <ChevronRight class="h-4 w-4 text-cyan-400 shrink-0" />
+              {/if}
               <FileCode class="h-4 w-4 text-cyan-400 shrink-0" />
               <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider">
                 Unassociated .xl Files
@@ -1408,7 +1420,7 @@
             <div class="flex items-center gap-2 shrink-0">
               <button
                 type="button"
-                onclick={() => showXlHelp = !showXlHelp}
+                onclick={(e) => { e.stopPropagation(); showXlHelp = !showXlHelp; }}
                 class="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border transition-colors {showXlHelp ? 'bg-cyan-950 text-cyan-300 border-cyan-600' : 'bg-nvidia-surface hover:bg-nvidia-card text-cyan-400 border-cyan-500/40'}"
                 title="Click for association instructions"
               >
@@ -1437,32 +1449,34 @@
             </div>
           {/if}
 
-          <div class="space-y-1">
-            {#each unassociatedXlFiles as xl (xl.file_name + '_' + xl.enabled)}
-              <div
-                oncontextmenu={(e) => openContextMenu(e, xl, 'unassociated_xl')}
-                class="rounded border border-nvidia-border bg-nvidia-surface/80 hover:bg-nvidia-surface px-3 flex items-center justify-between density-row cursor-context-menu"
-              >
-                <div class="flex items-center gap-2.5 min-w-0">
-                  <FileCode class="h-3.5 w-3.5 text-cyan-400 shrink-0" />
-                  <span class="font-mono text-nvidia-text-primary font-medium truncate">{xl.file_name}</span>
-                  <span class="text-[11px] font-mono text-nvidia-text-muted shrink-0 hidden sm:block">
-                    {formatBytes(xl.size_bytes)}
-                  </span>
-                </div>
+          {#if showUnassociatedXl}
+            <div class="space-y-1">
+              {#each unassociatedXlFiles as xl (xl.file_name + '_' + xl.enabled)}
+                <div
+                  oncontextmenu={(e) => openContextMenu(e, xl, 'unassociated_xl')}
+                  class="rounded border border-nvidia-border bg-nvidia-surface/80 hover:bg-nvidia-surface px-3 flex items-center justify-between density-row cursor-context-menu"
+                >
+                  <div class="flex items-center gap-2.5 min-w-0">
+                    <FileCode class="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+                    <span class="font-mono text-nvidia-text-primary font-medium truncate">{xl.file_name}</span>
+                    <span class="text-[11px] font-mono text-nvidia-text-muted shrink-0 hidden sm:block">
+                      {formatBytes(xl.size_bytes)}
+                    </span>
+                  </div>
 
-                <div class="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onclick={(e) => { e.stopPropagation(); targetXlToLink = xl.file_name; isLinkModalOpen = true; }}
-                    class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 hover:border-cyan-400 text-cyan-400 font-semibold transition cursor-pointer"
-                  >
-                    Active / Click to Link
-                  </button>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onclick={(e) => { e.stopPropagation(); targetXlToLink = xl.file_name; isLinkModalOpen = true; }}
+                      class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 hover:border-cyan-400 text-cyan-400 font-semibold transition cursor-pointer"
+                    >
+                      Active / Click to Link
+                    </button>
+                  </div>
                 </div>
-              </div>
-            {/each}
-          </div>
+              {/each}
+            </div>
+          {/if}
         </div>
       {/if}
     </div>
@@ -1545,10 +1559,10 @@
   onCancel={() => dialogState.isOpen = false}
 />
 
-<MoveCategoryModal
+<MoveFolderModal
   bind:isOpen={isMoveModalOpen}
-  categories={availableCategories}
-  onConfirm={handleMoveToCategory}
+  folders={availableFolders}
+  onConfirm={handleMoveToFolder}
   onCancel={() => isMoveModalOpen = false}
 />
 

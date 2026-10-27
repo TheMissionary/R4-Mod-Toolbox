@@ -442,7 +442,7 @@ fn scan_game_directory(game_path: String) -> Result<ScanResult, String> {
         if let Ok(entries) = fs::read_dir(&archive_dir) {
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().to_string();
-                if name.starts_with("[CAT] ") { continue; }
+                if name.starts_with("[CAT] ") || name.starts_with("[DIR] ") { continue; }
                 if name.ends_with(".archive") {
                     archive_active += 1;
                     archive_total += 1;
@@ -514,18 +514,18 @@ fn load_categories_config(game_path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn create_physical_category(game_path: String, category_name: String) -> Result<archive::ArchiveScanReport, String> {
-    archive::create_physical_category(&game_path, &category_name)
+fn create_physical_folder(game_path: String, folder_name: String) -> Result<archive::ArchiveScanReport, String> {
+    archive::create_physical_folder(&game_path, &folder_name)
 }
 
 #[tauri::command]
-fn delete_physical_category(game_path: String, category_file_name: String) -> Result<archive::ArchiveScanReport, String> {
-    archive::delete_physical_category(&game_path, &category_file_name)
+fn delete_physical_folder(game_path: String, folder_file_name: String) -> Result<archive::ArchiveScanReport, String> {
+    archive::delete_physical_folder(&game_path, &folder_file_name)
 }
 
 #[tauri::command]
-fn rename_physical_category(game_path: String, old_file_name: String, new_category_name: String) -> Result<archive::ArchiveScanReport, String> {
-    archive::rename_physical_category(&game_path, &old_file_name, &new_category_name)
+fn rename_physical_folder(game_path: String, old_file_name: String, new_folder_name: String) -> Result<archive::ArchiveScanReport, String> {
+    archive::rename_physical_folder(&game_path, &old_file_name, &new_folder_name)
 }
 
 #[tauri::command]
@@ -829,6 +829,34 @@ fn toggle_plugin_state(
 }
 
 #[tauri::command]
+fn bulk_toggle_mod_type(game_path: String, mod_type: String, enable: bool) -> Result<(), String> {
+    info!("Bulk toggling {} to {}", mod_type, enable);
+    if mod_type == "archive" {
+        if let Ok(report) = archive::scan_archives(&game_path) {
+            for item in report.archives {
+                if !item.is_delimiter && item.enabled != enable {
+                    let _ = archive::toggle_mod(&game_path, &item.file_name, enable);
+                }
+            }
+        }
+    } else {
+        let items = match mod_type.as_str() {
+            "cet" => get_cet_details(game_path.clone()).map(|v| v.into_iter().map(|i| (i.name, i.enabled)).collect::<Vec<_>>())?,
+            "red4ext" => get_red4ext_details(game_path.clone()).map(|v| v.into_iter().map(|i| (i.name, i.enabled)).collect::<Vec<_>>())?,
+            "redscript" => get_redscript_details(game_path.clone()).map(|v| v.into_iter().map(|i| (i.name, i.enabled)).collect::<Vec<_>>())?,
+            "r6tweaks" => get_r6tweaks_details(game_path.clone()).map(|v| v.into_iter().map(|i| (i.name, i.enabled)).collect::<Vec<_>>())?,
+            _ => return Err("Unknown mod type".to_string()),
+        };
+        for (name, is_enabled) in items {
+            if is_enabled != enable {
+                let _ = toggle_plugin_state(game_path.clone(), mod_type.clone(), name, enable);
+            }
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn get_folder_contents(folder_path: String) -> Result<Vec<FileNode>, String> {
     let path = PathBuf::from(&folder_path);
     if !path.exists() || !path.is_dir() {
@@ -993,9 +1021,9 @@ pub fn run() {
             save_load_order,
             save_categories_config,
             load_categories_config,
-            create_physical_category,
-            delete_physical_category,
-            rename_physical_category,
+            create_physical_folder,
+            delete_physical_folder,
+            rename_physical_folder,
             link_xl_to_archive,
             unlink_xl_from_archive,
             start_directory_watcher,
@@ -1005,6 +1033,7 @@ pub fn run() {
             get_r6tweaks_details,
             get_recent_mods,
             toggle_plugin_state,
+            bulk_toggle_mod_type,
             get_folder_contents,
             open_in_text_editor,
             open_log_folder,

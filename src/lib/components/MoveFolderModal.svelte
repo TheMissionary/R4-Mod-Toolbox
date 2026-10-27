@@ -4,31 +4,28 @@
 
   let {
     isOpen = $bindable(false),
-    categories = [],
+    folders = [],
     onConfirm,
     onCancel
   }: {
     isOpen: boolean;
-    categories: { name: string, file_name: string }[];
+    folders: { name: string, file_name: string }[];
     onConfirm: (fileName: string) => void;
     onCancel: () => void;
   } = $props();
 
   let searchQuery = $state('');
-  // -2 means absolutely nothing is highlighted upon arrival
-  // -1 represents the "Create New" button
-  // 0+ represents existing categories
   let selectedIndex = $state(-2);
   let inputEl = $state<HTMLInputElement | null>(null);
 
   let filtered = $derived(
-    categories.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    folders.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   $effect(() => {
     if (isOpen) {
       searchQuery = '';
-      selectedIndex = -2; // Reset to no highlight on open
+      selectedIndex = -2;
       tick().then(() => inputEl?.focus());
     }
   });
@@ -46,7 +43,7 @@
       } else if (selectedIndex < filtered.length - 1) {
         selectedIndex++;
       } else {
-        selectedIndex = -1; // Loop back to Create New
+        selectedIndex = -1;
       }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
@@ -55,14 +52,13 @@
       } else if (selectedIndex > -1) {
         selectedIndex--;
       } else {
-        selectedIndex = filtered.length - 1; // Loop to bottom
+        selectedIndex = filtered.length - 1;
       }
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (selectedIndex >= 0 && filtered.length > 0) {
         onConfirm(filtered[selectedIndex].file_name);
       } else {
-        // Defaults to Create New if nothing is selected (-2) or if Create New is focused (-1)
         onConfirm(`[CREATE_NEW]:${searchQuery}`);
       }
     }
@@ -85,7 +81,7 @@
       <div class="px-5 py-3.5 border-b border-nvidia-border flex items-center justify-between bg-nvidia-surface/40">
         <div class="flex items-center gap-2.5">
           <FolderInput class="h-4 w-4 text-nvidia-accent" />
-          <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Move to Category</span>
+          <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Move to Folder</span>
         </div>
         <button
           type="button"
@@ -103,28 +99,25 @@
           type="text"
           bind:value={searchQuery}
           oninput={() => selectedIndex = -2}
-          placeholder="Search categories..."
+          placeholder="Search folders..."
           class="w-full pl-9 pr-3 py-2 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent"
         />
       </div>
 
       <div class="max-h-64 overflow-y-auto p-2 space-y-1">
-        <!-- Always First: Create New Category -->
         <button
           type="button"
           onclick={() => onConfirm(`[CREATE_NEW]:${searchQuery}`)}
           class="w-full text-left px-3 py-2 rounded text-xs font-bold transition flex items-center gap-2 cursor-pointer text-nvidia-accent border {selectedIndex === -1 ? 'bg-nvidia-accent/15 border-nvidia-accent/30' : 'border-transparent hover:bg-nvidia-accent/10'}"
         >
           <FolderPlus class="h-4 w-4" />
-          {searchQuery ? `+ Create "${searchQuery}" Category...` : '+ Create New Category...'}
+          {searchQuery ? `+ Create "${searchQuery}" Folder...` : '+ Create New Folder...'}
         </button>
 
-        <!-- Visual Separator -->
         {#if filtered.length > 0}
           <div class="h-px bg-nvidia-border/50 my-1.5 mx-1"></div>
         {/if}
 
-        <!-- Existing Categories -->
         {#each filtered as cat, i}
           <button
             type="button"
@@ -137,7 +130,7 @@
         {/each}
         
         {#if filtered.length === 0}
-          <div class="p-4 text-center text-xs text-nvidia-text-muted">No existing categories match your search.</div>
+          <div class="p-4 text-center text-xs text-nvidia-text-muted">No existing folders match your search.</div>
         {/if}
       </div>
     </div>

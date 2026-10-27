@@ -15,7 +15,8 @@
     Code,
     FolderOpen,
     Trash2,
-    Check
+    Check,
+    LayoutGrid
   } from 'lucide-svelte';
 
   // Default to having the support section open
@@ -61,14 +62,14 @@
     </div>
     <h2 class="text-xl font-bold text-nvidia-text-primary mb-1">R4 Knowledge Base</h2>
     <p class="text-xs text-nvidia-text-muted max-w-2xl">
-      Learn how to manage your load order, resolve archive conflicts, and utilize advanced features like XL linking and physical categories.
+      Learn how to manage your load order, resolve archive conflicts, and utilize advanced features like XL linking and physical folders.
     </p>
   </div>
 
   <div class="flex-1 overflow-y-auto p-6 space-y-6">
     <div class="max-w-4xl space-y-3">
       
-      <!-- Accordion 1: Load Order & Categories -->
+      <!-- Accordion 1: Load Order & Folders -->
       <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col">
         <button 
           type="button"
@@ -77,7 +78,7 @@
         >
           <div class="flex items-center gap-2.5">
             <FolderTree class="h-4 w-4 text-nvidia-accent" />
-            <h3 class="text-sm font-bold uppercase tracking-wider">Load Order & Categories</h3>
+            <h3 class="text-sm font-bold uppercase tracking-wider">Load Order & Folders</h3>
           </div>
           {#if openSection === 'load_order'}
             <ChevronDown class="h-4 w-4 text-nvidia-text-muted" />
@@ -98,19 +99,57 @@
                 To change which mod wins a conflict, simply click and drag the grip handle on any mod to move it higher or lower in the list.
               </div>
               <div>
-                <strong class="text-nvidia-text-primary block mb-1">Physical Categories:</strong>
-                R4 leverages native engine mechanics to create categories without compromising your data through app-injected logic. These optional created categories are real 0-byte <span class="font-mono text-nvidia-text-primary">.txt</span> files, meaning your perfect build is preserved even if you launch the game without the toolbox.
+                <strong class="text-nvidia-text-primary block mb-1">Physical Folders:</strong>
+                R4 leverages native engine mechanics to create folders without compromising your data through app-injected logic. These optional created folders are real 0-byte <span class="font-mono text-nvidia-text-primary">.txt</span> files, meaning your perfect build is preserved even if you launch the game without the toolbox.
               </div>
               <div>
                 <strong class="text-nvidia-text-primary block mb-1">Multi-Select:</strong>
-                Hold <kbd class="px-1.5 py-0.5 rounded bg-nvidia-card border border-nvidia-border font-mono text-[10px] text-nvidia-text-primary">Ctrl</kbd> to select multiple mods, or <kbd class="px-1.5 py-0.5 rounded bg-nvidia-card border border-nvidia-border font-mono text-[10px] text-nvidia-text-primary">Shift</kbd> to select a range. Right-click the selection to move, disable, or categorize them all at once.
+                Hold <kbd class="px-1.5 py-0.5 rounded bg-nvidia-card border border-nvidia-border font-mono text-[10px] text-nvidia-text-primary">Ctrl</kbd> to select multiple mods, or <kbd class="px-1.5 py-0.5 rounded bg-nvidia-card border border-nvidia-border font-mono text-[10px] text-nvidia-text-primary">Shift</kbd> to select a range. Right-click the selection to move, disable, or organize them all at once.
               </div>
             </div>
           </div>
         {/if}
       </div>
 
-      <!-- Accordion 2: Conflict Resolution -->
+      <!-- Accordion 2: Organizer View -->
+      <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col">
+        <button 
+          type="button"
+          onclick={() => toggleSection('organizer')}
+          class="w-full px-4 py-3 flex items-center justify-between bg-nvidia-surface/60 hover:bg-nvidia-surface/90 transition-colors cursor-pointer"
+        >
+          <div class="flex items-center gap-2.5">
+            <LayoutGrid class="h-4 w-4 text-cyan-400" />
+            <h3 class="text-sm font-bold uppercase tracking-wider">Organizer View (Virtual Categories)</h3>
+          </div>
+          {#if openSection === 'organizer'}
+            <ChevronDown class="h-4 w-4 text-nvidia-text-muted" />
+          {:else}
+            <ChevronRight class="h-4 w-4 text-nvidia-text-muted" />
+          {/if}
+        </button>
+        
+        {#if openSection === 'organizer'}
+          <div transition:slide={{ duration: 200 }} class="border-t border-nvidia-border/60 bg-nvidia-bg/30">
+            <div class="p-5 space-y-4 text-xs text-nvidia-text-muted leading-relaxed">
+              <div class="p-3 rounded border border-nvidia-accent/30 bg-nvidia-accent/10 text-nvidia-text-primary mb-2">
+                <strong class="text-nvidia-accent">Note:</strong> This feature is disabled by default to preserve the pure 1:1 load order experience. To enable it, go to <strong>Settings &gt; Advanced Integrations</strong> and toggle <strong>Enable Organizer View</strong>.
+              </div>
+              <p>
+                The Organizer View is a purely visual layer that allows you to group your mods into custom-named, color-coded categories (like "Vehicles", "Weapons", or "Clothing") without altering their physical load order.
+              </p>
+              <p>
+                <strong>How it works:</strong><br/>
+                • <strong>Bento Box UI:</strong> When enabled, you can toggle the Archive tab into "Organizer View". This displays your categories as a grid of boxes.<br/>
+                • <strong>Zero Load Order Impact:</strong> Dragging a mod into a category here only assigns it a visual label. It does not move the file on your hard drive or change its conflict priority.<br/>
+                • <strong>The Bridge:</strong> When you switch back to the standard "Load Order View", your mods will display their assigned colored labels, giving you visual context while you manage physical conflicts.
+              </p>
+            </div>
+          </div>
+        {/if}
+      </div>
+
+      <!-- Accordion 3: Conflict Resolution -->
       <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col">
         <button 
           type="button"
@@ -152,7 +191,7 @@
         {/if}
       </div>
 
-      <!-- Accordion 3: XL Linking -->
+      <!-- Accordion 4: XL Linking -->
       <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col">
         <button 
           type="button"
@@ -187,7 +226,7 @@
         {/if}
       </div>
 
-      <!-- Accordion 4: Frameworks & Scripts -->
+      <!-- Accordion 5: Frameworks & Scripts -->
       <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col">
         <button 
           type="button"
@@ -231,7 +270,7 @@
         {/if}
       </div>
 
-      <!-- Accordion 5: Support & Feedback (Open by Default, Moved to Bottom) -->
+      <!-- Accordion 6: Support & Feedback -->
       <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col">
         <button 
           type="button"

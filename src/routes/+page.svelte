@@ -43,7 +43,9 @@
     Coffee,
     PanelLeftClose,
     Clock,
-    Camera
+    Camera,
+    Check,
+    Power
   } from 'lucide-svelte';
 
   type TabType = 'archive' | 'cet' | 'red4ext' | 'redscript' | 'r6tweaks' | 'history' | 'settings' | 'help' | 'about';
@@ -92,6 +94,45 @@
   // History Timeframe State
   let newModsHours = $state(6);
   let targetHighlightMod = $state<string | null>(null);
+
+  // Sidebar Context Menu State
+  let sidebarContextMenu = $state<{
+    visible: boolean;
+    x: number;
+    y: number;
+    modType: string;
+    label: string;
+  }>({ visible: false, x: 0, y: 0, modType: '', label: '' });
+
+  function openSidebarContextMenu(event: MouseEvent, modType: string, label: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    const menuWidth = 160;
+    const menuHeight = 80;
+    const posX = (event.clientX + menuWidth > window.innerWidth) ? (window.innerWidth - menuWidth - 10) : event.clientX;
+    const posY = (event.clientY + menuHeight > window.innerHeight) ? (window.innerHeight - menuHeight - 10) : event.clientY;
+    sidebarContextMenu = { visible: true, x: posX, y: posY, modType, label };
+  }
+
+  function closeSidebarContextMenu() {
+    if (sidebarContextMenu.visible) {
+      sidebarContextMenu.visible = false;
+    }
+  }
+
+  async function handleBulkToggle(enable: boolean) {
+    if (!gamePath || !sidebarContextMenu.modType) return;
+    const type = sidebarContextMenu.modType;
+    closeSidebarContextMenu();
+    isLoading = true;
+    try {
+      await invoke('bulk_toggle_mod_type', { gamePath, modType: type, enable });
+      await refreshAll();
+    } catch (err) {
+      error(`Failed to bulk toggle ${type}: ${err}`);
+      isLoading = false;
+    }
+  }
 
   function handleNavigateToMod(tab: string, modName: string) {
     setTab(tab as TabType);
@@ -223,7 +264,40 @@
   });
 </script>
 
-<svelte:window bind:innerWidth oncontextmenu={(e) => e.preventDefault()} />
+<svelte:window bind:innerWidth onclick={closeSidebarContextMenu} oncontextmenu={(e) => e.preventDefault()} />
+
+{#if sidebarContextMenu.visible}
+  <div
+    class="fixed z-50 w-40 rounded-md border border-nvidia-border bg-nvidia-card py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
+    style="left: {sidebarContextMenu.x}px; top: {sidebarContextMenu.y}px;"
+    onclick={(e) => e.stopPropagation()}
+    oncontextmenu={(e) => e.preventDefault()}
+  >
+    <div class="px-3 py-1.5 border-b border-nvidia-border/60 bg-nvidia-surface/40 flex items-center gap-2">
+      <span class="font-mono text-[11px] font-bold text-nvidia-text-primary truncate">
+        {sidebarContextMenu.label}
+      </span>
+    </div>
+    <div class="p-1 space-y-0.5">
+      <button
+        type="button"
+        onclick={() => handleBulkToggle(true)}
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+      >
+        <Check class="h-3.5 w-3.5 text-nvidia-accent" />
+        <span>Enable All</span>
+      </button>
+      <button
+        type="button"
+        onclick={() => handleBulkToggle(false)}
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+      >
+        <Power class="h-3.5 w-3.5 text-red-400" />
+        <span>Disable All</span>
+      </button>
+    </div>
+  </div>
+{/if}
 
 <div class="flex h-screen w-screen overflow-hidden bg-nvidia-bg text-nvidia-text-primary font-sans">
   <!-- Left Navigation Sidebar -->
@@ -262,7 +336,8 @@
           <button
             type="button"
             onclick={() => setTab('archive')}
-            title={isSidebarCollapsed ? 'Archive Mods' : ''}
+            oncontextmenu={(e) => openSidebarContextMenu(e, 'archive', 'Archive Mods')}
+            title={isSidebarCollapsed ? 'Archive Mods (Right-click for options)' : 'Right-click for options'}
             class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'} py-2.5 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'archive' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
           >
             {#if currentTab === 'archive'}
@@ -284,7 +359,8 @@
           <button
             type="button"
             onclick={() => setTab('cet')}
-            title={isSidebarCollapsed ? 'CET Plugins' : ''}
+            oncontextmenu={(e) => openSidebarContextMenu(e, 'cet', 'CET Plugins')}
+            title={isSidebarCollapsed ? 'CET Plugins (Right-click for options)' : 'Right-click for options'}
             class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'} py-2.5 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'cet' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
           >
             {#if currentTab === 'cet'}
@@ -306,7 +382,8 @@
           <button
             type="button"
             onclick={() => setTab('red4ext')}
-            title={isSidebarCollapsed ? 'RED4ext Plugins' : ''}
+            oncontextmenu={(e) => openSidebarContextMenu(e, 'red4ext', 'RED4ext Plugins')}
+            title={isSidebarCollapsed ? 'RED4ext Plugins (Right-click for options)' : 'Right-click for options'}
             class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'} py-2.5 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'red4ext' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
           >
             {#if currentTab === 'red4ext'}
@@ -328,7 +405,8 @@
           <button
             type="button"
             onclick={() => setTab('redscript')}
-            title={isSidebarCollapsed ? 'R6\\Scripts' : ''}
+            oncontextmenu={(e) => openSidebarContextMenu(e, 'redscript', 'R6\\Scripts')}
+            title={isSidebarCollapsed ? 'R6\\Scripts (Right-click for options)' : 'Right-click for options'}
             class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'} py-2.5 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'redscript' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
           >
             {#if currentTab === 'redscript'}
@@ -350,7 +428,8 @@
           <button
             type="button"
             onclick={() => setTab('r6tweaks')}
-            title={isSidebarCollapsed ? 'R6\\Tweaks' : ''}
+            oncontextmenu={(e) => openSidebarContextMenu(e, 'r6tweaks', 'R6\\Tweaks')}
+            title={isSidebarCollapsed ? 'R6\\Tweaks (Right-click for options)' : 'Right-click for options'}
             class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'} py-2.5 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'r6tweaks' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
           >
             {#if currentTab === 'r6tweaks'}

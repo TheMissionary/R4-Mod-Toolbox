@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import type { ArchiveItem } from '$lib/types';
   import { GripVertical, Folder, FolderOpen, Pencil, Trash2, MoreVertical, ChevronDown, ChevronRight } from 'lucide-svelte';
 
@@ -14,8 +14,8 @@
     onPointerMove,
     onToggle,
     onContextMenu,
-    onRenameCategory,
-    onDeleteCategory,
+    onRenameFolder,
+    onDeleteFolder,
     registerNode
   }: {
     archive: ArchiveItem;
@@ -24,20 +24,20 @@
     isHighlighted: boolean;
     collapsed?: boolean;
     modCount?: number;
-    onToggleCollapse?: (categoryFileName: string) => void;
+    onToggleCollapse?: (folderFileName: string) => void;
     onDragStart: (e: PointerEvent, index: number) => void;
     onPointerMove: (e: PointerEvent, index: number) => void;
     onToggle: (archive: ArchiveItem) => void;
     onContextMenu: (e: MouseEvent, archive: ArchiveItem, type: 'archive' | 'xl') => void;
-    onRenameCategory?: (archive: ArchiveItem) => void;
-    onDeleteCategory?: (archive: ArchiveItem) => void;
+    onRenameFolder?: (archive: ArchiveItem) => void;
+    onDeleteFolder?: (archive: ArchiveItem) => void;
     registerNode: (node: HTMLElement, name: string) => any;
   } = $props();
 </script>
 
 <div
   role="group"
-  aria-label="Category Delimiter: {archive.category_name || archive.file_name}"
+  aria-label="Folder: {archive.category_name || archive.file_name}"
   use:registerNode={archive.file_name}
   onpointermove={(e) => onPointerMove(e, originalIndex)}
   oncontextmenu={(e) => onContextMenu(e, archive, 'archive')}
@@ -63,7 +63,7 @@
       <!-- Completely Neutral, De-Emphasized Switch -->
       <button
         onclick={() => onToggle(archive)}
-        aria-label={archive.enabled ? "Disable category marker" : "Enable category marker"}
+        aria-label={archive.enabled ? "Disable folder marker" : "Enable folder marker"}
         class="w-7 h-4 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer {archive.enabled ? 'bg-zinc-700/80 border border-zinc-600' : 'bg-zinc-900/90 border border-zinc-800'}"
       >
         <div class="h-2.5 w-2.5 rounded-full transition-transform transform {archive.enabled ? 'translate-x-3 bg-zinc-100 shadow-xs' : 'translate-x-0 bg-zinc-500'}"></div>
@@ -74,7 +74,7 @@
         type="button"
         onclick={() => onToggleCollapse && onToggleCollapse(archive.file_name)}
         class="flex items-center gap-1.5 text-nvidia-text-primary hover:text-nvidia-accent transition cursor-pointer min-w-0"
-        title={collapsed ? "Expand category" : "Collapse category"}
+        title={collapsed ? "Expand folder" : "Collapse folder"}
       >
         {#if collapsed}
           <ChevronRight class="h-4 w-4 text-nvidia-text-muted shrink-0" />
@@ -84,7 +84,7 @@
           <FolderOpen class="h-4 w-4 text-nvidia-text-muted shrink-0" />
         {/if}
         <span class="font-bold uppercase tracking-wider truncate">
-          {archive.category_name || archive.file_name.replace('[CAT] ', '').replace('.txt', '')}
+          {archive.category_name || archive.file_name.replace('[DIR] ', '').replace('.txt', '')}
         </span>
       </button>
 
@@ -98,18 +98,18 @@
     <div class="flex items-center gap-1.5 shrink-0">
       <button
         type="button"
-        onclick={(e) => { e.stopPropagation(); onRenameCategory && onRenameCategory(archive); }}
+        onclick={(e) => { e.stopPropagation(); onRenameFolder && onRenameFolder(archive); }}
         class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-accent hover:bg-nvidia-surface/80 transition cursor-pointer"
-        title="Rename category"
+        title="Rename folder"
       >
         <Pencil class="h-3.5 w-3.5" />
       </button>
 
       <button
         type="button"
-        onclick={(e) => { e.stopPropagation(); onDeleteCategory && onDeleteCategory(archive); }}
+        onclick={(e) => { e.stopPropagation(); onDeleteFolder && onDeleteFolder(archive); }}
         class="p-1 rounded text-nvidia-text-muted hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer"
-        title="Delete category (mods remain preserved)"
+        title="Delete folder (mods remain preserved)"
       >
         <Trash2 class="h-3.5 w-3.5" />
       </button>
