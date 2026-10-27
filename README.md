@@ -2,9 +2,9 @@
 
 **Advanced Mod Manager and Conflict Resolver for Cyberpunk 2077**
 
-![Beta Release](https://img.shields.io/badge/Release-Beta_1-orange.svg)
-![Platform](https://img.shields.io/badge/Platform-Windows_11-blue.svg)
-<img width="2560" height="1440" alt="Unreleased-IP=Mods-Header" src="https://github.com/user-attachments/assets/1d8909f3-6aee-42ef-97c1-d90b30c7c8be" />
+![Beta Release](https://img.shields.io/badge/Release-v0.39.0_(Beta_4)-orange.svg)
+![Platform](https://img.shields.io/badge/Platform-Windows_10_%7C_11-blue.svg)
+![R4 Mod Toolbox Header](https://raw.githubusercontent.com/TheMissionary/R4-Mod-Toolbox/main/assets/headertemplate2.png)
 
 R4 Mod Toolbox is a high-performance, standalone desktop application built specifically for **manual modders**. If you prefer to download and extract your own mods but want a powerful, visualized dashboard to manage load orders, resolve conflicts, and organize your workspace, R4 is built for you. 
 
@@ -12,25 +12,27 @@ It does not hijack your downloads or obfuscate your files in virtual file system
 
 ---
 
-## ⚠️ Beta Release X.XX.X (see Releases)
-R4 Mod Toolbox has entered public beta release period. The core engine is stable, but we are actively pursuing community testing, feedback, and edge-case reports from users with massive, complex modlists. Please report any bugs or UX friction in the [Issues tab](https://github.com/TheMissionary/R4-Mod-Toolbox/issues). 
+## ⚠️ Beta Release v0.39.0
+R4 Mod Toolbox has entered its public beta release period. The core engine is stable, but we are actively pursuing community testing, feedback, and edge-case reports from users with massive, complex modlists. Please report any bugs or UX friction in the [Issues tab](https://github.com/TheMissionary/R4-Mod-Toolbox/issues). 
 
 ---
-
-<img width="1664" height="1088" alt="HomePage" src="https://github.com/user-attachments/assets/9fda1300-968e-4924-a6d5-97bfebcbbbe8" />
 
 
 ## 🚀 Key Features
 
 * **Real-Time Conflict Resolution:** R4 scans the internal hashes of every `.archive` file in milliseconds. Instantly see exactly which mods are winning (green) and losing (red) asset conflicts before you even launch the game.
 * **Drag-and-Drop Load Ordering:** Effortlessly reorder your mods to change conflict winners. The UI updates conflict states in real-time as you drag.
-* **Universal Framework Support:** Complete visibility and safe toggle control over **Archive**, **CET**, **RED4ext**, **R6\Scripts**, and **R6\Tweaks**.
+* **Universal Framework Support:** Complete visibility with Windows Explorer-style file trees and safe toggle control over **Archive**, **CET**, **RED4ext**, **R6\Scripts**, and **R6\Tweaks**.
+* **Mod History & Ledger:** Track every mod by its "First Seen" date. Use the universal search to instantly locate any file across your entire modding history.
 * **Smart XL Linking:** ArchiveXL requires `.xl` files to load custom entities. R4 automatically pairs these sidecar files with their parent `.archive`, allowing you to toggle both with a single click.
+* **Advanced Integrations:** Link your custom text editor, custom game launch path, and Cyberpunk 2077 Photo Folder for seamless access directly from the sidebar.
 * **Customizable Workspace:** Personalize your experience with dynamic accent colors, dual typography engines (featuring Geist and GeistMono), and light/dark modes.
 
 ---
 
-<img width="1202" height="1088" alt="multimenu" src="https://github.com/user-attachments/assets/26ff1029-1f41-4c47-ad68-4a979e57c474" />
+![Archive Conflict Summary](https://raw.githubusercontent.com/TheMissionary/R4-Mod-Toolbox/main/assets/R4-ArchiveConflictSummary.png)
+
+![CET Explorer](https://raw.githubusercontent.com/TheMissionary/R4-Mod-Toolbox/main/assets/R4-CET-Explorer.png)
 
 ## 📂 Transparency: How R4 Manages Your Files
 
@@ -39,7 +41,7 @@ Because R4 is built for manual modders, we believe in 100% transparency regardin
 ### 1. Disabling Mods Safely
 R4 uses two highly optimized methods to disable mods without deleting your data:
 * **Archive Mods:** Toggling an archive simply renames it in-place (appending `.disabled`). It never leaves your mod folder and retains its exact alphabetical position.
-* **Frameworks & Scripts:** Toggling CET, RED4ext, or R6 mods executes an in-place swap to show the disabled files in your Cyberpunk 2077\Disabled_Mods folder. This prevents the REDengine from throwing fatal compilation errors on boot.
+* **Frameworks & Scripts:** Toggling CET, RED4ext, or R6 mods executes an in-place swap to move the disabled files into your `Cyberpunk 2077\Disabled_Mods` folder. This prevents the REDengine from throwing fatal compilation errors on boot.
 
 
 ### 2. Physical Categories & Load Order Management
