@@ -22,3 +22,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 notify = "6.1.1"
 red4lib = { git = "https://github.com/rfuzzo/red4lib", rev = "cfa6713570e9bf859c29c05052035d38daa08d55" }
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
+opt-level = "s"
+panic = "abort"

@@ -2,7 +2,7 @@
   import type { ArchiveItem, LabelsConfig, CategoryLabel } from '$lib/types';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
-  import { Plus, Pencil, Trash2, GripVertical, FileArchive, LayoutGrid, Inbox, Tag, ListTree, FolderSearch, FolderInput, X } from 'lucide-svelte';
+  import { Plus, Pencil, Trash2, GripVertical, FileArchive, LayoutGrid, Inbox, Tag, ListTree, FolderSearch, FolderInput, X, ChevronDown, ChevronRight, Folder, FolderOpen } from 'lucide-svelte';
   import CategoryModal from './CategoryModal.svelte';
   import DialogModal from './DialogModal.svelte';
   import MoveCategoryModal from './MoveCategoryModal.svelte';
@@ -14,7 +14,8 @@
     showCategoryLabelsInLoadOrder = $bindable(true),
     onLabelsToggle,
     showUncategorizedDrawer = true,
-    onShowInLoadOrder
+    onShowInLoadOrder,
+    onRouteToHistory
   }: {
     archives: ArchiveItem[];
     labelsConfig: LabelsConfig;
@@ -23,6 +24,7 @@
     onLabelsToggle?: (val: boolean) => void;
     showUncategorizedDrawer?: boolean;
     onShowInLoadOrder?: (modName: string) => void;
+    onRouteToHistory?: (modName: string) => void;
   } = $props();
 
   let isCatModalOpen = $state(false);
@@ -33,6 +35,28 @@
   let catToDelete = $state<CategoryLabel | null>(null);
 
   let isMoveCatModalOpen = $state(false);
+
+  // --- Collapse State ---
+  let collapsedCategories = $state<Record<string, boolean>>({});
+  let totalCategories = $derived(labelsConfig.categories.length);
+  let collapsedCount = $derived(Object.keys(collapsedCategories).filter(k => collapsedCategories[k]).length);
+  let isAllCollapsed = $derived(totalCategories > 0 && collapsedCount === totalCategories);
+
+  function toggleAllCategories() {
+    if (isAllCollapsed) {
+      collapsedCategories = {};
+    } else {
+      const newState: Record<string, boolean> = {};
+      for (const cat of labelsConfig.categories) {
+        newState[cat.id] = true;
+      }
+      collapsedCategories = newState;
+    }
+  }
+
+  function toggleCategoryCollapse(catId: string) {
+    collapsedCategories[catId] = !collapsedCategories[catId];
+  }
 
   // Derived state for rendering
   let actualMods = $derived(archives.filter(a => !a.is_delimiter));
@@ -89,9 +113,15 @@
   let currentX = $state(0);
   let currentY = $state(0);
   
+  // Mod Drag State
   let activeDropTarget = $state<string | null>(null);
   let dropTargetMod = $state<string | null>(null);
   let dropPlacement = $state<'before' | 'after' | null>(null);
+
+  // Category Drag State
+  let activeCategoryDragId = $state<string | null>(null);
+  let categoryDropTargetId = $state<string | null>(null);
+  let categoryDropPlacement = $state<'before' | 'after' | null>(null);
 
   // --- Context Menu State ---
   let contextMenu = $state<{
@@ -223,6 +253,17 @@
   }
 
   // --- Custom Pointer DnD Engine Logic ---
+  function handleCategoryPointerDown(e: PointerEvent, catId: string) {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    isPointerDown = true;
+    activeCategoryDragId = catId;
+    startX = e.clientX;
+    startY = e.clientY;
+    currentX = e.clientX;
+    currentY = e.clientY;
+  }
+
   function handlePointerDown(e: PointerEvent, modName: string) {
     if (e.button !== 0) return; // Only left click
     
@@ -278,20 +319,49 @@
       currentX = e.clientX;
       currentY = e.clientY;
 
-      const el = document.elementFromPoint(e.clientX, e.clientY);
-      
-      const targetContainer = el?.closest('[data-category-id]');
-      activeDropTarget = targetContainer ? targetContainer.getAttribute('data-category-id') : null;
-
-      const modEl = el?.closest('[data-mod-name]');
-      if (modEl && activeDropTarget) {
-        const rect = modEl.getBoundingClientRect();
-        const mid = rect.top + rect.height / 2;
-        dropPlacement = e.clientY < mid ? 'before' : 'after';
-        dropTargetMod = modEl.getAttribute('data-mod-name');
+      if (activeCategoryDragId) {
+        // Robust 1D Distance-Based Category Dragging
+        const catElements = Array.from(document.querySelectorAll('.organizer-category-header'));
+        let closestCat: Element | null = null;
+        let minDistance = Infinity;
+        
+        for (const el of catElements) {
+          const rect = el.getBoundingClientRect();
+          const midY = rect.top + rect.height / 2;
+          const dist = Math.abs(e.clientY - midY);
+          if (dist < minDistance) {
+            minDistance = dist;
+            closestCat = el;
+          }
+        }
+        
+        if (closestCat) {
+          const targetId = closestCat.getAttribute('data-category-id');
+          if (targetId && targetId !== activeCategoryDragId) {
+            categoryDropTargetId = targetId;
+            const rect = closestCat.getBoundingClientRect();
+            categoryDropPlacement = e.clientY < (rect.top + rect.height / 2) ? 'before' : 'after';
+          } else {
+            categoryDropTargetId = null;
+            categoryDropPlacement = null;
+          }
+        }
       } else {
-        dropTargetMod = null;
-        dropPlacement = null;
+        // Mod Dragging Logic
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        const targetContainer = el?.closest('[data-category-id]');
+        activeDropTarget = targetContainer ? targetContainer.getAttribute('data-category-id') : null;
+
+        const modEl = el?.closest('[data-mod-name]');
+        if (modEl && activeDropTarget) {
+          const rect = modEl.getBoundingClientRect();
+          const mid = rect.top + rect.height / 2;
+          dropPlacement = e.clientY < mid ? 'before' : 'after';
+          dropTargetMod = modEl.getAttribute('data-mod-name');
+        } else {
+          dropTargetMod = null;
+          dropPlacement = null;
+        }
       }
     }
   }
@@ -300,11 +370,26 @@
     if (!isPointerDown) return;
 
     if (isDragging) {
-      if (activeDropTarget) {
+      if (activeCategoryDragId && categoryDropTargetId && categoryDropPlacement) {
+        // Reorder categories
+        const cats = [...labelsConfig.categories];
+        const dragIdx = cats.findIndex(c => c.id === activeCategoryDragId);
+        const targetIdx = cats.findIndex(c => c.id === categoryDropTargetId);
+        
+        if (dragIdx !== -1 && targetIdx !== -1) {
+          const [draggedCat] = cats.splice(dragIdx, 1);
+          const newTargetIdx = cats.findIndex(c => c.id === categoryDropTargetId);
+          const insertIdx = categoryDropPlacement === 'before' ? newTargetIdx : newTargetIdx + 1;
+          cats.splice(insertIdx, 0, draggedCat);
+          
+          labelsConfig.categories = cats;
+          saveConfig();
+        }
+      } else if (activeDropTarget && !activeCategoryDragId) {
+        // Mod Drop Logic
         const newAssignments = { ...labelsConfig.assignments };
         const newOrders = { ...(labelsConfig.orders || {}) };
 
-        // 1. Update assignments
         for (const modName of selectedMods) {
           if (activeDropTarget === 'uncategorized') {
             delete newAssignments[modName];
@@ -313,7 +398,6 @@
           }
         }
 
-        // 2. Build current visual order for the target
         let currentVisualOrder: string[] = [];
         if (activeDropTarget === 'uncategorized') {
           currentVisualOrder = sortedUncategorizedMods.map(m => m.file_name);
@@ -321,10 +405,8 @@
           currentVisualOrder = (sortedCategorizedMods.get(activeDropTarget) || []).map(m => m.file_name);
         }
 
-        // 3. Remove dragged items from this visual order
         currentVisualOrder = currentVisualOrder.filter(m => !selectedMods.has(m));
 
-        // 4. Insert dragged items
         if (dropTargetMod && !selectedMods.has(dropTargetMod)) {
           const targetIdx = currentVisualOrder.indexOf(dropTargetMod);
           if (targetIdx !== -1) {
@@ -337,7 +419,6 @@
           currentVisualOrder.push(...Array.from(selectedMods));
         }
 
-        // 5. Save to newOrders
         newOrders[activeDropTarget] = currentVisualOrder;
 
         labelsConfig.assignments = newAssignments;
@@ -346,7 +427,7 @@
       }
     } else {
       // Resolve standard click selection if not ctrl/shift
-      if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !activeCategoryDragId) {
         if (lastSelectedMod) {
           selectedMods.clear();
           selectedMods.add(lastSelectedMod);
@@ -360,6 +441,9 @@
     activeDropTarget = null;
     dropTargetMod = null;
     dropPlacement = null;
+    activeCategoryDragId = null;
+    categoryDropTargetId = null;
+    categoryDropPlacement = null;
   }
 
   function clearSelection(e: PointerEvent) {
@@ -373,7 +457,8 @@
 
 <svelte:window onpointermove={handlePointerMove} onpointerup={handlePointerUp} onclick={closeContextMenu} />
 
-{#if isDragging}
+<!-- Mod Drag Ghost -->
+{#if isDragging && !activeCategoryDragId}
   <div
     id="dnd-ghost"
     class="fixed pointer-events-none z-50 px-3 py-1.5 rounded-lg bg-nvidia-card border border-cyan-400 shadow-2xl shadow-black/60 flex items-center gap-2.5 backdrop-blur-md -translate-x-4 -translate-y-6"
@@ -389,6 +474,21 @@
       {/if}
     </span>
   </div>
+{/if}
+
+<!-- Category Drag Ghost -->
+{#if isDragging && activeCategoryDragId}
+  {@const draggedCat = labelsConfig.categories.find(c => c.id === activeCategoryDragId)}
+  {#if draggedCat}
+    <div
+      class="fixed pointer-events-none z-50 px-3 py-2 rounded-lg bg-nvidia-card border shadow-2xl shadow-black/60 flex items-center gap-2.5 backdrop-blur-md -translate-x-4 -translate-y-6"
+      style="left: {currentX}px; top: {currentY}px; border-color: {draggedCat.color};"
+    >
+      <GripVertical class="h-3.5 w-3.5 text-nvidia-text-muted" />
+      <div class="h-2.5 w-2.5 rounded-full shrink-0 shadow-sm" style="background-color: {draggedCat.color};"></div>
+      <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">{draggedCat.name}</span>
+    </div>
+  {/if}
 {/if}
 
 <!-- Context Menu -->
@@ -454,7 +554,7 @@
 
 <div class="flex h-full gap-4 overflow-hidden select-none" onpointerdown={clearSelection}>
   
-  <!-- Left: Bento Box Grid -->
+  <!-- Left: Vertical Category Stack -->
   <div class="flex-1 flex flex-col min-w-0 overflow-hidden" onpointerdown={clearSelection}>
     <div class="flex items-center justify-between mb-4 shrink-0">
       <div class="flex items-center gap-2">
@@ -481,6 +581,21 @@
 
         <button
           type="button"
+          onclick={toggleAllCategories}
+          disabled={totalCategories === 0}
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {#if isAllCollapsed}
+            <FolderOpen class="h-3.5 w-3.5 text-cyan-400" />
+            <span>Expand All</span>
+          {:else}
+            <Folder class="h-3.5 w-3.5 text-cyan-400" />
+            <span>Collapse All</span>
+          {/if}
+        </button>
+
+        <button
+          type="button"
           onclick={openCreateModal}
           class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-xs font-bold text-cyan-400 transition cursor-pointer shadow-sm"
         >
@@ -498,77 +613,110 @@
           <p class="text-[10px] mt-1 opacity-70">Click "Add Category" to start organizing.</p>
         </div>
       {:else}
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4" onpointerdown={clearSelection}>
+        <div class="flex flex-col" onpointerdown={clearSelection}>
           {#each labelsConfig.categories as cat (cat.id)}
             {@const mods = sortedCategorizedMods.get(cat.id) || []}
-            <div
-              class="flex flex-col rounded-xl border transition-all duration-200 bg-nvidia-surface/40 overflow-hidden shadow-sm {activeDropTarget === cat.id ? 'border-cyan-400 ring-1 ring-cyan-400 bg-cyan-950/20' : 'border-nvidia-border'}"
-              data-category-id={cat.id}
-            >
-              <!-- Category Header -->
-              <div class="px-3 py-2 border-b border-nvidia-border/60 flex items-center justify-between bg-nvidia-surface/80" style="border-top: 3px solid {cat.color};">
-                <div class="flex items-center gap-2 min-w-0">
-                  <div class="h-2.5 w-2.5 rounded-full shrink-0 shadow-sm" style="background-color: {cat.color};"></div>
-                  <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider truncate">{cat.name}</span>
-                  <span class="text-[10px] font-mono text-nvidia-text-muted bg-nvidia-bg px-1.5 py-0.5 rounded border border-nvidia-border shrink-0">
-                    {mods.length}
-                  </span>
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                  <button
-                    type="button"
-                    onclick={() => openEditModal(cat)}
-                    class="p-1 rounded text-nvidia-text-muted hover:text-cyan-400 hover:bg-cyan-500/10 transition cursor-pointer"
-                    title="Edit Category"
-                  >
-                    <Pencil class="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onclick={() => confirmDelete(cat)}
-                    class="p-1 rounded text-nvidia-text-muted hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer"
-                    title="Delete Category"
-                  >
-                    <Trash2 class="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
+            <div class="relative flex flex-col">
+              
+              <!-- Drop Indicator Before Category -->
+              {#if isDragging && activeCategoryDragId && categoryDropTargetId === cat.id && categoryDropPlacement === 'before'}
+                <div class="absolute -top-1 left-0 right-0 h-[2.5px] bg-cyan-400 z-30 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
+              {/if}
 
-              <!-- Category Body (Drop Target) -->
-              <div class="p-2 min-h-[120px] max-h-[300px] overflow-y-auto space-y-1 bg-nvidia-bg/30" onpointerdown={clearSelection}>
-                {#if mods.length === 0}
-                  <div class="h-full min-h-[100px] flex items-center justify-center text-[10px] font-mono text-nvidia-text-muted/50 italic pointer-events-none">
-                    Drag mods here
-                  </div>
-                {:else}
-                  {#each mods as mod (mod.file_name)}
-                    <div class="relative flex flex-col">
-                      {#if isDragging && dropTargetMod === mod.file_name && dropPlacement === 'before' && !selectedMods.has(mod.file_name)}
-                        <div class="absolute -top-1 left-0 right-0 h-[2.5px] bg-cyan-400 z-30 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
-                      {/if}
-
-                      <div
-                        onpointerdown={(e) => handlePointerDown(e, mod.file_name)}
-                        oncontextmenu={(e) => openContextMenu(e, mod.file_name)}
-                        ondblclick={() => onShowInLoadOrder && onShowInLoadOrder(mod.file_name)}
-                        class="flex items-center gap-2 px-2 py-1.5 rounded border transition density-row cursor-pointer {selectedMods.has(mod.file_name) ? 'border-cyan-500/60 bg-cyan-500/15 opacity-50' : 'border-nvidia-border/50 bg-nvidia-surface hover:border-nvidia-border'}"
-                        data-mod-name={mod.file_name}
-                        title="Double-click to locate in Load Order"
-                      >
-                        <GripVertical class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
-                        <FileArchive class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
-                        <span class="text-[11px] font-mono text-nvidia-text-primary truncate {mod.enabled ? '' : 'opacity-50 line-through'}">
-                          {mod.file_name}
-                        </span>
-                      </div>
-
-                      {#if isDragging && dropTargetMod === mod.file_name && dropPlacement === 'after' && !selectedMods.has(mod.file_name)}
-                        <div class="absolute -bottom-1 left-0 right-0 h-[2.5px] bg-cyan-400 z-30 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
-                      {/if}
+              <!-- Category Header (Mimics FolderDelimiterRow) -->
+              <div
+                class="organizer-category-header group rounded-lg border transition-all duration-300 border-nvidia-border mt-2 mb-1 {activeCategoryDragId === cat.id ? 'opacity-30 border-dashed' : ''}"
+                data-category-id={cat.id}
+                style="background-color: color-mix(in srgb, {cat.color} 15%, transparent);"
+              >
+                <div class="flex items-center justify-between px-3 gap-2 density-row relative overflow-hidden">
+                  <div class="absolute left-0 top-0 bottom-0 w-1" style="background-color: {cat.color};"></div>
+                  
+                  <div class="flex items-center gap-3 min-w-0 flex-1 pl-1">
+                    <div
+                      role="button"
+                      tabindex="0"
+                      onpointerdown={(e) => handleCategoryPointerDown(e, cat.id)}
+                      class="cursor-grab active:cursor-grabbing p-1 text-nvidia-text-muted hover:text-nvidia-text-primary shrink-0 rounded hover:bg-nvidia-surface transition"
+                      title="Drag to reorder category"
+                    >
+                      <GripVertical class="h-4 w-4" />
                     </div>
-                  {/each}
-                {/if}
+
+                    <button
+                      type="button"
+                      onclick={() => toggleCategoryCollapse(cat.id)}
+                      class="flex items-center gap-1.5 text-nvidia-text-primary hover:text-cyan-400 transition cursor-pointer min-w-0"
+                    >
+                      {#if collapsedCategories[cat.id]}
+                        <ChevronRight class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+                        <Folder class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+                      {:else}
+                        <ChevronDown class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+                        <FolderOpen class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+                      {/if}
+                      <span class="font-bold uppercase tracking-wider truncate">{cat.name}</span>
+                    </button>
+
+                    <span class="text-[10px] font-mono text-nvidia-text-muted shrink-0 opacity-80">
+                      ({mods.length} {mods.length === 1 ? 'mod' : 'mods'})
+                    </span>
+                  </div>
+
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <button onclick={() => openEditModal(cat)} class="p-1 rounded text-nvidia-text-muted hover:text-cyan-400 hover:bg-nvidia-surface/80 transition cursor-pointer" title="Edit Category"><Pencil class="h-3.5 w-3.5" /></button>
+                    <button onclick={() => confirmDelete(cat)} class="p-1 rounded text-nvidia-text-muted hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer" title="Delete Category"><Trash2 class="h-3.5 w-3.5" /></button>
+                  </div>
+                </div>
               </div>
+
+              <!-- Drop Indicator After Category -->
+              {#if isDragging && activeCategoryDragId && categoryDropTargetId === cat.id && categoryDropPlacement === 'after'}
+                <div class="absolute -bottom-1 left-0 right-0 h-[2.5px] bg-cyan-400 z-30 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
+              {/if}
+
+              <!-- Category Body (Mods) -->
+              {#if !collapsedCategories[cat.id]}
+                <div class="flex flex-col space-y-1 mb-2" data-category-id={cat.id} onpointerdown={clearSelection}>
+                  {#if mods.length === 0}
+                    <div class="ml-3 pl-4 py-2 text-[10px] font-mono text-nvidia-text-muted/50 italic pointer-events-none border-l border-nvidia-border/45">
+                      Drag mods here
+                    </div>
+                  {:else}
+                    {#each mods as mod}
+                      <div class="relative flex flex-col ml-3">
+                        <div class="absolute -left-2 -top-1 bottom-0 w-[1px] bg-nvidia-border/45 z-0"></div>
+                        <div class="absolute -left-2 top-1/2 w-2 h-[1px] bg-nvidia-border/45 z-0"></div>
+                        
+                        <!-- Mod Drop Before -->
+                        {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'before' && !selectedMods.has(mod.file_name)}
+                          <div class="absolute -top-1 left-0 right-0 h-[2.5px] bg-cyan-400 z-30 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
+                        {/if}
+
+                        <div
+                          onpointerdown={(e) => handlePointerDown(e, mod.file_name)}
+                          oncontextmenu={(e) => openContextMenu(e, mod.file_name)}
+                          ondblclick={() => onShowInLoadOrder && onShowInLoadOrder(mod.file_name)}
+                          class="flex items-center gap-2 px-2 py-1.5 rounded border transition density-row cursor-pointer z-10 {selectedMods.has(mod.file_name) ? 'border-cyan-500/60 bg-cyan-500/15 opacity-50' : 'border-nvidia-border/50 bg-nvidia-surface hover:border-nvidia-border'}"
+                          data-mod-name={mod.file_name}
+                          title="Double-click to locate in Load Order"
+                        >
+                          <GripVertical class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+                          <FileArchive class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+                          <span class="text-[11px] font-mono text-nvidia-text-primary truncate {mod.enabled ? '' : 'opacity-50 line-through'}">
+                            {mod.file_name}
+                          </span>
+                        </div>
+
+                        <!-- Mod Drop After -->
+                        {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'after' && !selectedMods.has(mod.file_name)}
+                          <div class="absolute -bottom-1 left-0 right-0 h-[2.5px] bg-cyan-400 z-30 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
+                        {/if}
+                      </div>
+                    {/each}
+                  {/if}
+                </div>
+              {/if}
             </div>
           {/each}
         </div>
@@ -579,7 +727,7 @@
   <!-- Right: Uncategorized Drawer -->
   {#if showUncategorizedDrawer}
     <div 
-      class="w-80 flex flex-col rounded-xl border transition-all duration-200 bg-nvidia-surface/40 overflow-hidden shrink-0 shadow-sm {activeDropTarget === 'uncategorized' ? 'border-cyan-400 ring-1 ring-cyan-400 bg-cyan-950/20' : 'border-nvidia-border'}"
+      class="w-80 flex flex-col rounded-xl border transition-all duration-200 bg-nvidia-surface/40 overflow-hidden shrink-0 shadow-sm {activeDropTarget === 'uncategorized' && !activeCategoryDragId ? 'border-cyan-400 ring-1 ring-cyan-400 bg-cyan-950/20' : 'border-nvidia-border'}"
       data-category-id="uncategorized"
     >
       <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/80 flex items-center justify-between shrink-0">
@@ -600,7 +748,7 @@
         {:else}
           {#each sortedUncategorizedMods as mod (mod.file_name)}
             <div class="relative flex flex-col">
-              {#if isDragging && dropTargetMod === mod.file_name && dropPlacement === 'before' && !selectedMods.has(mod.file_name)}
+              {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'before' && !selectedMods.has(mod.file_name)}
                 <div class="absolute -top-1 left-0 right-0 h-[2.5px] bg-cyan-400 z-30 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
               {/if}
 
@@ -619,7 +767,7 @@
                 </span>
               </div>
 
-              {#if isDragging && dropTargetMod === mod.file_name && dropPlacement === 'after' && !selectedMods.has(mod.file_name)}
+              {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'after' && !selectedMods.has(mod.file_name)}
                 <div class="absolute -bottom-1 left-0 right-0 h-[2.5px] bg-cyan-400 z-30 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
               {/if}
             </div>

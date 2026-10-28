@@ -32,7 +32,8 @@
     Unlink,
     ArrowUp,
     LayoutGrid,
-    ListTree
+    ListTree,
+    Clock
   } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -56,7 +57,7 @@
     onScanRequested?: () => void;
     onStateChanged?: () => void;
     targetHighlightMod?: string | null;
-    onRouteToHistory?: () => void;
+    onRouteToHistory?: (modName: string) => void;
     enableOrganizerView?: boolean;
     showCategoryLabelsInLoadOrder?: boolean;
     onLabelsToggle?: (val: boolean) => void;
@@ -240,7 +241,7 @@
     dialogState = {
       isOpen: true,
       title: 'Create Folder',
-      message: 'Enter a name for the new physical folder delimiter (symbols like [], (), hyphens allowed):',
+      message: 'Name your new folder. Folders are an optional way to visually organize your load order. They appear as empty .txt files in your mod folder and have zero impact on game performance.',
       mode: 'prompt',
       initialValue: 'New Folder',
       confirmText: 'Create Folder',
@@ -584,7 +585,7 @@
       dialogState = {
         isOpen: true,
         title: 'Create & Move to Folder',
-        message: 'Enter a name for the new folder delimiter:',
+        message: 'Name your new folder. Folders are an optional way to visually organize your load order. They appear as empty .txt files in your mod folder and have zero impact on game performance.',
         mode: 'prompt',
         initialValue: prefill,
         confirmText: 'Create & Move',
@@ -712,11 +713,11 @@
 
     const menuWidth = 230;
     let menuHeight = 145;
-    if (targetType === 'unassociated_xl') menuHeight = 145;
+    if (targetType === 'unassociated_xl') menuHeight = 180;
     else if (targetType === 'xl') menuHeight = 180;
     else if (targetType === 'archive') {
       const archive = target as ArchiveItem;
-      menuHeight = archive.is_delimiter ? 190 : (selectedMods.size > 0 ? 215 : 145);
+      menuHeight = archive.is_delimiter ? 190 : (selectedMods.size > 0 ? 250 : 180);
     }
 
     const posX = (event.clientX + menuWidth > window.innerWidth) ? (window.innerWidth - menuWidth - 10) : event.clientX;
@@ -1054,6 +1055,19 @@
         <span>Show in Explorer</span>
       </button>
 
+      <button
+        type="button"
+        onclick={() => {
+          const name = contextMenu.targetType === 'unassociated_xl' ? contextMenu.unassociatedXl?.file_name : contextMenu.archive?.file_name;
+          if (name && onRouteToHistory) onRouteToHistory(name);
+          closeContextMenu();
+        }}
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+      >
+        <Clock class="h-3.5 w-3.5 text-nvidia-accent group-hover:brightness-110" />
+        <span>Show in History</span>
+      </button>
+
       {#if contextMenu.targetType === 'unassociated_xl'}
         <button
           type="button"
@@ -1152,10 +1166,34 @@
   
   <!-- Standardized Header -->
   <div class="mb-4 shrink-0">
-    <h2 class="text-lg font-bold text-nvidia-text-primary uppercase tracking-wider">Archive Mods</h2>
+    <div class="flex items-center gap-4">
+      <h2 class="text-lg font-bold text-nvidia-text-primary uppercase tracking-wider">
+        Archive Mods: {activeViewMode === 'organizer' ? 'Organizer' : 'Load Order'}
+      </h2>
+      {#if enableOrganizerView}
+        <div class="flex items-center p-0.5 rounded border border-nvidia-border bg-nvidia-bg shrink-0">
+          <button
+            type="button"
+            onclick={() => activeViewMode = 'load_order'}
+            class="flex items-center gap-1.5 px-3 py-1 rounded-sm text-[11px] font-bold uppercase tracking-wider transition cursor-pointer {activeViewMode === 'load_order' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
+          >
+            <ListTree class="h-3.5 w-3.5 {activeViewMode === 'load_order' ? 'text-nvidia-accent' : ''}" />
+            <span>Load Order</span>
+          </button>
+          <button
+            type="button"
+            onclick={() => activeViewMode = 'organizer'}
+            class="flex items-center gap-1.5 px-3 py-1 rounded-sm text-[11px] font-bold uppercase tracking-wider transition cursor-pointer {activeViewMode === 'organizer' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
+          >
+            <LayoutGrid class="h-3.5 w-3.5 {activeViewMode === 'organizer' ? 'text-cyan-400' : ''}" />
+            <span>Organizer</span>
+          </button>
+        </div>
+      {/if}
+    </div>
     <div class="flex items-center gap-2 text-xs text-nvidia-text-muted mt-1">
       <span class="font-mono bg-nvidia-surface px-1.5 py-0.5 rounded border border-nvidia-border">archive\pc\mod</span>
-      <span>Standard REDengine archive modifications and physical load order folders.</span>
+      <span>Standard REDengine archive modifications and simulated load order folders.</span>
     </div>
   </div>
 
@@ -1237,28 +1275,6 @@
           <span>Uncategorized</span>
         </button>
       {/if}
-
-      <!-- Organizer View Toggle (Anchored Right) -->
-      {#if enableOrganizerView}
-        <div class="flex items-center p-0.5 rounded border border-nvidia-border bg-nvidia-bg shrink-0 ml-2">
-          <button
-            type="button"
-            onclick={() => activeViewMode = 'load_order'}
-            class="flex items-center gap-1.5 px-3 py-1 rounded-sm text-[11px] font-bold uppercase tracking-wider transition cursor-pointer {activeViewMode === 'load_order' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
-          >
-            <ListTree class="h-3.5 w-3.5 {activeViewMode === 'load_order' ? 'text-nvidia-accent' : ''}" />
-            <span>Load Order</span>
-          </button>
-          <button
-            type="button"
-            onclick={() => activeViewMode = 'organizer'}
-            class="flex items-center gap-1.5 px-3 py-1 rounded-sm text-[11px] font-bold uppercase tracking-wider transition cursor-pointer {activeViewMode === 'organizer' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
-          >
-            <LayoutGrid class="h-3.5 w-3.5 {activeViewMode === 'organizer' ? 'text-cyan-400' : ''}" />
-            <span>Organizer</span>
-          </button>
-        </div>
-      {/if}
     </div>
   </div>
 
@@ -1277,6 +1293,7 @@
             activeViewMode = 'load_order';
             setTimeout(() => focusModInMainList(modName), 100);
           }}
+          {onRouteToHistory}
         />
       </div>
     {:else}

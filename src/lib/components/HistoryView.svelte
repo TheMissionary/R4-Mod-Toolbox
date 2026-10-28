@@ -1,5 +1,5 @@
-<script lang="ts">
-  import { onMount, untrack } from 'svelte';
+﻿<script lang="ts">
+  import { onMount, untrack, tick } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { loadConfigFromDisk, saveConfigToDisk } from '$lib/theme';
@@ -18,16 +18,22 @@
   let {
     gamePath = '',
     newModsHours = $bindable(6),
+    targetHighlightMod = null,
     onNavigateToMod
   }: {
     gamePath: string;
     newModsHours: number;
+    targetHighlightMod?: string | null;
     onNavigateToMod: (tab: string, modName: string) => void;
   } = $props();
 
   let recentMods = $state<LedgerEntry[]>([]);
   let copiedFeedback = $state(false);
   let searchQuery = $state('');
+
+  let highlightedModName = $state<string | null>(null);
+  let highlightTimeoutId: number | null = null;
+  const modNodeMap = new Map<string, HTMLElement>();
 
   let contextMenu = $state<{
     visible: boolean;
@@ -49,7 +55,23 @@
     'r6tweaks': 'R6\\Tweaks'
   };
 
-  // Auto-switch to "All Time" when searching
+  function registerModNode(node: HTMLElement, modName: string) {
+    modNodeMap.set(modName, node);
+    return {
+      update(newName: string) {
+        if (newName !== modName) {
+          modNodeMap.delete(modName);
+          modName = newName;
+          modNodeMap.set(modName, node);
+        }
+      },
+      destroy() {
+        modNodeMap.delete(modName);
+      }
+    };
+  }
+
+  // Auto-switch to "All Time" when searching manually
   $effect(() => {
     if (searchQuery.trim() !== '' && newModsHours !== 999999) {
       untrack(() => {
@@ -58,6 +80,47 @@
       });
     }
   });
+
+  // React to incoming "Show in History" requests
+  $effect(() => {
+    if (targetHighlightMod) {
+      untrack(() => {
+        focusModInHistory(targetHighlightMod as string);
+      });
+    }
+  });
+
+  async function focusModInHistory(modName: string) {
+    if (searchQuery !== '') {
+      searchQuery = '';
+    }
+    
+    if (newModsHours !== 999999) {
+      newModsHours = 999999;
+      await handleTimeframeChange();
+    }
+
+    await tick();
+
+    let targetElement = modNodeMap.get(modName);
+    let retries = 0;
+    
+    // Wait for DOM to render the full list if we just switched to All Time
+    while (!targetElement && retries < 10) {
+      await new Promise(r => setTimeout(r, 50));
+      targetElement = modNodeMap.get(modName);
+      retries++;
+    }
+
+    if (targetElement) {
+      targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      highlightedModName = modName;
+      if (highlightTimeoutId) clearTimeout(highlightTimeoutId);
+      highlightTimeoutId = window.setTimeout(() => {
+        highlightedModName = null;
+      }, 2500);
+    }
+  }
 
   // Group mods by exact timestamp and filter by search query
   let groupedMods = $derived.by(() => {
@@ -105,8 +168,8 @@
     }
   }
 
-  function handleTimeframeChange() {
-    loadRecentMods();
+  async function handleTimeframeChange() {
+    await loadRecentMods();
     loadConfigFromDisk().then(config => {
       config.newModsHours = newModsHours;
       saveConfigToDisk(config);
@@ -332,9 +395,13 @@
 
               <!-- Group Items -->
               {#each group.mods as entry (entry.path)}
+                {@const isHighlighted = highlightedModName === entry.name}
                 <div
+                  use:registerModNode={entry.name}
                   oncontextmenu={(e) => openContextMenu(e, entry)}
-                  class="grid grid-cols-[120px_1fr] gap-4 px-3 rounded border border-transparent hover:border-nvidia-border/50 hover:bg-nvidia-surface/80 transition items-center cursor-context-menu density-row ml-2"
+                  class="grid grid-cols-[120px_1fr] gap-4 px-3 rounded border transition-all duration-300 items-center cursor-context-menu density-row ml-2
+                    {isHighlighted ? 'border-nvidia-accent ring-2 ring-nvidia-accent bg-nvidia-accent/20 scale-[1.008] z-10 relative' : 'border-transparent hover:border-nvidia-border/50 hover:bg-nvidia-surface/80'}"
+                  style={isHighlighted ? 'box-shadow: 0 0 15px color-mix(in srgb, var(--theme-accent) 35%, transparent);' : ''}
                 >
                   <div>
                     <span class="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border bg-nvidia-accent/10 border-nvidia-accent/20 text-nvidia-accent">

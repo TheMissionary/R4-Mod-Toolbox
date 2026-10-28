@@ -902,16 +902,9 @@ fn open_in_text_editor(file_path: String, editor_path: Option<String>) -> Result
         return Err("Invalid file path".to_string());
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        let mut cmd = if let Some(ep) = editor_path.filter(|s| !s.trim().is_empty()) {
-            std::process::Command::new(ep)
-        } else {
-            std::process::Command::new("notepad.exe")
-        };
-
-        cmd.arg(&file_path).spawn().map_err(|e| e.to_string())?;
-    }
+    let with = editor_path.filter(|s| !s.trim().is_empty());
+    tauri_plugin_opener::open_path(&path, with).map_err(|e| e.to_string())?;
+    
     Ok(())
 }
 
@@ -921,10 +914,9 @@ fn open_log_folder(app: tauri::AppHandle) -> Result<(), String> {
     if !log_dir.exists() {
         std::fs::create_dir_all(&log_dir).map_err(|e| e.to_string())?;
     }
-    #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("explorer").arg(&log_dir).spawn().map_err(|e| e.to_string())?;
-    }
+    
+    tauri_plugin_opener::open_path(&log_dir, None::<&str>).map_err(|e| e.to_string())?;
+    
     Ok(())
 }
 
@@ -948,15 +940,8 @@ fn clear_user_log(app: tauri::AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn launch_game(game_path: String) -> Result<(), String> {
-    #[cfg(target_os = "windows")]
-    {
-        let target = PathBuf::from(&game_path).join("bin").join("x64").join("Cyberpunk2077.exe");
-        let working_dir = target.parent().unwrap_or(Path::new(""));
-        std::process::Command::new(&target)
-            .current_dir(working_dir)
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
+    let target = PathBuf::from(&game_path).join("bin").join("x64").join("Cyberpunk2077.exe");
+    tauri_plugin_opener::open_path(&target, None::<&str>).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -966,10 +951,9 @@ fn open_custom_folder(folder_path: String) -> Result<(), String> {
     if !path.exists() || !path.is_dir() {
         return Err("Invalid folder path".to_string());
     }
-    #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("explorer").arg(&path).spawn().map_err(|e| e.to_string())?;
-    }
+    
+    tauri_plugin_opener::open_path(&path, None::<&str>).map_err(|e| e.to_string())?;
+    
     Ok(())
 }
 

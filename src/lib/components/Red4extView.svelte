@@ -1,7 +1,7 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { onMount } from 'svelte';
   import type { Red4extPluginItem, FileNode } from '$lib/types';
-  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen } from 'lucide-svelte';
+  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen, Clock } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { tick } from 'svelte';
@@ -18,7 +18,7 @@
     gamePath: string;
     onStateChanged?: () => void;
     targetHighlightMod?: string | null;
-    onRouteToHistory?: () => void;
+    onRouteToHistory?: (modName: string) => void;
   } = $props();
 
   let searchQuery = $state('');
@@ -327,6 +327,19 @@
       >
         <FolderSearch class="h-3.5 w-3.5 text-nvidia-accent group-hover:brightness-110" />
         <span>Show in Explorer</span>
+      </button>
+
+      <button
+        type="button"
+        onclick={() => {
+          const name = contextMenu.targetType === 'plugin' ? contextMenu.plugin?.name : contextMenu.fileNode?.name;
+          if (name && onRouteToHistory) onRouteToHistory(name);
+          closeContextMenu();
+        }}
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+      >
+        <Clock class="h-3.5 w-3.5 text-nvidia-accent group-hover:brightness-110" />
+        <span>Show in History</span>
       </button>
 
       {#if contextMenu.targetType === 'plugin'}

@@ -144,6 +144,12 @@
     setTimeout(() => { targetHighlightMod = null; }, 100);
   }
 
+  function handleNavigateToHistory(modName: string) {
+    setTab('history');
+    targetHighlightMod = modName;
+    setTimeout(() => { targetHighlightMod = null; }, 100);
+  }
+
   async function openExternalLink(url: string) {
     if (!url) return;
     try {
@@ -234,9 +240,8 @@
       }
       if (config.targetGamePath) {
         gamePath = config.targetGamePath;
-        let tab = config.activeTab as TabType;
-        if (tab === 'home' || !tab) tab = 'archive';
-        currentTab = tab;
+        // Force Archive tab on startup
+        currentTab = 'archive';
       } else {
         currentTab = 'settings';
       }
@@ -597,7 +602,7 @@
           onScanRequested={refreshAll}
           onStateChanged={refreshCountsOnly}
           {targetHighlightMod}
-          onRouteToHistory={() => setTab('history')}
+          onRouteToHistory={handleNavigateToHistory}
           {enableOrganizerView}
           {showCategoryLabelsInLoadOrder}
           onLabelsToggle={async (val) => {
@@ -619,7 +624,7 @@
           {gamePath}
           onStateChanged={refreshCountsOnly}
           {targetHighlightMod}
-          onRouteToHistory={() => setTab('history')}
+          onRouteToHistory={handleNavigateToHistory}
         />
       </div>
 
@@ -629,7 +634,7 @@
           {gamePath}
           onStateChanged={refreshCountsOnly}
           {targetHighlightMod}
-          onRouteToHistory={() => setTab('history')}
+          onRouteToHistory={handleNavigateToHistory}
         />
       </div>
 
@@ -639,7 +644,7 @@
           {gamePath}
           onStateChanged={refreshCountsOnly}
           {targetHighlightMod}
-          onRouteToHistory={() => setTab('history')}
+          onRouteToHistory={handleNavigateToHistory}
         />
       </div>
 
@@ -649,7 +654,7 @@
           {gamePath}
           onStateChanged={refreshCountsOnly}
           {targetHighlightMod}
-          onRouteToHistory={() => setTab('history')}
+          onRouteToHistory={handleNavigateToHistory}
         />
       </div>
 
@@ -658,6 +663,7 @@
         <HistoryView
           {gamePath}
           bind:newModsHours
+          {targetHighlightMod}
           onNavigateToMod={handleNavigateToMod}
         />
       </div>

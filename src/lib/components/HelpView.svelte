@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { slide } from 'svelte/transition';
@@ -62,7 +62,7 @@
     </div>
     <h2 class="text-xl font-bold text-nvidia-text-primary mb-1">R4 Knowledge Base</h2>
     <p class="text-xs text-nvidia-text-muted max-w-2xl">
-      Learn how to manage your load order, resolve archive conflicts, and utilize advanced features like XL linking and physical folders.
+      Learn how to manage your load order, resolve archive conflicts, and utilize advanced features like XL linking and simulated folders.
     </p>
   </div>
 
@@ -99,8 +99,8 @@
                 To change which mod wins a conflict, simply click and drag the grip handle on any mod to move it higher or lower in the list.
               </div>
               <div>
-                <strong class="text-nvidia-text-primary block mb-1">Physical Folders:</strong>
-                R4 leverages native engine mechanics to create folders without compromising your data through app-injected logic. These optional created folders are real 0-byte <span class="font-mono text-nvidia-text-primary">.txt</span> files, meaning your perfect build is preserved even if you launch the game without the toolbox.
+                <strong class="text-nvidia-text-primary block mb-1">Simulated Folders:</strong>
+                R4 allows you to create simulated folders directly within your load order to group related mods. These are purely organizational. Under the hood, R4 creates a safe, 0-byte <span class="font-mono text-nvidia-text-primary">.txt</span> file (e.g., <span class="font-mono text-nvidia-text-primary">[DIR] UI Mods.txt</span>) in your mod directory. The game engine completely ignores these files, ensuring your load order remains perfectly intact even if you launch the game without the toolbox.
               </div>
               <div>
                 <strong class="text-nvidia-text-primary block mb-1">Multi-Select:</strong>
