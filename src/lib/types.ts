@@ -145,6 +145,7 @@ export interface CategoryLabel {
 export interface LabelsConfig {
   categories: CategoryLabel[];
   assignments: Record<string, string>;
+  orders?: Record<string, string[]>;
 }
 
 export interface AppConfig {
@@ -161,5 +162,6 @@ export interface AppConfig {
   customTextEditorPath?: string;
   customPhotoPath?: string;
   enableOrganizerView?: boolean;
+  showCategoryLabelsInLoadOrder?: boolean;
   theme: ThemeSettings;
 }

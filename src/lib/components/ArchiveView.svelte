@@ -46,7 +46,9 @@
     onStateChanged,
     targetHighlightMod = null,
     onRouteToHistory,
-    enableOrganizerView = false
+    enableOrganizerView = false,
+    showCategoryLabelsInLoadOrder = true,
+    onLabelsToggle
   }: {
     archives: ArchiveItem[];
     gamePath: string;
@@ -56,6 +58,8 @@
     targetHighlightMod?: string | null;
     onRouteToHistory?: () => void;
     enableOrganizerView?: boolean;
+    showCategoryLabelsInLoadOrder?: boolean;
+    onLabelsToggle?: (val: boolean) => void;
   } = $props();
 
   let searchQuery = $state('');
@@ -69,6 +73,7 @@
   // Organizer View State
   let labelsConfig = $state<LabelsConfig>({ categories: [], assignments: {} });
   let activeViewMode = $state<'load_order' | 'organizer'>('load_order');
+  let showUncategorizedDrawer = $state(true);
 
   // Multi-Select State
   let selectedMods = $state<Set<string>>(new Set());
@@ -1182,28 +1187,6 @@
 
     <div class="flex items-center gap-2.5">
       
-      <!-- Organizer View Toggle -->
-      {#if enableOrganizerView}
-        <div class="flex items-center p-0.5 rounded border border-nvidia-border bg-nvidia-bg shrink-0 mr-2">
-          <button
-            type="button"
-            onclick={() => activeViewMode = 'load_order'}
-            class="flex items-center gap-1.5 px-3 py-1 rounded-sm text-[11px] font-bold uppercase tracking-wider transition cursor-pointer {activeViewMode === 'load_order' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
-          >
-            <ListTree class="h-3.5 w-3.5 {activeViewMode === 'load_order' ? 'text-nvidia-accent' : ''}" />
-            <span>Load Order</span>
-          </button>
-          <button
-            type="button"
-            onclick={() => activeViewMode = 'organizer'}
-            class="flex items-center gap-1.5 px-3 py-1 rounded-sm text-[11px] font-bold uppercase tracking-wider transition cursor-pointer {activeViewMode === 'organizer' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
-          >
-            <LayoutGrid class="h-3.5 w-3.5 {activeViewMode === 'organizer' ? 'text-cyan-400' : ''}" />
-            <span>Organizer</span>
-          </button>
-        </div>
-      {/if}
-
       {#if activeViewMode === 'load_order'}
         <button
           onclick={toggleAllFolders}
@@ -1239,6 +1222,42 @@
           {/if}
           <span>Conflict Summary</span>
         </button>
+      {:else}
+        <!-- Organizer View Specific Toolbar Actions (if any) -->
+        <button
+          onclick={() => showUncategorizedDrawer = !showUncategorizedDrawer}
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition cursor-pointer {showUncategorizedDrawer ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-400' : 'bg-nvidia-surface hover:bg-nvidia-card border-nvidia-border text-nvidia-text-muted hover:text-nvidia-text-primary'}"
+          title="Toggle Uncategorized Drawer"
+        >
+          {#if showUncategorizedDrawer}
+            <Eye class="h-3.5 w-3.5" />
+          {:else}
+            <EyeOff class="h-3.5 w-3.5" />
+          {/if}
+          <span>Uncategorized</span>
+        </button>
+      {/if}
+
+      <!-- Organizer View Toggle (Anchored Right) -->
+      {#if enableOrganizerView}
+        <div class="flex items-center p-0.5 rounded border border-nvidia-border bg-nvidia-bg shrink-0 ml-2">
+          <button
+            type="button"
+            onclick={() => activeViewMode = 'load_order'}
+            class="flex items-center gap-1.5 px-3 py-1 rounded-sm text-[11px] font-bold uppercase tracking-wider transition cursor-pointer {activeViewMode === 'load_order' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
+          >
+            <ListTree class="h-3.5 w-3.5 {activeViewMode === 'load_order' ? 'text-nvidia-accent' : ''}" />
+            <span>Load Order</span>
+          </button>
+          <button
+            type="button"
+            onclick={() => activeViewMode = 'organizer'}
+            class="flex items-center gap-1.5 px-3 py-1 rounded-sm text-[11px] font-bold uppercase tracking-wider transition cursor-pointer {activeViewMode === 'organizer' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
+          >
+            <LayoutGrid class="h-3.5 w-3.5 {activeViewMode === 'organizer' ? 'text-cyan-400' : ''}" />
+            <span>Organizer</span>
+          </button>
+        </div>
       {/if}
     </div>
   </div>
@@ -1247,7 +1266,18 @@
     
     {#if activeViewMode === 'organizer'}
       <div class="flex-1 overflow-hidden pt-2">
-        <OrganizerView bind:labelsConfig {archives} {gamePath} />
+        <OrganizerView 
+          bind:labelsConfig 
+          {archives} 
+          {gamePath} 
+          bind:showCategoryLabelsInLoadOrder
+          onLabelsToggle={onLabelsToggle}
+          {showUncategorizedDrawer}
+          onShowInLoadOrder={(modName) => {
+            activeViewMode = 'load_order';
+            setTimeout(() => focusModInMainList(modName), 100);
+          }}
+        />
       </div>
     {:else}
       <div
@@ -1343,17 +1373,6 @@
                         {archive.file_name}
                       </span>
 
-                      <!-- The Bridge: Virtual Category Pill -->
-                      {#if assignedCat}
-                        <span 
-                          class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded border shrink-0"
-                          style="background-color: {assignedCat.color}15; color: {assignedCat.color}; border-color: {assignedCat.color}40;"
-                          title="Assigned to {assignedCat.name}"
-                        >
-                          {assignedCat.name}
-                        </span>
-                      {/if}
-
                       {#if archive.associated_xls && archive.associated_xls.length > 0}
                         <span
                           role="button"
@@ -1375,7 +1394,21 @@
                     </div>
 
                     <!-- Fixed-Width Laser-Aligned Conflict Column & Hover Menu -->
-                    <div class="flex items-center gap-2 shrink-0 w-24">
+                    <div class="flex items-center gap-2 shrink-0">
+                      
+                      <!-- The Bridge: Virtual Category Pill (Right Justified) -->
+                      <div class="w-28 flex justify-end pr-2">
+                        {#if showCategoryLabelsInLoadOrder && assignedCat}
+                          <span 
+                            class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded border shrink-0 truncate max-w-full"
+                            style="background-color: {assignedCat.color}15; color: {assignedCat.color}; border-color: {assignedCat.color}40;"
+                            title="Assigned to {assignedCat.name}"
+                          >
+                            {assignedCat.name}
+                          </span>
+                        {/if}
+                      </div>
+
                       <div class="w-3 flex items-center justify-center shrink-0">
                         {#if activeConflicts.loses.length > 0}
                           <div class="h-2.5 w-2.5 rounded-full bg-[#ef4444] shadow-[0_0_6px_rgba(239,68,68,0.7)]" title="Overwritten by higher mod"></div>
@@ -1386,7 +1419,7 @@
                         {/if}
                       </div>
 
-                      <div class="flex items-center min-w-0 flex-1">
+                      <div class="flex items-center min-w-0 w-10">
                         {#if archive.has_conflicts}
                           {@const conflictCount = activeConflicts.loses.length > 0 ? activeConflicts.loses.length : activeConflicts.wins.length}
                           <button
@@ -1404,18 +1437,18 @@
                           </button>
                         {/if}
                       </div>
-                    </div>
 
-                    <!-- Hover Context Menu Button -->
-                    <div class="flex items-center justify-end shrink-0 w-6">
-                      <button
-                        type="button"
-                        onclick={(e) => { e.stopPropagation(); openContextMenu(e, archive, 'archive'); }}
-                        class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-text-primary hover:bg-nvidia-card transition cursor-pointer opacity-0 group-hover:opacity-100"
-                        title="More options"
-                      >
-                        <MoreVertical class="h-3.5 w-3.5" />
-                      </button>
+                      <!-- Hover Context Menu Button -->
+                      <div class="flex items-center justify-end shrink-0 w-6">
+                        <button
+                          type="button"
+                          onclick={(e) => { e.stopPropagation(); openContextMenu(e, archive, 'archive'); }}
+                          class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-text-primary hover:bg-nvidia-card transition cursor-pointer opacity-0 group-hover:opacity-100"
+                          title="More options"
+                        >
+                          <MoreVertical class="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
 

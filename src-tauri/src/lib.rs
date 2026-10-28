@@ -100,6 +100,8 @@ pub struct AppConfig {
     pub custom_photo_path: Option<String>,
     #[serde(default)]
     pub enable_organizer_view: Option<bool>,
+    #[serde(default)]
+    pub show_category_labels_in_load_order: Option<bool>,
     pub theme: ThemeConfig,
 }
 
@@ -119,6 +121,7 @@ impl Default for AppConfig {
             custom_text_editor_path: None,
             custom_photo_path: None,
             enable_organizer_view: Some(false),
+            show_category_labels_in_load_order: Some(true),
             theme: ThemeConfig::default(),
         }
     }

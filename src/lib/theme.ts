@@ -150,6 +150,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   customTextEditorPath: '',
   customPhotoPath: '',
   enableOrganizerView: false,
+  showCategoryLabelsInLoadOrder: true,
   theme: { ...DEFAULT_THEME_SETTINGS },
 };
 
@@ -260,6 +261,7 @@ export async function loadConfigFromDisk(): Promise<AppConfig> {
       if (config.customTextEditorPath === undefined) config.customTextEditorPath = '';
       if (config.customPhotoPath === undefined) config.customPhotoPath = '';
       if (config.enableOrganizerView === undefined) config.enableOrganizerView = false;
+      if (config.showCategoryLabelsInLoadOrder === undefined) config.showCategoryLabelsInLoadOrder = true;
 
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(config.theme));

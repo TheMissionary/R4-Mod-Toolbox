@@ -67,6 +67,7 @@
 
   let customPhotoPath = $state('');
   let enableOrganizerView = $state(false);
+  let showCategoryLabelsInLoadOrder = $state(true);
 
   async function setTab(tab: TabType) {
     currentTab = tab;
@@ -76,6 +77,7 @@
       config.activeTab = tab;
       customPhotoPath = config.customPhotoPath || '';
       enableOrganizerView = config.enableOrganizerView || false;
+      showCategoryLabelsInLoadOrder = config.showCategoryLabelsInLoadOrder ?? true;
       await saveConfigToDisk(config);
     } catch (err) {
       warn(`Failed to save active tab state: ${err}`);
@@ -245,6 +247,7 @@
         customPhotoPath = config.customPhotoPath;
       }
       enableOrganizerView = config.enableOrganizerView || false;
+      showCategoryLabelsInLoadOrder = config.showCategoryLabelsInLoadOrder ?? true;
     }).catch(err => {
       error(`Config hydration error: ${err}`);
     }).finally(() => {
@@ -596,6 +599,17 @@
           {targetHighlightMod}
           onRouteToHistory={() => setTab('history')}
           {enableOrganizerView}
+          {showCategoryLabelsInLoadOrder}
+          onLabelsToggle={async (val) => {
+            showCategoryLabelsInLoadOrder = val;
+            try {
+              const config = await loadConfigFromDisk();
+              config.showCategoryLabelsInLoadOrder = val;
+              await saveConfigToDisk(config);
+            } catch (err) {
+              console.error('Failed to save label toggle state:', err);
+            }
+          }}
         />
       </div>
 
@@ -656,6 +670,7 @@
             const config = await loadConfigFromDisk();
             customPhotoPath = config.customPhotoPath || '';
             enableOrganizerView = config.enableOrganizerView || false;
+            showCategoryLabelsInLoadOrder = config.showCategoryLabelsInLoadOrder ?? true;
           }}
         />
       </div>

@@ -54,6 +54,8 @@ pub struct CategoryLabel {
 pub struct LabelsConfig {
     pub categories: Vec<CategoryLabel>,
     pub assignments: HashMap<String, String>,
+    #[serde(default)]
+    pub orders: HashMap<String, Vec<String>>,
 }
 
 impl Default for LabelsConfig {
@@ -61,6 +63,7 @@ impl Default for LabelsConfig {
         Self {
             categories: Vec::new(),
             assignments: HashMap::new(),
+            orders: HashMap::new(),
         }
     }
 }
