@@ -1,4 +1,4 @@
-export type ActiveView = 'home' | 'archive' | 'cet' | 'red4ext' | 'redscript' | 'r6tweaks';
+﻿export type ActiveView = 'home' | 'archive' | 'cet' | 'red4ext' | 'redscript' | 'r6tweaks';
 
 export interface XlItem {
   file_name: string;
@@ -136,6 +136,17 @@ export interface ThemeSettings {
   isCompact?: boolean;
 }
 
+export interface CategoryLabel {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface LabelsConfig {
+  categories: CategoryLabel[];
+  assignments: Record<string, string>;
+}
+
 export interface AppConfig {
   targetGamePath: string;
   activeTab: string;
@@ -149,5 +160,6 @@ export interface AppConfig {
   showNewMods?: boolean;
   customTextEditorPath?: string;
   customPhotoPath?: string;
+  enableOrganizerView?: boolean;
   theme: ThemeSettings;
 }

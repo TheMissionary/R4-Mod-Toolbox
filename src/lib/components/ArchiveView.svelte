@@ -1,9 +1,10 @@
-<script lang="ts">
-  import type { ArchiveItem, ArchiveScanReport, XlItem } from '$lib/types';
+﻿<script lang="ts">
+  import type { ArchiveItem, ArchiveScanReport, XlItem, LabelsConfig } from '$lib/types';
   import FolderDelimiterRow from '$lib/components/FolderDelimiterRow.svelte';
   import DialogModal from '$lib/components/DialogModal.svelte';
   import MoveFolderModal from '$lib/components/MoveFolderModal.svelte';
   import LinkXlModal from '$lib/components/LinkXlModal.svelte';
+  import OrganizerView from '$lib/components/OrganizerView.svelte';
   import {
     GripVertical,
     ChevronDown,
@@ -29,7 +30,9 @@
     FolderInput,
     Link2,
     Unlink,
-    ArrowUp
+    ArrowUp,
+    LayoutGrid,
+    ListTree
   } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -42,7 +45,8 @@
     onScanRequested,
     onStateChanged,
     targetHighlightMod = null,
-    onRouteToHistory
+    onRouteToHistory,
+    enableOrganizerView = false
   }: {
     archives: ArchiveItem[];
     gamePath: string;
@@ -51,6 +55,7 @@
     onStateChanged?: () => void;
     targetHighlightMod?: string | null;
     onRouteToHistory?: () => void;
+    enableOrganizerView?: boolean;
   } = $props();
 
   let searchQuery = $state('');
@@ -60,6 +65,10 @@
   let scrollContainer = $state<HTMLElement | null>(null);
   let showXlHelp = $state(false);
   let showUnassociatedXl = $state(false);
+
+  // Organizer View State
+  let labelsConfig = $state<LabelsConfig>({ categories: [], assignments: {} });
+  let activeViewMode = $state<'load_order' | 'organizer'>('load_order');
 
   // Multi-Select State
   let selectedMods = $state<Set<string>>(new Set());
@@ -188,7 +197,22 @@
 
   $effect(() => {
     if (targetHighlightMod) {
+      activeViewMode = 'load_order';
       focusModInMainList(targetHighlightMod);
+    }
+  });
+
+  $effect(() => {
+    if (gamePath) {
+      invoke<LabelsConfig>('load_labels_config', { gamePath }).then(res => {
+        labelsConfig = res;
+      }).catch(err => console.error('Failed to load labels config:', err));
+    }
+  });
+
+  $effect(() => {
+    if (!enableOrganizerView && activeViewMode !== 'load_order') {
+      activeViewMode = 'load_order';
     }
   });
 
@@ -1157,391 +1181,436 @@
     </div>
 
     <div class="flex items-center gap-2.5">
-      <button
-        onclick={toggleAllFolders}
-        disabled={totalFolders === 0}
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {#if isAllCollapsed}
-          <FolderOpen class="h-3.5 w-3.5 text-nvidia-accent" />
-          <span>Expand All</span>
-        {:else}
-          <Folder class="h-3.5 w-3.5 text-nvidia-accent" />
-          <span>Collapse All</span>
-        {/if}
-      </button>
+      
+      <!-- Organizer View Toggle -->
+      {#if enableOrganizerView}
+        <div class="flex items-center p-0.5 rounded border border-nvidia-border bg-nvidia-bg shrink-0 mr-2">
+          <button
+            type="button"
+            onclick={() => activeViewMode = 'load_order'}
+            class="flex items-center gap-1.5 px-3 py-1 rounded-sm text-[11px] font-bold uppercase tracking-wider transition cursor-pointer {activeViewMode === 'load_order' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
+          >
+            <ListTree class="h-3.5 w-3.5 {activeViewMode === 'load_order' ? 'text-nvidia-accent' : ''}" />
+            <span>Load Order</span>
+          </button>
+          <button
+            type="button"
+            onclick={() => activeViewMode = 'organizer'}
+            class="flex items-center gap-1.5 px-3 py-1 rounded-sm text-[11px] font-bold uppercase tracking-wider transition cursor-pointer {activeViewMode === 'organizer' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
+          >
+            <LayoutGrid class="h-3.5 w-3.5 {activeViewMode === 'organizer' ? 'text-cyan-400' : ''}" />
+            <span>Organizer</span>
+          </button>
+        </div>
+      {/if}
 
-      <button
-        onclick={addFolder}
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary font-medium transition cursor-pointer"
-      >
-        <FolderPlus class="h-3.5 w-3.5 text-nvidia-accent" />
-        <span>Add Folder</span>
-      </button>
+      {#if activeViewMode === 'load_order'}
+        <button
+          onclick={toggleAllFolders}
+          disabled={totalFolders === 0}
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {#if isAllCollapsed}
+            <FolderOpen class="h-3.5 w-3.5 text-nvidia-accent" />
+            <span>Expand All</span>
+          {:else}
+            <Folder class="h-3.5 w-3.5 text-nvidia-accent" />
+            <span>Collapse All</span>
+          {/if}
+        </button>
 
-      <button
-        onclick={toggleSummaryDrawer}
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition cursor-pointer {showConflictSummary ? 'bg-nvidia-accent/15 border-nvidia-accent/40 text-nvidia-accent' : 'bg-nvidia-surface hover:bg-nvidia-card border-nvidia-border text-nvidia-text-muted hover:text-nvidia-text-primary'}"
-        title="Toggle Conflict Summary Column"
-      >
-        {#if showConflictSummary}
-          <Eye class="h-3.5 w-3.5" />
-        {:else}
-          <EyeOff class="h-3.5 w-3.5" />
-        {/if}
-        <span>Conflict Summary</span>
-      </button>
+        <button
+          onclick={addFolder}
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary font-medium transition cursor-pointer"
+        >
+          <FolderPlus class="h-3.5 w-3.5 text-nvidia-accent" />
+          <span>Add Folder</span>
+        </button>
+
+        <button
+          onclick={toggleSummaryDrawer}
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition cursor-pointer {showConflictSummary ? 'bg-nvidia-accent/15 border-nvidia-accent/40 text-nvidia-accent' : 'bg-nvidia-surface hover:bg-nvidia-card border-nvidia-border text-nvidia-text-muted hover:text-nvidia-text-primary'}"
+          title="Toggle Conflict Summary Column"
+        >
+          {#if showConflictSummary}
+            <Eye class="h-3.5 w-3.5" />
+          {:else}
+            <EyeOff class="h-3.5 w-3.5" />
+          {/if}
+          <span>Conflict Summary</span>
+        </button>
+      {/if}
     </div>
   </div>
 
   <div class="flex gap-3 flex-1 overflow-hidden min-h-0">
-    <div
-      bind:this={scrollContainer}
-      class="space-y-1 overflow-y-auto pr-1 pt-2 flex-1 max-h-[calc(100vh-170px)]"
-    >
-      {#if visibleItems.length === 0}
-        <div class="p-6 text-center text-xs text-nvidia-text-muted border border-nvidia-border rounded bg-nvidia-surface">
-          No matches found.
-        </div>
-      {:else}
-        {#each visibleItems as { archive, originalIndex, archiveRank, inCategory } (archive.file_name + '_' + archive.enabled)}
-          {@const isSource = activeDragIndex !== null && originalIndex >= activeDragIndex && originalIndex < activeDragIndex + dragBlockSize}
-          {@const showLineBefore = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'before' && !isSource}
-          {@const showLineAfter = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'after' && !isSource}
+    
+    {#if activeViewMode === 'organizer'}
+      <div class="flex-1 overflow-hidden pt-2">
+        <OrganizerView bind:labelsConfig {archives} {gamePath} />
+      </div>
+    {:else}
+      <div
+        bind:this={scrollContainer}
+        class="space-y-1 overflow-y-auto pr-1 pt-2 flex-1 max-h-[calc(100vh-170px)]"
+      >
+        {#if visibleItems.length === 0}
+          <div class="p-6 text-center text-xs text-nvidia-text-muted border border-nvidia-border rounded bg-nvidia-surface">
+            No matches found.
+          </div>
+        {:else}
+          {#each visibleItems as { archive, originalIndex, archiveRank, inCategory } (archive.file_name + '_' + archive.enabled)}
+            {@const isSource = activeDragIndex !== null && originalIndex >= activeDragIndex && originalIndex < activeDragIndex + dragBlockSize}
+            {@const showLineBefore = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'before' && !isSource}
+            {@const showLineAfter = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'after' && !isSource}
 
-          <div class="relative flex flex-col {inCategory ? 'ml-3' : ''}">
-            {#if inCategory}
-              <div class="absolute -left-2 -top-1 bottom-0 w-[1px] bg-nvidia-border/45 z-0"></div>
-              <div class="absolute -left-2 top-1/2 w-2 h-[1px] bg-nvidia-border/45 z-0"></div>
-            {/if}
+            <div class="relative flex flex-col {inCategory ? 'ml-3' : ''}">
+              {#if inCategory}
+                <div class="absolute -left-2 -top-1 bottom-0 w-[1px] bg-nvidia-border/45 z-0"></div>
+                <div class="absolute -left-2 top-1/2 w-2 h-[1px] bg-nvidia-border/45 z-0"></div>
+              {/if}
 
-            {#if showLineBefore}
-              <div class="absolute {originalIndex === 0 ? '-top-1.5' : '-top-1'} left-0 right-0 h-[2.5px] bg-nvidia-accent z-30 shadow-[0_0_12px_var(--theme-accent)] flex items-center">
-                <div class="h-2.5 w-2.5 rounded-full bg-nvidia-accent -ml-1.5 shadow-[0_0_8px_var(--theme-accent)]"></div>
-              </div>
-            {/if}
+              {#if showLineBefore}
+                <div class="absolute {originalIndex === 0 ? '-top-1.5' : '-top-1'} left-0 right-0 h-[2.5px] bg-nvidia-accent z-30 shadow-[0_0_12px_var(--theme-accent)] flex items-center">
+                  <div class="h-2.5 w-2.5 rounded-full bg-nvidia-accent -ml-1.5 shadow-[0_0_8px_var(--theme-accent)]"></div>
+                </div>
+              {/if}
 
-            {#if archive.is_delimiter}
-              <FolderDelimiterRow
-                {archive}
-                {originalIndex}
-                {isSource}
-                collapsed={!!collapsedFolders[archive.file_name]}
-                modCount={folderCounts.get(archive.file_name) ?? 0}
-                onToggleCollapse={toggleFolderCollapse}
-                isHighlighted={highlightedModName === archive.file_name}
-                onDragStart={startDrag}
-                onPointerMove={onRowPointerMove}
-                onToggle={toggleMod}
-                onContextMenu={openContextMenu}
-                onRenameFolder={handleRenameFolder}
-                onDeleteFolder={handleDeleteFolder}
-                registerNode={registerModNode}
-              />
-            {:else}
-              {@const isExpanded = !!expandedRows[archive.file_name]}
-              {@const isHighlighted = highlightedModName === archive.file_name}
-              {@const isSelected = selectedMods.has(archive.file_name)}
-              {@const activeConflicts = previewConflictState?.get(archive.file_name) || { wins: archive.wins, loses: archive.loses }}
+              {#if archive.is_delimiter}
+                <FolderDelimiterRow
+                  {archive}
+                  {originalIndex}
+                  {isSource}
+                  collapsed={!!collapsedFolders[archive.file_name]}
+                  modCount={folderCounts.get(archive.file_name) ?? 0}
+                  onToggleCollapse={toggleFolderCollapse}
+                  isHighlighted={highlightedModName === archive.file_name}
+                  onDragStart={startDrag}
+                  onPointerMove={onRowPointerMove}
+                  onToggle={toggleMod}
+                  onContextMenu={openContextMenu}
+                  onRenameFolder={handleRenameFolder}
+                  onDeleteFolder={handleDeleteFolder}
+                  registerNode={registerModNode}
+                />
+              {:else}
+                {@const isExpanded = !!expandedRows[archive.file_name]}
+                {@const isHighlighted = highlightedModName === archive.file_name}
+                {@const isSelected = selectedMods.has(archive.file_name)}
+                {@const activeConflicts = previewConflictState?.get(archive.file_name) || { wins: archive.wins, loses: archive.loses }}
+                {@const catId = labelsConfig.assignments[archive.file_name]}
+                {@const assignedCat = catId ? labelsConfig.categories.find(c => c.id === catId) : null}
 
-              <div
-                role="group"
-                aria-label="Archive mod item: {archive.file_name}"
-                use:registerModNode={archive.file_name}
-                onclick={(e) => handleModClick(e, archive)}
-                onpointermove={(e) => onRowPointerMove(e, originalIndex)}
-                oncontextmenu={(e) => openContextMenu(e, archive, 'archive')}
-                class="group rounded border transition-all duration-300 z-10 {isHighlighted ? 'border-nvidia-accent ring-2 ring-nvidia-accent bg-nvidia-accent/20 scale-[1.008]' : (isSelected ? 'border-nvidia-accent/60 bg-nvidia-accent/10' : 'border-nvidia-border/70 bg-nvidia-surface hover:border-nvidia-border')} {archive.enabled ? 'opacity-100' : 'opacity-40'} {isSource ? 'opacity-20 border-dashed border-nvidia-accent/50' : ''}"
-                style={isHighlighted ? 'box-shadow: 0 0 15px color-mix(in srgb, var(--theme-accent) 35%, transparent);' : ''}
-              >
-                <!-- Density-aware Row Container (28px) -->
-                <div class="flex items-center justify-between px-3 gap-2 density-row">
-                  <div class="flex items-center gap-2.5 min-w-0 flex-1">
-                    <div
-                      role="button"
-                      tabindex="0"
-                      aria-label="Drag to adjust load order"
-                      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
-                      onpointerdown={(e) => { e.stopPropagation(); startDrag(e, originalIndex); }}
-                      class="cursor-grab active:cursor-grabbing p-1 text-nvidia-text-muted hover:text-nvidia-accent shrink-0 rounded hover:bg-nvidia-card transition"
-                      title="Drag to adjust load order"
-                    >
-                      <GripVertical class="h-3.5 w-3.5" />
-                    </div>
-
-                    <!-- Subtle, Neutral Calmed Switch -->
-                    <button
-                      onclick={(e) => { e.stopPropagation(); toggleMod(archive); }}
-                      aria-label={archive.enabled ? "Disable mod " + archive.file_name : "Enable mod " + archive.file_name}
-                      class="w-7 h-4 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer {archive.enabled ? 'bg-zinc-700/80 border border-zinc-600' : 'bg-zinc-900/90 border border-zinc-800'}"
-                    >
-                      <div class="h-2.5 w-2.5 rounded-full transition-transform transform {archive.enabled ? 'translate-x-3 bg-zinc-100 shadow-xs' : 'translate-x-0 bg-zinc-500'}"></div>
-                    </button>
-
-                    <span class="text-[10px] font-mono px-1 py-0.2 min-w-[34px] text-center rounded bg-nvidia-card text-nvidia-text-muted border border-nvidia-border shrink-0">
-                      #{archiveRank}
-                    </span>
-
-                    <span class="font-mono font-medium text-nvidia-text-primary truncate max-w-md">
-                      {archive.file_name}
-                    </span>
-
-                    {#if archive.associated_xls && archive.associated_xls.length > 0}
-                      <span
+                <div
+                  role="group"
+                  aria-label="Archive mod item: {archive.file_name}"
+                  use:registerModNode={archive.file_name}
+                  onclick={(e) => handleModClick(e, archive)}
+                  onpointermove={(e) => onRowPointerMove(e, originalIndex)}
+                  oncontextmenu={(e) => openContextMenu(e, archive, 'archive')}
+                  class="group rounded border transition-all duration-300 z-10 {isHighlighted ? 'border-nvidia-accent ring-2 ring-nvidia-accent bg-nvidia-accent/20 scale-[1.008]' : (isSelected ? 'border-nvidia-accent/60 bg-nvidia-accent/10' : 'border-nvidia-border/70 bg-nvidia-surface hover:border-nvidia-border')} {archive.enabled ? 'opacity-100' : 'opacity-40'} {isSource ? 'opacity-20 border-dashed border-nvidia-accent/50' : ''}"
+                  style={isHighlighted ? 'box-shadow: 0 0 15px color-mix(in srgb, var(--theme-accent) 35%, transparent);' : ''}
+                >
+                  <!-- Density-aware Row Container (28px) -->
+                  <div class="flex items-center justify-between px-3 gap-2 density-row">
+                    <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div
                         role="button"
                         tabindex="0"
-                        oncontextmenu={(e) => { e.stopPropagation(); openContextMenu(e, archive, 'xl'); }}
+                        aria-label="Drag to adjust load order"
                         onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
-                        class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded border transition-colors shrink-0 cursor-context-menu {archive.enabled ? 'bg-cyan-950/80 text-cyan-400 border-cyan-700/60 hover:border-cyan-500' : 'bg-nvidia-card text-nvidia-text-muted border-nvidia-border opacity-50'}"
-                        title="Companions: {archive.associated_xls.map(x => x.file_name).join(', ')} - Right-click for options"
+                        onpointerdown={(e) => { e.stopPropagation(); startDrag(e, originalIndex); }}
+                        class="cursor-grab active:cursor-grabbing p-1 text-nvidia-text-muted hover:text-nvidia-accent shrink-0 rounded hover:bg-nvidia-card transition"
+                        title="Drag to adjust load order"
                       >
-                        XL {#if archive.associated_xls.length > 1}({archive.associated_xls.length}){/if}
+                        <GripVertical class="h-3.5 w-3.5" />
+                      </div>
+
+                      <!-- Subtle, Neutral Calmed Switch -->
+                      <button
+                        onclick={(e) => { e.stopPropagation(); toggleMod(archive); }}
+                        aria-label={archive.enabled ? "Disable mod " + archive.file_name : "Enable mod " + archive.file_name}
+                        class="w-7 h-4 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer {archive.enabled ? 'bg-zinc-700/80 border border-zinc-600' : 'bg-zinc-900/90 border border-zinc-800'}"
+                      >
+                        <div class="h-2.5 w-2.5 rounded-full transition-transform transform {archive.enabled ? 'translate-x-3 bg-zinc-100 shadow-xs' : 'translate-x-0 bg-zinc-500'}"></div>
+                      </button>
+
+                      <span class="text-[10px] font-mono px-1 py-0.2 min-w-[34px] text-center rounded bg-nvidia-card text-nvidia-text-muted border border-nvidia-border shrink-0">
+                        #{archiveRank}
                       </span>
-                    {/if}
 
-                    <div class="flex items-center gap-1.5 text-[11px] text-nvidia-text-muted shrink-0 opacity-80 hidden lg:flex">
-                      <span>({archive.file_count} assets)</span>
-                      <span>•</span>
-                      <span>{formatBytes(archive.size_bytes)}</span>
-                    </div>
-                  </div>
+                      <span class="font-mono font-medium text-nvidia-text-primary truncate max-w-md">
+                        {archive.file_name}
+                      </span>
 
-                  <!-- Fixed-Width Laser-Aligned Conflict Column & Hover Menu -->
-                  <div class="flex items-center gap-2 shrink-0 w-24">
-                    <div class="w-3 flex items-center justify-center shrink-0">
-                      {#if activeConflicts.loses.length > 0}
-                        <div class="h-2.5 w-2.5 rounded-full bg-[#ef4444] shadow-[0_0_6px_rgba(239,68,68,0.7)]" title="Overwritten by higher mod"></div>
-                      {:else if activeConflicts.wins.length > 0}
-                        <div class="h-2.5 w-2.5 rounded-full bg-[#22c55e] shadow-[0_0_6px_rgba(34,197,94,0.7)]" title="Winning overwrites"></div>
-                      {:else}
-                        <div class="h-2.5 w-2.5 rounded-full bg-[#22c55e]/90" title="Clean (No conflicts)"></div>
-                      {/if}
-                    </div>
-
-                    <div class="flex items-center min-w-0 flex-1">
-                      {#if archive.has_conflicts}
-                        {@const conflictCount = activeConflicts.loses.length > 0 ? activeConflicts.loses.length : activeConflicts.wins.length}
-                        <button
-                          type="button"
-                          onclick={(e) => { e.stopPropagation(); expandedRows[archive.file_name] = !expandedRows[archive.file_name]; }}
-                          class="flex items-center gap-1 px-1 py-0.5 rounded hover:bg-nvidia-card text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer font-mono text-[11px]"
-                          title="Toggle conflict details ({conflictCount} impacted)"
+                      <!-- The Bridge: Virtual Category Pill -->
+                      {#if assignedCat}
+                        <span 
+                          class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded border shrink-0"
+                          style="background-color: {assignedCat.color}15; color: {assignedCat.color}; border-color: {assignedCat.color}40;"
+                          title="Assigned to {assignedCat.name}"
                         >
-                          <span class="font-medium">{conflictCount}</span>
-                          {#if isExpanded}
-                            <ChevronDown class="h-3 w-3" />
-                          {:else}
-                            <ChevronRight class="h-3 w-3" />
-                          {/if}
-                        </button>
+                          {assignedCat.name}
+                        </span>
                       {/if}
+
+                      {#if archive.associated_xls && archive.associated_xls.length > 0}
+                        <span
+                          role="button"
+                          tabindex="0"
+                          oncontextmenu={(e) => { e.stopPropagation(); openContextMenu(e, archive, 'xl'); }}
+                          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
+                          class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded border transition-colors shrink-0 cursor-context-menu {archive.enabled ? 'bg-cyan-950/80 text-cyan-400 border-cyan-700/60 hover:border-cyan-500' : 'bg-nvidia-card text-nvidia-text-muted border-nvidia-border opacity-50'}"
+                          title="Companions: {archive.associated_xls.map(x => x.file_name).join(', ')} - Right-click for options"
+                        >
+                          XL {#if archive.associated_xls.length > 1}({archive.associated_xls.length}){/if}
+                        </span>
+                      {/if}
+
+                      <div class="flex items-center gap-1.5 text-[11px] text-nvidia-text-muted shrink-0 opacity-80 hidden lg:flex">
+                        <span>({archive.file_count} assets)</span>
+                        <span>•</span>
+                        <span>{formatBytes(archive.size_bytes)}</span>
+                      </div>
+                    </div>
+
+                    <!-- Fixed-Width Laser-Aligned Conflict Column & Hover Menu -->
+                    <div class="flex items-center gap-2 shrink-0 w-24">
+                      <div class="w-3 flex items-center justify-center shrink-0">
+                        {#if activeConflicts.loses.length > 0}
+                          <div class="h-2.5 w-2.5 rounded-full bg-[#ef4444] shadow-[0_0_6px_rgba(239,68,68,0.7)]" title="Overwritten by higher mod"></div>
+                        {:else if activeConflicts.wins.length > 0}
+                          <div class="h-2.5 w-2.5 rounded-full bg-[#22c55e] shadow-[0_0_6px_rgba(34,197,94,0.7)]" title="Winning overwrites"></div>
+                        {:else}
+                          <div class="h-2.5 w-2.5 rounded-full bg-[#22c55e]/90" title="Clean (No conflicts)"></div>
+                        {/if}
+                      </div>
+
+                      <div class="flex items-center min-w-0 flex-1">
+                        {#if archive.has_conflicts}
+                          {@const conflictCount = activeConflicts.loses.length > 0 ? activeConflicts.loses.length : activeConflicts.wins.length}
+                          <button
+                            type="button"
+                            onclick={(e) => { e.stopPropagation(); expandedRows[archive.file_name] = !expandedRows[archive.file_name]; }}
+                            class="flex items-center gap-1 px-1 py-0.5 rounded hover:bg-nvidia-card text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer font-mono text-[11px]"
+                            title="Toggle conflict details ({conflictCount} impacted)"
+                          >
+                            <span class="font-medium">{conflictCount}</span>
+                            {#if isExpanded}
+                              <ChevronDown class="h-3 w-3" />
+                            {:else}
+                              <ChevronRight class="h-3 w-3" />
+                            {/if}
+                          </button>
+                        {/if}
+                      </div>
+                    </div>
+
+                    <!-- Hover Context Menu Button -->
+                    <div class="flex items-center justify-end shrink-0 w-6">
+                      <button
+                        type="button"
+                        onclick={(e) => { e.stopPropagation(); openContextMenu(e, archive, 'archive'); }}
+                        class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-text-primary hover:bg-nvidia-card transition cursor-pointer opacity-0 group-hover:opacity-100"
+                        title="More options"
+                      >
+                        <MoreVertical class="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </div>
 
-                  <!-- Hover Context Menu Button -->
-                  <div class="flex items-center justify-end shrink-0 w-6">
-                    <button
-                      type="button"
-                      onclick={(e) => { e.stopPropagation(); openContextMenu(e, archive, 'archive'); }}
-                      class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-text-primary hover:bg-nvidia-card transition cursor-pointer opacity-0 group-hover:opacity-100"
-                      title="More options"
-                    >
-                      <MoreVertical class="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {#if isExpanded && archive.has_conflicts}
-                  <div class="px-4 py-2 border-t border-nvidia-border/60 bg-nvidia-card/30 space-y-2 text-xs">
-                    {#if activeConflicts.wins.length > 0}
-                      <div>
-                        <span class="text-[10px] font-semibold text-[#22c55e] uppercase tracking-wider">Overwrites Lower Mods:</span>
-                        <div class="mt-1 flex flex-wrap gap-1">
-                          {#each activeConflicts.wins as target}
-                            <span class="px-1.5 py-0.2 rounded bg-nvidia-surface border border-nvidia-border text-[10px] font-mono text-nvidia-text-primary">
-                              {target}
-                            </span>
-                          {/each}
+                  {#if isExpanded && archive.has_conflicts}
+                    <div class="px-4 py-2 border-t border-nvidia-border/60 bg-nvidia-card/30 space-y-2 text-xs">
+                      {#if activeConflicts.wins.length > 0}
+                        <div>
+                          <span class="text-[10px] font-semibold text-[#22c55e] uppercase tracking-wider">Overwrites Lower Mods:</span>
+                          <div class="mt-1 flex flex-wrap gap-1">
+                            {#each activeConflicts.wins as target}
+                              <span class="px-1.5 py-0.2 rounded bg-nvidia-surface border border-nvidia-border text-[10px] font-mono text-nvidia-text-primary">
+                                {target}
+                              </span>
+                            {/each}
+                          </div>
                         </div>
-                      </div>
-                    {/if}
+                      {/if}
 
-                    {#if activeConflicts.loses.length > 0}
-                      <div>
-                        <span class="text-[10px] font-semibold text-[#ef4444] uppercase tracking-wider">Loses To Higher Mods:</span>
-                        <div class="mt-1 flex flex-wrap gap-1">
-                          {#each activeConflicts.loses as target}
-                            <span class="px-1.5 py-0.2 rounded bg-[#ef4444]/15 border border-[#ef4444]/40 text-[10px] font-mono text-[#ef4444] font-semibold">
-                              {target}
-                            </span>
-                          {/each}
+                      {#if activeConflicts.loses.length > 0}
+                        <div>
+                          <span class="text-[10px] font-semibold text-[#ef4444] uppercase tracking-wider">Loses To Higher Mods:</span>
+                          <div class="mt-1 flex flex-wrap gap-1">
+                            {#each activeConflicts.loses as target}
+                              <span class="px-1.5 py-0.2 rounded bg-[#ef4444]/15 border border-[#ef4444]/40 text-[10px] font-mono text-[#ef4444] font-semibold">
+                                {target}
+                              </span>
+                            {/each}
+                          </div>
                         </div>
-                      </div>
-                    {/if}
-                  </div>
-                {/if}
-              </div>
-            {/if}
-
-            {#if showLineAfter}
-              <div class="absolute -bottom-1 left-0 right-0 h-[2.5px] bg-nvidia-accent z-30 shadow-[0_0_12px_var(--theme-accent)] flex items-center">
-                <div class="h-2.5 w-2.5 rounded-full bg-nvidia-accent -ml-1.5 shadow-[0_0_8px_var(--theme-accent)]"></div>
-              </div>
-            {/if}
-          </div>
-        {/each}
-      {/if}
-
-      <!-- Dedicated Bottom Section: Unassociated .xl Files -->
-      {#if unassociatedXlFiles.length > 0}
-        <div class="mt-6 pt-4 border-t border-nvidia-border/60 space-y-2">
-          <div 
-            role="button"
-            tabindex="0"
-            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') showUnassociatedXl = !showUnassociatedXl; }}
-            onclick={() => showUnassociatedXl = !showUnassociatedXl}
-            class="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 flex items-center justify-between cursor-pointer hover:bg-cyan-500/20 transition-colors"
-          >
-            <div class="flex items-center gap-2 min-w-0">
-              {#if showUnassociatedXl}
-                <ChevronDown class="h-4 w-4 text-cyan-400 shrink-0" />
-              {:else}
-                <ChevronRight class="h-4 w-4 text-cyan-400 shrink-0" />
-              {/if}
-              <FileCode class="h-4 w-4 text-cyan-400 shrink-0" />
-              <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider">
-                Unassociated .xl Files
-              </span>
-              <span class="text-[10px] text-nvidia-text-muted hidden sm:inline">
-                (Active in game, without a systemically generated mod association)
-              </span>
-            </div>
-
-            <div class="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onclick={(e) => { e.stopPropagation(); showXlHelp = !showXlHelp; }}
-                class="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border transition-colors {showXlHelp ? 'bg-cyan-950 text-cyan-300 border-cyan-600' : 'bg-nvidia-surface hover:bg-nvidia-card text-cyan-400 border-cyan-500/40'}"
-                title="Click for association instructions"
-              >
-                <Info class="h-3.5 w-3.5" />
-                <span>Info</span>
-              </button>
-
-              <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-nvidia-surface border border-nvidia-border text-cyan-400">
-                {unassociatedXlFiles.length} loose
-              </span>
-            </div>
-          </div>
-
-          {#if showXlHelp}
-            <div class="p-3 rounded-lg border border-cyan-500/30 bg-cyan-500/5 text-xs text-nvidia-text-primary space-y-1.5">
-              <p class="text-[11px] text-nvidia-text-muted pl-6 leading-relaxed">
-                <span class="text-nvidia-text-primary font-medium">Not required for the game to function. An organizational quality-of-life feature only. ArchiveXL will load untethered .xl files regardless.</span>
-                <br /><br />
-                <span class="text-cyan-400 font-semibold">What is Linking?</span><br />
-                Linking bonds a loose <span class="font-mono text-nvidia-text-primary">.xl</span> file to a parent <span class="font-mono text-nvidia-text-primary">.archive</span> mod. Once linked, the parent mod will display a blue <span class="font-mono text-cyan-400 font-bold">[XL]</span> badge, and toggling the parent mod will automatically toggle the companion file.
-                <br /><br />
-                <span class="text-cyan-400 font-semibold">How to Link / Unlink:</span><br />
-                • <span class="font-semibold text-nvidia-text-primary">Link:</span> Click the "Active / Click to Link" button on any loose file below, or right-click it and select "Link to Archive...".<br />
-                • <span class="font-semibold text-nvidia-text-primary">Unlink:</span> Right-click the blue <span class="font-mono text-cyan-400 font-bold">[XL]</span> badge on a parent mod and select "Unlink .xl".
-              </p>
-            </div>
-          {/if}
-
-          {#if showUnassociatedXl}
-            <div class="space-y-1">
-              {#each unassociatedXlFiles as xl (xl.file_name + '_' + xl.enabled)}
-                <div
-                  oncontextmenu={(e) => openContextMenu(e, xl, 'unassociated_xl')}
-                  class="rounded border border-nvidia-border bg-nvidia-surface/80 hover:bg-nvidia-surface px-3 flex items-center justify-between density-row cursor-context-menu"
-                >
-                  <div class="flex items-center gap-2.5 min-w-0">
-                    <FileCode class="h-3.5 w-3.5 text-cyan-400 shrink-0" />
-                    <span class="font-mono text-nvidia-text-primary font-medium truncate">{xl.file_name}</span>
-                    <span class="text-[11px] font-mono text-nvidia-text-muted shrink-0 hidden sm:block">
-                      {formatBytes(xl.size_bytes)}
-                    </span>
-                  </div>
-
-                  <div class="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onclick={(e) => { e.stopPropagation(); targetXlToLink = xl.file_name; isLinkModalOpen = true; }}
-                      class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 hover:border-cyan-400 text-cyan-400 font-semibold transition cursor-pointer"
-                    >
-                      Active / Click to Link
-                    </button>
-                  </div>
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </div>
-      {/if}
-    </div>
-
-    <!-- Conflict Summary Drawer -->
-    {#if showConflictSummary}
-      <aside class="w-80 rounded-lg border border-nvidia-border bg-nvidia-surface flex flex-col overflow-hidden shrink-0 shadow-xl transition-all duration-200">
-        <div class="p-3 border-b border-nvidia-border bg-nvidia-card/50 flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <AlertTriangle class="h-4 w-4 text-[#ef4444]" />
-            <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Conflict Summary</span>
-          </div>
-          <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-nvidia-surface border border-nvidia-border text-nvidia-text-primary">
-            {conflictingArchives.length} Contested
-          </span>
-        </div>
-
-        <div class="p-2 space-y-1 overflow-y-auto flex-1 max-h-[calc(100vh-220px)]">
-          {#if conflictingArchives.length === 0}
-            <div class="p-6 text-center text-xs text-nvidia-text-muted">
-              No load order conflicts detected.
-            </div>
-          {:else}
-            {#each conflictingArchives as archive (archive.file_name + '_' + archive.enabled)}
-              {@const isLosing = archive.loses.length > 0}
-              {@const isDragged = draggedEntry?.file_name === archive.file_name}
-              <button
-                type="button"
-                onclick={() => focusModInMainList(archive.file_name)}
-                class="w-full text-left rounded px-2.5 flex items-center justify-between gap-2 border transition-all duration-200 cursor-pointer density-row group
-                  {isDragged 
-                    ? (isLosing 
-                        ? 'border-[#ef4444] bg-[#ef4444]/15 shadow-[0_0_12px_rgba(239,68,68,0.3)] scale-[1.02] z-10 relative' 
-                        : 'border-[#22c55e] bg-[#22c55e]/15 shadow-[0_0_12px_rgba(34,197,94,0.3)] scale-[1.02] z-10 relative')
-                    : 'border-nvidia-border/70 bg-nvidia-surface/80 hover:bg-nvidia-surface hover:border-nvidia-border'}"
-                title="Click to locate in main load order"
-              >
-                <div class="flex items-center gap-2 min-w-0 flex-1">
-                  <div class="h-2 w-2 rounded-full shrink-0 {isLosing ? 'bg-[#ef4444] shadow-[0_0_8px_rgba(239,68,68,0.7)]' : 'bg-[#22c55e] shadow-[0_0_8px_rgba(34,197,94,0.7)]'}"></div>
-
-                  <span class="font-mono text-nvidia-text-primary truncate font-medium">
-                    {archive.file_name}
-                  </span>
-                </div>
-
-                <div class="shrink-0">
-                  {#if isLosing}
-                    <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-[#ef4444]/15 text-[#ef4444] border border-[#ef4444]/30">
-                      -{archive.loses.length}
-                    </span>
-                  {:else}
-                    <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-[#22c55e]/15 text-[#22c55e] border border-[#22c55e]/30">
-                      +{archive.wins.length}
-                    </span>
+                      {/if}
+                    </div>
                   {/if}
                 </div>
-              </button>
-            {/each}
-          {/if}
-        </div>
+              {/if}
 
-        <div class="p-2.5 border-t border-nvidia-border bg-nvidia-card/30 text-[11px] text-nvidia-text-muted flex items-center justify-center">
-          <span>Click any mod to locate in main load order</span>
-        </div>
-      </aside>
+              {#if showLineAfter}
+                <div class="absolute -bottom-1 left-0 right-0 h-[2.5px] bg-nvidia-accent z-30 shadow-[0_0_12px_var(--theme-accent)] flex items-center">
+                  <div class="h-2.5 w-2.5 rounded-full bg-nvidia-accent -ml-1.5 shadow-[0_0_8px_var(--theme-accent)]"></div>
+                </div>
+              {/if}
+            </div>
+          {/each}
+        {/if}
+
+        <!-- Dedicated Bottom Section: Unassociated .xl Files -->
+        {#if unassociatedXlFiles.length > 0}
+          <div class="mt-6 pt-4 border-t border-nvidia-border/60 space-y-2">
+            <div 
+              role="button"
+              tabindex="0"
+              onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') showUnassociatedXl = !showUnassociatedXl; }}
+              onclick={() => showUnassociatedXl = !showUnassociatedXl}
+              class="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 flex items-center justify-between cursor-pointer hover:bg-cyan-500/20 transition-colors"
+            >
+              <div class="flex items-center gap-2 min-w-0">
+                {#if showUnassociatedXl}
+                  <ChevronDown class="h-4 w-4 text-cyan-400 shrink-0" />
+                {:else}
+                  <ChevronRight class="h-4 w-4 text-cyan-400 shrink-0" />
+                {/if}
+                <FileCode class="h-4 w-4 text-cyan-400 shrink-0" />
+                <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider">
+                  Unassociated .xl Files
+                </span>
+                <span class="text-[10px] text-nvidia-text-muted hidden sm:inline">
+                  (Active in game, without a systemically generated mod association)
+                </span>
+              </div>
+
+              <div class="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onclick={(e) => { e.stopPropagation(); showXlHelp = !showXlHelp; }}
+                  class="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border transition-colors {showXlHelp ? 'bg-cyan-950 text-cyan-300 border-cyan-600' : 'bg-nvidia-surface hover:bg-nvidia-card text-cyan-400 border-cyan-500/40'}"
+                  title="Click for association instructions"
+                >
+                  <Info class="h-3.5 w-3.5" />
+                  <span>Info</span>
+                </button>
+
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-nvidia-surface border border-nvidia-border text-cyan-400">
+                  {unassociatedXlFiles.length} loose
+                </span>
+              </div>
+            </div>
+
+            {#if showXlHelp}
+              <div class="p-3 rounded-lg border border-cyan-500/30 bg-cyan-500/5 text-xs text-nvidia-text-primary space-y-1.5">
+                <p class="text-[11px] text-nvidia-text-muted pl-6 leading-relaxed">
+                  <span class="text-nvidia-text-primary font-medium">Not required for the game to function. An organizational quality-of-life feature only. ArchiveXL will load untethered .xl files regardless.</span>
+                  <br /><br />
+                  <span class="text-cyan-400 font-semibold">What is Linking?</span><br />
+                  Linking bonds a loose <span class="font-mono text-nvidia-text-primary">.xl</span> file to a parent <span class="font-mono text-nvidia-text-primary">.archive</span> mod. Once linked, the parent mod will display a blue <span class="font-mono text-cyan-400 font-bold">[XL]</span> badge, and toggling the parent mod will automatically toggle the companion file.
+                  <br /><br />
+                  <span class="text-cyan-400 font-semibold">How to Link / Unlink:</span><br />
+                  • <span class="font-semibold text-nvidia-text-primary">Link:</span> Click the "Active / Click to Link" button on any loose file below, or right-click it and select "Link to Archive...".<br />
+                  • <span class="font-semibold text-nvidia-text-primary">Unlink:</span> Right-click the blue <span class="font-mono text-cyan-400 font-bold">[XL]</span> badge on a parent mod and select "Unlink .xl".
+                </p>
+              </div>
+            {/if}
+
+            {#if showUnassociatedXl}
+              <div class="space-y-1">
+                {#each unassociatedXlFiles as xl (xl.file_name + '_' + xl.enabled)}
+                  <div
+                    oncontextmenu={(e) => openContextMenu(e, xl, 'unassociated_xl')}
+                    class="rounded border border-nvidia-border bg-nvidia-surface/80 hover:bg-nvidia-surface px-3 flex items-center justify-between density-row cursor-context-menu"
+                  >
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <FileCode class="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+                      <span class="font-mono text-nvidia-text-primary font-medium truncate">{xl.file_name}</span>
+                      <span class="text-[11px] font-mono text-nvidia-text-muted shrink-0 hidden sm:block">
+                        {formatBytes(xl.size_bytes)}
+                      </span>
+                    </div>
+
+                    <div class="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onclick={(e) => { e.stopPropagation(); targetXlToLink = xl.file_name; isLinkModalOpen = true; }}
+                        class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 hover:border-cyan-400 text-cyan-400 font-semibold transition cursor-pointer"
+                      >
+                        Active / Click to Link
+                      </button>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
+      </div>
+
+      <!-- Conflict Summary Drawer -->
+      {#if showConflictSummary}
+        <aside class="w-80 rounded-lg border border-nvidia-border bg-nvidia-surface flex flex-col overflow-hidden shrink-0 shadow-xl transition-all duration-200">
+          <div class="p-3 border-b border-nvidia-border bg-nvidia-card/50 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <AlertTriangle class="h-4 w-4 text-[#ef4444]" />
+              <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Conflict Summary</span>
+            </div>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-nvidia-surface border border-nvidia-border text-nvidia-text-primary">
+              {conflictingArchives.length} Contested
+            </span>
+          </div>
+
+          <div class="p-2 space-y-1 overflow-y-auto flex-1 max-h-[calc(100vh-220px)]">
+            {#if conflictingArchives.length === 0}
+              <div class="p-6 text-center text-xs text-nvidia-text-muted">
+                No load order conflicts detected.
+              </div>
+            {:else}
+              {#each conflictingArchives as archive (archive.file_name + '_' + archive.enabled)}
+                {@const isLosing = archive.loses.length > 0}
+                {@const isDragged = draggedEntry?.file_name === archive.file_name}
+                <button
+                  type="button"
+                  onclick={() => focusModInMainList(archive.file_name)}
+                  class="w-full text-left rounded px-2.5 flex items-center justify-between gap-2 border transition-all duration-200 cursor-pointer density-row group
+                    {isDragged 
+                      ? (isLosing 
+                          ? 'border-[#ef4444] bg-[#ef4444]/15 shadow-[0_0_12px_rgba(239,68,68,0.3)] scale-[1.02] z-10 relative' 
+                          : 'border-[#22c55e] bg-[#22c55e]/15 shadow-[0_0_12px_rgba(34,197,94,0.3)] scale-[1.02] z-10 relative')
+                      : 'border-nvidia-border/70 bg-nvidia-surface/80 hover:bg-nvidia-surface hover:border-nvidia-border'}"
+                  title="Click to locate in main load order"
+                >
+                  <div class="flex items-center gap-2 min-w-0 flex-1">
+                    <div class="h-2 w-2 rounded-full shrink-0 {isLosing ? 'bg-[#ef4444] shadow-[0_0_8px_rgba(239,68,68,0.7)]' : 'bg-[#22c55e] shadow-[0_0_8px_rgba(34,197,94,0.7)]'}"></div>
+
+                    <span class="font-mono text-nvidia-text-primary truncate font-medium">
+                      {archive.file_name}
+                    </span>
+                  </div>
+
+                  <div class="shrink-0">
+                    {#if isLosing}
+                      <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-[#ef4444]/15 text-[#ef4444] border border-[#ef4444]/30">
+                        -{archive.loses.length}
+                      </span>
+                    {:else}
+                      <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-[#22c55e]/15 text-[#22c55e] border border-[#22c55e]/30">
+                        +{archive.wins.length}
+                      </span>
+                    {/if}
+                  </div>
+                </button>
+              {/each}
+            {/if}
+          </div>
+
+          <div class="p-2.5 border-t border-nvidia-border bg-nvidia-card/30 text-[11px] text-nvidia-text-muted flex items-center justify-center">
+            <span>Click any mod to locate in main load order</span>
+          </div>
+        </aside>
+      {/if}
     {/if}
   </div>
 </div>

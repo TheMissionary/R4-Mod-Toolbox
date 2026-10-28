@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
@@ -66,6 +66,7 @@
   });
 
   let customPhotoPath = $state('');
+  let enableOrganizerView = $state(false);
 
   async function setTab(tab: TabType) {
     currentTab = tab;
@@ -73,7 +74,8 @@
     try {
       const config = await loadConfigFromDisk();
       config.activeTab = tab;
-      customPhotoPath = config.customPhotoPath || ''; // Refresh photo path state when navigating
+      customPhotoPath = config.customPhotoPath || '';
+      enableOrganizerView = config.enableOrganizerView || false;
       await saveConfigToDisk(config);
     } catch (err) {
       warn(`Failed to save active tab state: ${err}`);
@@ -242,6 +244,7 @@
       if (config.customPhotoPath) {
         customPhotoPath = config.customPhotoPath;
       }
+      enableOrganizerView = config.enableOrganizerView || false;
     }).catch(err => {
       error(`Config hydration error: ${err}`);
     }).finally(() => {
@@ -592,6 +595,7 @@
           onStateChanged={refreshCountsOnly}
           {targetHighlightMod}
           onRouteToHistory={() => setTab('history')}
+          {enableOrganizerView}
         />
       </div>
 
@@ -651,6 +655,7 @@
           onSettingsSaved={async () => {
             const config = await loadConfigFromDisk();
             customPhotoPath = config.customPhotoPath || '';
+            enableOrganizerView = config.enableOrganizerView || false;
           }}
         />
       </div>

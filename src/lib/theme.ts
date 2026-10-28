@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+﻿import { invoke } from '@tauri-apps/api/core';
 import type { AppThemeColors, ThemeSettings, AppConfig } from '$lib/types';
 
 export type { AppThemeColors, ThemeSettings, AppConfig };
@@ -149,12 +149,12 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   showNewMods: false,
   customTextEditorPath: '',
   customPhotoPath: '',
+  enableOrganizerView: false,
   theme: { ...DEFAULT_THEME_SETTINGS },
 };
 
 const STORAGE_KEY = 'cp2077_theme_settings_v2';
 
-// Legacy defaults to check against for smart migration
 const LEGACY_DEFAULT_BASE = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 const LEGACY_DEFAULT_MODS = '"Cascadia Code", "Consolas", monospace';
 
@@ -174,7 +174,6 @@ export function loadThemeSettings(): ThemeSettings {
       let loadedBase = parsed.fontFamilyBase || parsed.fontFamily || APP_FONT_PRESETS[0].value;
       let loadedMods = parsed.fontFamilyMods || MOD_FONT_PRESETS[0].value;
 
-      // Smart Migration: Upgrade legacy defaults to Geist
       if (loadedBase === LEGACY_DEFAULT_BASE) {
         loadedBase = APP_FONT_PRESETS[0].value;
       }
@@ -243,7 +242,6 @@ export async function loadConfigFromDisk(): Promise<AppConfig> {
         config.theme.fontFamilyMods = MOD_FONT_PRESETS[0].value;
       }
 
-      // Smart Migration for disk config
       if (config.theme.fontFamilyBase === LEGACY_DEFAULT_BASE) {
         config.theme.fontFamilyBase = APP_FONT_PRESETS[0].value;
       }
@@ -256,21 +254,12 @@ export async function loadConfigFromDisk(): Promise<AppConfig> {
       config.theme.darkColors = generateThemeColors('dark', config.theme.darkColors?.accent || ACCENT_PRESETS[0].hex);
       config.theme.lightColors = generateThemeColors('light', config.theme.lightColors?.accent || '#5A8F00');
 
-      if (config.recentDaysThreshold === undefined) {
-        config.recentDaysThreshold = 30;
-      }
-      if (config.newModsHours === undefined) {
-        config.newModsHours = 6;
-      }
-      if (config.showNewMods === undefined) {
-        config.showNewMods = false;
-      }
-      if (config.customTextEditorPath === undefined) {
-        config.customTextEditorPath = '';
-      }
-      if (config.customPhotoPath === undefined) {
-        config.customPhotoPath = '';
-      }
+      if (config.recentDaysThreshold === undefined) config.recentDaysThreshold = 30;
+      if (config.newModsHours === undefined) config.newModsHours = 6;
+      if (config.showNewMods === undefined) config.showNewMods = false;
+      if (config.customTextEditorPath === undefined) config.customTextEditorPath = '';
+      if (config.customPhotoPath === undefined) config.customPhotoPath = '';
+      if (config.enableOrganizerView === undefined) config.enableOrganizerView = false;
 
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(config.theme));

@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { open, message } from '@tauri-apps/plugin-dialog';
@@ -27,7 +27,8 @@
     Wrench,
     GripVertical,
     Folder,
-    FileCode
+    FileCode,
+    LayoutGrid
   } from 'lucide-svelte';
 
   let { 
@@ -48,6 +49,7 @@
   let customModsInput = $state('');
   let customEditorPath = $state('');
   let customPhotoPath = $state('');
+  let enableOrganizerView = $state(false);
   let isDirty = $state(false);
   
   let showAdvancedIntegrations = $state(false);
@@ -86,6 +88,7 @@
     loadConfigFromDisk().then(config => {
       customEditorPath = config.customTextEditorPath || '';
       customPhotoPath = config.customPhotoPath || '';
+      enableOrganizerView = config.enableOrganizerView || false;
     });
   });
 
@@ -239,6 +242,7 @@
     customModsInput = '';
     customEditorPath = '';
     customPhotoPath = '';
+    enableOrganizerView = false;
     markDirty();
   }
 
@@ -260,6 +264,7 @@
       config.theme = plainPayload;
       config.customTextEditorPath = customEditorPath.trim();
       config.customPhotoPath = customPhotoPath.trim();
+      config.enableOrganizerView = enableOrganizerView;
       await saveConfigToDisk(config);
       isDirty = false;
       if (onSettingsSaved) onSettingsSaved();
@@ -511,6 +516,28 @@
           {#if showAdvancedIntegrations}
             <div class="p-5 space-y-6 border-t border-nvidia-border/60 bg-nvidia-bg/30">
               
+              <!-- Organizer View Toggle -->
+              <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <LayoutGrid class="h-4 w-4 text-cyan-400" />
+                    <span class="text-xs font-semibold text-nvidia-text-primary">Enable Organizer View</span>
+                  </div>
+                  <button
+                    type="button"
+                    onclick={() => { enableOrganizerView = !enableOrganizerView; markDirty(); }}
+                    class="w-9 h-5 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer {enableOrganizerView ? 'bg-nvidia-accent border border-nvidia-accent/80' : 'bg-zinc-900/90 border border-zinc-800'}"
+                  >
+                    <div class="h-3.5 w-3.5 rounded-full transition-transform transform {enableOrganizerView ? 'translate-x-4 bg-black shadow-xs' : 'translate-x-0 bg-zinc-500'}"></div>
+                  </button>
+                </div>
+                <p class="text-[11px] text-nvidia-text-muted leading-tight pl-6">
+                  Adds a virtual category layer to the Archive tab for visual organization without altering physical load order.
+                </p>
+              </div>
+
+              <div class="h-px bg-nvidia-border/50"></div>
+
               <!-- Custom Text Editor -->
               <div class="space-y-2">
                 <span class="text-xs font-semibold text-nvidia-text-primary">Custom Text Editor</span>

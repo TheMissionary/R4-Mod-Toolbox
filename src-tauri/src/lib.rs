@@ -1,4 +1,4 @@
-mod archive;
+﻿mod archive;
 
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
@@ -98,6 +98,8 @@ pub struct AppConfig {
     pub custom_text_editor_path: Option<String>,
     #[serde(default)]
     pub custom_photo_path: Option<String>,
+    #[serde(default)]
+    pub enable_organizer_view: Option<bool>,
     pub theme: ThemeConfig,
 }
 
@@ -116,6 +118,7 @@ impl Default for AppConfig {
             show_new_mods: Some(false),
             custom_text_editor_path: None,
             custom_photo_path: None,
+            enable_organizer_view: Some(false),
             theme: ThemeConfig::default(),
         }
     }
@@ -432,7 +435,6 @@ fn scan_game_directory(game_path: String) -> Result<ScanResult, String> {
     let exe_path = root.join("bin").join("x64").join("Cyberpunk2077.exe");
     let is_valid = exe_path.exists();
 
-    // Automatically sync the ledger on every scan
     update_ledger(&game_path);
 
     let archive_dir = root.join("archive").join("pc").join("mod");
@@ -511,6 +513,16 @@ fn save_categories_config(game_path: String, config_json: String) -> Result<(), 
 #[tauri::command]
 fn load_categories_config(game_path: String) -> Result<String, String> {
     archive::load_categories(&game_path)
+}
+
+#[tauri::command]
+fn load_labels_config(game_path: String) -> Result<archive::LabelsConfig, String> {
+    archive::load_labels(&game_path)
+}
+
+#[tauri::command]
+fn save_labels_config(game_path: String, config: archive::LabelsConfig) -> Result<(), String> {
+    archive::save_labels(&game_path, config)
 }
 
 #[tauri::command]
@@ -1021,6 +1033,8 @@ pub fn run() {
             save_load_order,
             save_categories_config,
             load_categories_config,
+            load_labels_config,
+            save_labels_config,
             create_physical_folder,
             delete_physical_folder,
             rename_physical_folder,

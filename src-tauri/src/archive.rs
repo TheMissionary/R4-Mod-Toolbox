@@ -1,4 +1,4 @@
-use log::{error, info, warn};
+﻿use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
@@ -41,6 +41,28 @@ pub struct CategoryItem {
     pub name: String,
     pub enabled: bool,
     pub collapsed: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CategoryLabel {
+    pub id: String,
+    pub name: String,
+    pub color: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LabelsConfig {
+    pub categories: Vec<CategoryLabel>,
+    pub assignments: HashMap<String, String>,
+}
+
+impl Default for LabelsConfig {
+    fn default() -> Self {
+        Self {
+            categories: Vec::new(),
+            assignments: HashMap::new(),
+        }
+    }
 }
 
 pub fn get_path_timestamp_ms(path: &Path) -> Option<u64> {
@@ -94,8 +116,34 @@ fn get_categories_config_path(base_game_path: &str) -> PathBuf {
     PathBuf::from(base_game_path).join("archive").join("pc").join("mod").join("modcategories.json")
 }
 
+fn get_labels_config_path(base_game_path: &str) -> PathBuf {
+    PathBuf::from(base_game_path).join("archive").join("pc").join("mod").join("r4_labels.json")
+}
+
 fn get_xl_associations_path(base_game_path: &str) -> PathBuf {
     PathBuf::from(base_game_path).join("archive").join("pc").join("mod").join("modxl_associations.json")
+}
+
+pub fn load_labels(base_game_path: &str) -> Result<LabelsConfig, String> {
+    let path = get_labels_config_path(base_game_path);
+    if path.exists() {
+        if let Ok(content) = fs::read_to_string(&path) {
+            if let Ok(config) = serde_json::from_str::<LabelsConfig>(&content) {
+                return Ok(config);
+            }
+        }
+    }
+    Ok(LabelsConfig::default())
+}
+
+pub fn save_labels(base_game_path: &str, config: LabelsConfig) -> Result<(), String> {
+    let path = get_labels_config_path(base_game_path);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let serialized = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    fs::write(&path, serialized).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 fn load_xl_associations_map(base_game_path: &str) -> HashMap<String, String> {
@@ -188,7 +236,6 @@ fn migrate_legacy_categories(archive_dir: &Path) {
             if p.is_file() {
                 let name = p.file_name().unwrap_or_default().to_string_lossy().to_string();
                 
-                // 1. Migrate old .archive to .txt
                 if name.starts_with("[CAT] ") || name.starts_with("[DIR] ") {
                     if name.ends_with(".archive") {
                         let new_name = name.replace(".archive", ".txt");
@@ -199,7 +246,6 @@ fn migrate_legacy_categories(archive_dir: &Path) {
                     }
                 }
                 
-                // 2. Migrate [CAT] to [DIR]
                 let current_name = p.file_name().unwrap_or_default().to_string_lossy().to_string();
                 if current_name.starts_with("[CAT] ") {
                     let new_name = current_name.replacen("[CAT] ", "[DIR] ", 1);
@@ -281,7 +327,6 @@ pub fn scan_archives(base_game_path: &str) -> Result<ArchiveScanReport, String> 
         }
     }
 
-    // Deduplicate: Prioritize active files over disabled files with the same clean name
     let mut unique_archives = std::collections::HashMap::new();
     for p in active_archive_files {
         unique_archives.insert(clean_path_name(&p), p);
