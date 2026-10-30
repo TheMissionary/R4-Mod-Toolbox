@@ -140,6 +140,7 @@ export interface CategoryLabel {
   id: string;
   name: string;
   color: string;
+  stashed?: boolean;
 }
 
 export interface LabelsConfig {

@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { openUrl } from '@tauri-apps/plugin-opener';
   import {
     Info,
@@ -23,65 +23,35 @@
 
   const changelog = [
     {
+      version: "0.42.0 (RC1)",
+      date: "October 2026",
+      changes: [
+        "Organizer View & The Stash: Introduced a virtual categorization layer decoupled from physical load order, featuring 'The Stash' drawer for temporarily shelving categories and loose mods without deletion.",
+        "Draggable Categories & Live Mod Counters: Custom pointer-based drag-and-drop allows moving categories directly into The Stash and back into the active list, with live mod count badges (X mods).",
+        "Load Order Category Tagging: Added inline right-click 'Add Category Label' and 'Edit Category Label' actions directly from the main Load Order view with multi-select (Shift/Ctrl) batch tagging.",
+        "Full-Spectrum Color Picker: Integrated a native color wheel directly into category creation and editing dialogs, eliminating the need for external hex tools.",
+        "Real-Time Organizer Search: Wired the search bar directly into the Organizer View, auto-expanding categories with matches, highlighting matching mods, and dimming non-matches.",
+        "Universal History Routing: Added 'Show in History' across all framework tabs, automatically routing users to the mod ledger with all-time context.",
+        "Antivirus Compliance & Verifiable Cloud Builds: Excised all background process commands, implemented clean OS-native handlers, and integrated GitHub Actions CI/CD for public build provenance (0/62 clean MSI scan).",
+        "Special Acknowledgement: Dedicated card in About R4 honoring community collaborator rapsodyas for their essential feedback and design insights throughout the Organizer View's development."
+      ]
+    },
+    {
+      version: "0.41.0 (Beta 6)",
+      date: "October 2026",
+      changes: [
+        "Organizer View Foundation: Initial vertical stack prototype for decoupled mod categorization.",
+        "Custom Pointer DnD Engine: High-performance 60fps drag-and-drop bypassing WebView2 HTML5 drag limitations.",
+        "Universal History Routing: 'Show in History' context menu across framework tabs."
+      ]
+    },
+    {
       version: "0.40.0 (Beta 5)",
       date: "October 2026",
       changes: [
-        "Critical Fix: Duplicate Mod Crash: Resolved a fatal UI rendering halt that occurred when both an active and .disabled version of the exact same mod existed in the folder. The backend now strictly deduplicates files to ensure flawless rendering regardless of your total mod count.",
-        "Antivirus Compliance (Clean Slate): Completely excised background process monitoring (tasklist/taskkill) to eliminate false-positive heuristic flags from antivirus engines. R4 is now a pure, native file-management tool.",
-        "Display Scaling Fix: Adjusted the minimum window resolution to 1000x650. This permanently resolves the UI clipping and mouse-freeze bugs on 1080p monitors utilizing 125%+ Windows Display Scaling.",
-        "Feature Removal: Removed the \"Custom Launch Path\" option to support native, command-prompt-free game launching, further reducing AV suspicion."
-      ]
-    },
-    {
-      version: "0.39.0 (Beta 4)",
-      date: "October 2026",
-      changes: [
-        "History Ledger Search: Added a universal search field that automatically scans your entire mod history (\"All Time\"), alongside a new dedicated \"All Time\" timeframe option in the dropdown.",
-        "Photo Folder Integration: You can now link your Cyberpunk 2077 screenshots folder in the Advanced Integrations settings. Once linked, a dedicated \"Photos\" shortcut appears directly in the main sidebar.",
-        "File Tree Alignment: Refined the visual hierarchy across all framework tabs (CET, RED4ext, Scripts, Tweaks) to perfectly mimic Windows Explorer's vertical alignment for top-level files and folders.",
-        "Settings & UI Polish: Swapped the Settings page layout for better visual flow, relocated and dynamically recolored the \"Connected\" status indicator to match your theme, and made the expanded sidebar logo clickable.",
-        "Splash Screen & Typography: Updated the initial loading splash screen with heavier typography and tighter spacing for a punchier boot experience."
-      ]
-    },
-    {
-      version: "0.38.0 (Beta 3)",
-      date: "October 2026",
-      changes: [
-        "Responsive UI Overhaul: Mod rows across all framework views now utilize progressive disclosure, gracefully hiding secondary metadata on smaller screens to maximize file name visibility.",
-        "Settings Bento Layout: Completely redesigned the Settings page into a zero-scroll, multi-column grid layout with consolidated path configurations and a modernized live theme preview.",
-        "Sidebar Navigation: The collapsed sidebar now features a prominent, clickable R4 logo to maintain brand anchoring and improve expand/collapse UX.",
-        "Support Centralization: Migrated diagnostic log controls into a dedicated 'Support & Feedback' section on the Help page.",
-        "Header Refinement: Dynamic header text that adapts to the sidebar's collapsed state to eliminate redundancy."
-      ]
-    },
-    {
-      version: "0.37.0 (Beta 2)",
-      date: "October 2026",
-      changes: [
-        "Diagnostic Logging: Implemented a robust, human-readable logging system to track application state and catch file-lock errors.",
-        "Log Rotation: Logs are now capped at 50 KB and auto-pruned to keep only the 5 most recent sessions, preventing AppData bloat."
-      ]
-    },
-    {
-      version: "0.36.0 (Beta 1)",
-      date: "October 2026",
-      changes: [
-        "Dual Load Order System: Completely resolved the REDengine 0-byte crash vector. R4 now safely utilizes .txt files for physical categories and dynamically generates a sanitized modlist.txt strictly for the game engine.",
-        "FTUE Category Creation: Overhauled the 'Move to Category' workflow. Users can now create new categories inline, which automatically append to the bottom of the load order to prevent the 'swallowing' effect on uncategorized mods.",
-        "Typography Overhaul: Integrated Geist and GeistMono as the systemic default fonts, providing a crisp, modern aesthetic across the application and mod listings.",
-        "Custom Launch Paths: Added support for launching the game via custom executables or .lnk shortcuts directly from the sidebar.",
-        "UX & UI Refinements: Improved sidebar visual hierarchy, refined modal keyboard navigation, and added a safe log-truncation utility."
-      ]
-    },
-    {
-      version: "0.30.0 (Beta)",
-      date: "October 2026",
-      changes: [
-        "R4 Engine: Introduced real-time archive conflict resolution with in-memory hashing.",
-        "Load Order: Implemented 60fps drag-and-drop management with physical 0-byte [CAT] delimiters.",
-        "Framework Support: Added full integration for CET, RED4ext, Redscript, and R6 Tweaks.",
-        "XL Linking: Automated .xl sidecar pairing with manual override capabilities.",
-        "Theming: Integrated a 1-Color Generative Theme engine with Dual Typography support."
+        "Critical Fix: Duplicate Mod Crash: Resolved a fatal UI rendering halt when both active and .disabled versions of a mod existed.",
+        "Antivirus Compliance (Clean Slate): Excised tasklist/taskkill monitoring to eliminate heuristic flags.",
+        "Display Scaling Fix: Adjusted minimum window resolution to 1000x650 for high-scaling displays."
       ]
     }
   ];
@@ -142,7 +112,7 @@
               </div>
               <div>
                 <div class="text-lg font-bold text-nvidia-text-primary">R4 Mod Toolbox</div>
-                <div class="text-xs font-mono text-nvidia-text-muted mt-0.5">Version 0.40.0 (Beta 5)</div>
+                <div class="text-xs font-mono text-nvidia-text-muted mt-0.5">Version 0.42.0 (RC1)</div>
               </div>
             </div>
             
@@ -216,29 +186,63 @@
         </div>
       </div>
 
+      <!-- Special Acknowledgements Section -->
       <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col lg:col-span-2">
         <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center gap-2.5">
           <Star class="h-4 w-4 text-amber-400" />
           <h3 class="text-sm font-bold uppercase tracking-wider">Special Acknowledgements</h3>
         </div>
-        <div class="p-5 text-xs text-nvidia-text-muted leading-relaxed flex items-start gap-4">
-          <div class="h-10 w-10 rounded-full bg-nvidia-card border border-nvidia-border flex items-center justify-center shrink-0 shadow-inner">
-            <Code class="h-5 w-5 text-nvidia-text-muted" />
+        <div class="p-5 space-y-5">
+          
+          <!-- rfuzzo tribute -->
+          <div class="text-xs text-nvidia-text-muted leading-relaxed flex items-start gap-4">
+            <div class="h-10 w-10 rounded-full bg-nvidia-card border border-nvidia-border flex items-center justify-center shrink-0 shadow-inner">
+              <Code class="h-5 w-5 text-nvidia-text-muted" />
+            </div>
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <strong class="text-nvidia-text-primary text-sm">rfuzzo</strong>
+                <span class="text-[10px] font-mono text-nvidia-accent border border-nvidia-accent/30 bg-nvidia-accent/10 px-1.5 py-0.2 rounded">Core Technology</span>
+              </div>
+              <p class="mb-2">
+                A massive thank you to <strong class="text-nvidia-text-primary">rfuzzo</strong> for their foundational work on Wolvenkit and the creation of <span class="font-mono text-nvidia-text-primary">red4lib</span>. 
+                Without their continuous innovation and dedication to the Cyberpunk 2077 modding ecosystem, the real-time archive conflict resolution engine powering R4 would not be possible.
+              </p>
+              <button
+                type="button"
+                onclick={() => handleOpenLink('https://github.com/rfuzzo')}
+                class="flex items-center gap-1.5 text-nvidia-accent hover:brightness-110 transition cursor-pointer font-semibold"
+              >
+                <ExternalLink class="h-3 w-3" />
+                <span>Visit rfuzzo on GitHub</span>
+              </button>
+            </div>
           </div>
-          <div>
-            <p class="mb-2">
-              A massive thank you to <strong class="text-nvidia-text-primary">rfuzzo</strong> for their foundational work on Wolvenkit and the creation of <span class="font-mono text-nvidia-text-primary">red4lib</span>. 
-              Without their continuous innovation and dedication to the Cyberpunk 2077 modding ecosystem, the real-time archive conflict resolution engine powering R4 would not be possible.
-            </p>
-            <button
-              type="button"
-              onclick={() => handleOpenLink('https://github.com/rfuzzo')}
-              class="flex items-center gap-1.5 text-nvidia-accent hover:brightness-110 transition cursor-pointer font-semibold"
-            >
-              <ExternalLink class="h-3 w-3" />
-              <span>Visit rfuzzo on GitHub</span>
-            </button>
+
+          <!-- rapsodyas tribute -->
+          <div class="pt-4 border-t border-nvidia-border/50 text-xs text-nvidia-text-muted leading-relaxed flex items-start gap-4">
+            <div class="h-10 w-10 rounded-full bg-nvidia-card border border-nvidia-border flex items-center justify-center shrink-0 shadow-inner">
+              <Heart class="h-5 w-5 text-amber-500" />
+            </div>
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <strong class="text-nvidia-text-primary text-sm">rapsodyas</strong>
+                <span class="text-[10px] font-mono text-cyan-400 border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.2 rounded">Community Testing & Design Collaborator</span>
+              </div>
+              <p class="mb-2">
+                A sincere thank you to <strong class="text-nvidia-text-primary">rapsodyas</strong> on NexusMods for their dedicated testing and design insight throughout the beta cycle. Their perspective on managing sensitive load orders without breaking file priorities was the direct catalyst for R4’s <strong class="text-nvidia-text-primary">Organizer View</strong>, along with key refinements to inline label assignment, custom color selection, and search ergonomics.
+              </p>
+              <button
+                type="button"
+                onclick={() => handleOpenLink('https://www.nexusmods.com/profile/rapsodyas')}
+                class="flex items-center gap-1.5 text-cyan-400 hover:brightness-110 transition cursor-pointer font-semibold"
+              >
+                <ExternalLink class="h-3 w-3" />
+                <span>Visit rapsodyas on NexusMods</span>
+              </button>
+            </div>
           </div>
+
         </div>
       </div>
 

@@ -5,6 +5,8 @@
   import MoveFolderModal from '$lib/components/MoveFolderModal.svelte';
   import LinkXlModal from '$lib/components/LinkXlModal.svelte';
   import OrganizerView from '$lib/components/OrganizerView.svelte';
+  import CategoryModal from '$lib/components/CategoryModal.svelte';
+  import MoveCategoryModal from '$lib/components/MoveCategoryModal.svelte';
   import {
     GripVertical,
     ChevronDown,
@@ -33,7 +35,8 @@
     ArrowUp,
     LayoutGrid,
     ListTree,
-    Clock
+    Clock,
+    Tag
   } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -72,7 +75,7 @@
   let showUnassociatedXl = $state(false);
 
   // Organizer View State
-  let labelsConfig = $state<LabelsConfig>({ categories: [], assignments: {} });
+  let labelsConfig = $state<LabelsConfig>({ categories: [], assignments: {}, orders: {} });
   let activeViewMode = $state<'load_order' | 'organizer'>('load_order');
   let showUncategorizedDrawer = $state(true);
 
@@ -80,6 +83,12 @@
   let selectedMods = $state<Set<string>>(new Set());
   let lastSelectedFileName = $state<string | null>(null);
   let isMoveModalOpen = $state(false);
+
+  // Category Tagging Modal State
+  let isCategoryModalOpen = $state(false);
+  let categoryModalMode = $state<'create' | 'edit'>('create');
+  let categoryModalData = $state({ id: '', name: '', color: '#06B6D4' });
+  let isMoveCategoryModalOpen = $state(false);
 
   // XL Link State
   let isLinkModalOpen = $state(false);
@@ -235,6 +244,51 @@
     } catch (err) {
       console.error('Failed to persist state:', err);
     }
+  }
+
+  async function saveLabels() {
+    try {
+      await invoke('save_labels_config', { gamePath, config: labelsConfig });
+    } catch (err) {
+      console.error('Failed to save labels config:', err);
+    }
+  }
+
+  function handleCategoryModalConfirm(data: { id: string; name: string; color: string }) {
+    labelsConfig.categories = [...labelsConfig.categories, { ...data, stashed: false }];
+    for (const mod of selectedMods) {
+      labelsConfig.assignments[mod] = data.id;
+    }
+    labelsConfig = { ...labelsConfig };
+    saveLabels();
+    isCategoryModalOpen = false;
+  }
+
+  function handleMoveCategoryConfirm(actionOrId: string) {
+    if (actionOrId === '[CREATE_NEW]') {
+      isMoveCategoryModalOpen = false;
+      categoryModalMode = 'create';
+      categoryModalData = { id: '', name: '', color: '#06B6D4' };
+      isCategoryModalOpen = true;
+      return;
+    }
+
+    if (actionOrId === '[REMOVE]') {
+      for (const mod of selectedMods) {
+        delete labelsConfig.assignments[mod];
+      }
+      labelsConfig = { ...labelsConfig };
+      saveLabels();
+      isMoveCategoryModalOpen = false;
+      return;
+    }
+
+    for (const mod of selectedMods) {
+      labelsConfig.assignments[mod] = actionOrId;
+    }
+    labelsConfig = { ...labelsConfig };
+    saveLabels();
+    isMoveCategoryModalOpen = false;
   }
 
   function addFolder() {
@@ -481,7 +535,6 @@
 
   function onRowPointerMove(event: PointerEvent, index: number) {
     if (activeDragIndex === null) return;
-    
     if (index >= activeDragIndex && index < activeDragIndex + dragBlockSize) return;
 
     dropTargetIndex = index;
@@ -712,12 +765,12 @@
     }
 
     const menuWidth = 230;
-    let menuHeight = 145;
+    let menuHeight = 160;
     if (targetType === 'unassociated_xl') menuHeight = 180;
     else if (targetType === 'xl') menuHeight = 180;
     else if (targetType === 'archive') {
       const archive = target as ArchiveItem;
-      menuHeight = archive.is_delimiter ? 190 : (selectedMods.size > 0 ? 250 : 180);
+      menuHeight = archive.is_delimiter ? 190 : (selectedMods.size > 0 ? 280 : 180);
     }
 
     const posX = (event.clientX + menuWidth > window.innerWidth) ? (window.innerWidth - menuWidth - 10) : event.clientX;
@@ -1092,6 +1145,19 @@
         </button>
       {/if}
 
+      <!-- Category Label Assignment in Load Order -->
+      {#if enableOrganizerView && contextMenu.targetType === 'archive' && !contextMenu.archive?.is_delimiter && selectedMods.size > 0}
+        {@const hasExistingLabel = Array.from(selectedMods).some(m => labelsConfig.assignments[m])}
+        <button
+          type="button"
+          onclick={() => { closeContextMenu(); isMoveCategoryModalOpen = true; }}
+          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        >
+          <Tag class="h-3.5 w-3.5 text-cyan-400" />
+          <span>{hasExistingLabel ? 'Edit Category Label...' : 'Add Category Label...'}</span>
+        </button>
+      {/if}
+
       {#if contextMenu.targetType === 'archive' && contextMenu.archive?.is_delimiter}
         <button
           type="button"
@@ -1168,7 +1234,7 @@
   <div class="mb-4 shrink-0">
     <div class="flex items-center gap-4">
       <h2 class="text-lg font-bold text-nvidia-text-primary uppercase tracking-wider">
-        Archive Mods: {activeViewMode === 'organizer' ? 'Organizer' : 'Load Order'}
+        Archive Mods
       </h2>
       {#if enableOrganizerView}
         <div class="flex items-center p-0.5 rounded border border-nvidia-border bg-nvidia-bg shrink-0">
@@ -1261,18 +1327,17 @@
           <span>Conflict Summary</span>
         </button>
       {:else}
-        <!-- Organizer View Specific Toolbar Actions (if any) -->
         <button
           onclick={() => showUncategorizedDrawer = !showUncategorizedDrawer}
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition cursor-pointer {showUncategorizedDrawer ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-400' : 'bg-nvidia-surface hover:bg-nvidia-card border-nvidia-border text-nvidia-text-muted hover:text-nvidia-text-primary'}"
-          title="Toggle Uncategorized Drawer"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition cursor-pointer {showUncategorizedDrawer ? 'bg-amber-500/15 border-amber-500/40 text-amber-400' : 'bg-nvidia-surface hover:bg-nvidia-card border-nvidia-border text-nvidia-text-muted hover:text-nvidia-text-primary'}"
+          title="Toggle The Stash Drawer"
         >
           {#if showUncategorizedDrawer}
             <Eye class="h-3.5 w-3.5" />
           {:else}
             <EyeOff class="h-3.5 w-3.5" />
           {/if}
-          <span>Uncategorized</span>
+          <span>The Stash</span>
         </button>
       {/if}
     </div>
@@ -1289,6 +1354,7 @@
           bind:showCategoryLabelsInLoadOrder
           onLabelsToggle={onLabelsToggle}
           {showUncategorizedDrawer}
+          {searchQuery}
           onShowInLoadOrder={(modName) => {
             activeViewMode = 'load_order';
             setTimeout(() => focusModInMainList(modName), 100);
@@ -1373,7 +1439,6 @@
                         <GripVertical class="h-3.5 w-3.5" />
                       </div>
 
-                      <!-- Subtle, Neutral Calmed Switch -->
                       <button
                         onclick={(e) => { e.stopPropagation(); toggleMod(archive); }}
                         aria-label={archive.enabled ? "Disable mod " + archive.file_name : "Enable mod " + archive.file_name}
@@ -1410,12 +1475,12 @@
                       </div>
                     </div>
 
-                    <!-- Fixed-Width Laser-Aligned Conflict Column & Hover Menu -->
+                    <!-- Right Column: Stash-aware Label Pill & Conflict Indicators -->
                     <div class="flex items-center gap-2 shrink-0">
                       
-                      <!-- The Bridge: Virtual Category Pill (Right Justified) -->
+                      <!-- Virtual Category Pill (Suppressed if category is in The Stash) -->
                       <div class="w-28 flex justify-end pr-2">
-                        {#if showCategoryLabelsInLoadOrder && assignedCat}
+                        {#if showCategoryLabelsInLoadOrder && assignedCat && !assignedCat.stashed}
                           <span 
                             class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded border shrink-0 truncate max-w-full"
                             style="background-color: {assignedCat.color}15; color: {assignedCat.color}; border-color: {assignedCat.color}40;"
@@ -1691,4 +1756,21 @@
   archives={availableArchivesForLink}
   onConfirm={handleLinkXl}
   onCancel={() => isLinkModalOpen = false}
+/>
+
+<!-- Category Label Assignment Modals -->
+<CategoryModal
+  bind:isOpen={isCategoryModalOpen}
+  mode={categoryModalMode}
+  initialData={categoryModalData}
+  onConfirm={handleCategoryModalConfirm}
+  onCancel={() => isCategoryModalOpen = false}
+/>
+
+<MoveCategoryModal
+  bind:isOpen={isMoveCategoryModalOpen}
+  categories={labelsConfig.categories}
+  hasExistingLabel={selectedMods.size > 0 && Array.from(selectedMods).some(m => labelsConfig.assignments[m])}
+  onConfirm={handleMoveCategoryConfirm}
+  onCancel={() => isMoveCategoryModalOpen = false}
 />

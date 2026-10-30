@@ -48,6 +48,8 @@ pub struct CategoryLabel {
     pub id: String,
     pub name: String,
     pub color: String,
+    #[serde(default)]
+    pub stashed: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
