@@ -1,28 +1,28 @@
-﻿# R4 Mod Toolbox
+# R4 Mod Toolbox
 
 **Advanced Mod Manager and Conflict Resolver for Cyberpunk 2077**
 
-![Beta Release](https://img.shields.io/badge/Release-v0.41.0_(Beta_6)-orange.svg)
+![RC1 Release](https://img.shields.io/badge/Release-v0.42.0_(RC1)-green.svg)
 ![Platform](https://img.shields.io/badge/Platform-Windows_10_%7C_11-blue.svg)
-![R4 Mod Toolbox Header](https://raw.githubusercontent.com/TheMissionary/R4-Mod-Toolbox/main/assets/headertemplate2.png)
+![R4 Mod Toolbox Header](https://raw.githubusercontent.com/TheMissionary/R4-Mod-Toolbox/main/assets/headertemplate4.png)
 
-R4 Mod Toolbox is a high-performance, standalone desktop application built specifically for **manual modders**. If you prefer to download and extract your own mods but want a powerful, visualized dashboard to manage load orders, resolve conflicts, and organize your workspace, R4 is built for you. 
+R4 Mod Toolbox is a high-performance, standalone desktop application built specifically for **manual modders**. If you prefer to download and extract your own mods but require a powerful, visualized dashboard to manage load orders, resolve conflicts, and organize your workspace, R4 is built for you. 
 
-It does not hijack your downloads or obfuscate your files in virtual file systems. It simply gives you absolute, deterministic control over your existing Cyberpunk 2077 modding ecosystem.
+It does not hijack your downloads or obfuscate your files inside virtual file systems. It simply provides absolute, deterministic control over your existing Cyberpunk 2077 modding ecosystem.
 
 ---
 
-## ⚠️ Beta Release v0.41.0
-R4 Mod Toolbox is nearing RC1 (late-stage beta testing). The core engine is stable and most features are hardened. At this time, we are still pursuing community testing, feedback, and edge-case reports from users with massive or complex modlists. Please report any bugs or UX friction in the [Issues tab](https://github.com/TheMissionary/R4-Mod-Toolbox/issues). 
+## ✅ Release Candidate 1 (v0.42.0)
+R4 Mod Toolbox has officially reached Release Candidate 1. The core engine is stable, and the feature set is hardened. We are currently gathering community feedback and edge-case reports from users managing massive or highly complex modlists to ensure absolute stability before the 1.0 launch. Please report any bugs or UX friction in the [Issues tab](https://github.com/TheMissionary/R4-Mod-Toolbox/issues). 
 
 ---
 
 ## 🚀 Key Features
 
-* **Organizer View (Virtual Categories):** Group your mods into custom-named, color-coded Bento boxes. This purely visual layer allows for deep organization without altering your physical load order.
+* **Organizer View & The Stash:** Group your mods into custom-named, color-coded categories. This purely visual layer allows for deep organization—including a 'Stash' drawer for shelving inactive categories—without altering your physical load order.
 * **Real-Time Conflict Resolution:** R4 scans the internal hashes of every `.archive` file in milliseconds. Instantly see exactly which mods are winning (green) and losing (red) asset conflicts before you even launch the game.
 * **Custom Drag-and-Drop Engine:** Effortlessly reorder your mods or categories with a custom-built, 60fps pointer-based drag-and-drop engine. The UI updates conflict states in real-time as you drag.
-* **Visual Sorting & Multi-Select:** Full OS-level multi-select (Ctrl-click, Shift-click) is supported for moving, disabling, or organizing multiple mods simultaneously.
+* **Visual Sorting & Multi-Select:** Full OS-level multi-select (Ctrl-click, Shift-click) is supported for moving, disabling, tagging, or organizing multiple mods simultaneously.
 * **Universal Framework Support:** Complete visibility with Windows Explorer-style file trees and safe toggle control over **Archive**, **CET**, **RED4ext**, **R6\Scripts**, and **R6\Tweaks**.
 * **Mod History & Ledger:** Track every mod by its "First Seen" date. Use the universal search or the "Show in History" context menu to instantly locate any file across your entire modding history.
 * **Smart XL Linking:** ArchiveXL requires `.xl` files to load custom entities. R4 automatically pairs these sidecar files with their parent `.archive`, allowing you to toggle both with a single click.
@@ -36,7 +36,7 @@ R4 Mod Toolbox is nearing RC1 (late-stage beta testing). The core engine is stab
 
 ## 📂 Transparency: How R4 Manages Your Files
 
-Because R4 is built for manual modders, we believe in 100% transparency regarding what the app does to your files. 
+Because R4 is built for manual modders, we believe in absolute transparency regarding how the application interacts with your files. 
 
 ### 1. Disabling Mods Safely
 R4 uses two highly optimized methods to disable mods without deleting your data:
@@ -69,7 +69,8 @@ To help you organize massive load orders physically, R4 allows you to create Sim
 
 ## 🤝 Credits & Acknowledgements
 
-A massive thank you to **rfuzzo** for their foundational work on Wolvenkit and the creation of the [red4lib](https://github.com/rfuzzo/red4lib) Rust crate. `red4lib` powers the core archive parsing engine of this application. Without their continuous innovation and dedication to the Cyberpunk 2077 modding ecosystem, the real-time archive conflict resolution engine powering R4 would not be possible.
+* A massive thank you to **rfuzzo** for their foundational work on Wolvenkit and the creation of the [red4lib](https://github.com/rfuzzo/red4lib) Rust crate. `red4lib` powers the core archive parsing engine of this application. Without their continuous innovation and dedication to the Cyberpunk 2077 modding ecosystem, the real-time archive conflict resolution engine powering R4 would not be possible.
+* A sincere thank you to **rapsodyas** for their dedicated testing and design insight, which directly catalyzed the development of the Organizer View and additional QoL refinements.
 
 ## 📝 License
 
