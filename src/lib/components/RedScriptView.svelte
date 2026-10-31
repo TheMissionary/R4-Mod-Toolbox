@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { onMount } from 'svelte';
   import type { RedScriptItem, FileNode } from '$lib/types';
   import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen, Clock } from 'lucide-svelte';
@@ -508,7 +508,7 @@
         No Redscript packages detected.
       </div>
     {:else}
-      {#each filteredPackages as pkg (pkg.name)}
+      {#each filteredPackages as pkg (pkg.name + '_' + pkg.enabled)}
         {@const isHighlighted = highlightedModName === pkg.name}
         {@const isSelected = selectedMod === pkg.name}
         <div class="flex flex-col">

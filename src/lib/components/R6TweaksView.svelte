@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { onMount } from 'svelte';
   import type { R6TweaksItem, FileNode } from '$lib/types';
   import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen, EyeOff, Clock } from 'lucide-svelte';
@@ -532,7 +532,7 @@
         No R6 Tweaks detected.
       </div>
     {:else}
-      {#each filteredTweaks as tweak (tweak.name)}
+      {#each filteredTweaks as tweak (tweak.name + '_' + tweak.enabled)}
         {@const isHighlighted = highlightedModName === tweak.name}
         {@const isSelected = selectedMod === tweak.name}
         <div class="flex flex-col">

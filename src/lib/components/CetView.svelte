@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { onMount } from 'svelte';
   import type { CetPluginItem, FileNode } from '$lib/types';
   import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen, Clock } from 'lucide-svelte';
@@ -508,7 +508,7 @@
         No CET plugins detected.
       </div>
     {:else}
-      {#each filteredPlugins as plugin (plugin.name)}
+      {#each filteredPlugins as plugin (plugin.name + '_' + plugin.enabled)}
         {@const isHighlighted = highlightedModName === plugin.name}
         {@const isSelected = selectedMod === plugin.name}
         <div class="flex flex-col">
