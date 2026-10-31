@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { openUrl } from '@tauri-apps/plugin-opener';
   import {
     Info,
@@ -23,6 +23,14 @@
 
   const changelog = [
     {
+      version: "0.42.2 (RC1 Hotfix)",
+      date: "October 2026",
+      changes: [
+        "Framework Tab Rendering Crash: Resolved a fatal UI rendering halt (empty lists) in the CET, RED4ext, R6\\Scripts, and R6\\Tweaks tabs caused by duplicate mod folders.",
+        "Universal Synchronization: Implemented a new automated local build workflow that synchronizes versioning across all core configuration files and the public README.md."
+      ]
+    },
+    {
       version: "0.42.0 (RC1)",
       date: "October 2026",
       changes: [
@@ -43,15 +51,6 @@
         "Organizer View Foundation: Initial vertical stack prototype for decoupled mod categorization.",
         "Custom Pointer DnD Engine: High-performance 60fps drag-and-drop bypassing WebView2 HTML5 drag limitations.",
         "Universal History Routing: 'Show in History' context menu across framework tabs."
-      ]
-    },
-    {
-      version: "0.40.0 (Beta 5)",
-      date: "October 2026",
-      changes: [
-        "Critical Fix: Duplicate Mod Crash: Resolved a fatal UI rendering halt when both active and .disabled versions of a mod existed.",
-        "Antivirus Compliance (Clean Slate): Excised tasklist/taskkill monitoring to eliminate heuristic flags.",
-        "Display Scaling Fix: Adjusted minimum window resolution to 1000x650 for high-scaling displays."
       ]
     }
   ];
@@ -112,7 +111,7 @@
               </div>
               <div>
                 <div class="text-lg font-bold text-nvidia-text-primary">R4 Mod Toolbox</div>
-                <div class="text-xs font-mono text-nvidia-text-muted mt-0.5">Version 0.42.0 (RC1)</div>
+                <div class="text-xs font-mono text-nvidia-text-muted mt-0.5">Version 0.42.2 (RC1 Hotfix)</div>
               </div>
             </div>
             
