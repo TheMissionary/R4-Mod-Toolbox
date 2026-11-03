@@ -1,4 +1,4 @@
-﻿export type ActiveView = 'home' | 'archive' | 'cet' | 'red4ext' | 'redscript' | 'r6tweaks';
+export type ActiveView = 'home' | 'archive' | 'cet' | 'red4ext' | 'redscript' | 'r6tweaks';
 
 export interface XlItem {
   file_name: string;
@@ -164,5 +164,6 @@ export interface AppConfig {
   customPhotoPath?: string;
   enableOrganizerView?: boolean;
   showCategoryLabelsInLoadOrder?: boolean;
+  organizerColumns?: 'auto' | '1' | '2' | '3';
   theme: ThemeSettings;
 }

@@ -1,4 +1,4 @@
-﻿import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
 import type { AppThemeColors, ThemeSettings, AppConfig } from '$lib/types';
 
 export type { AppThemeColors, ThemeSettings, AppConfig };
@@ -151,6 +151,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   customPhotoPath: '',
   enableOrganizerView: false,
   showCategoryLabelsInLoadOrder: true,
+  organizerColumns: 'auto',
   theme: { ...DEFAULT_THEME_SETTINGS },
 };
 
@@ -262,6 +263,7 @@ export async function loadConfigFromDisk(): Promise<AppConfig> {
       if (config.customPhotoPath === undefined) config.customPhotoPath = '';
       if (config.enableOrganizerView === undefined) config.enableOrganizerView = false;
       if (config.showCategoryLabelsInLoadOrder === undefined) config.showCategoryLabelsInLoadOrder = true;
+      if (config.organizerColumns === undefined) config.organizerColumns = 'auto';
 
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(config.theme));

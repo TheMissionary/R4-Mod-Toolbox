@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
@@ -615,6 +615,7 @@
               console.error('Failed to save label toggle state:', err);
             }
           }}
+          {currentTab}
         />
       </div>
 
@@ -625,6 +626,7 @@
           onStateChanged={refreshCountsOnly}
           {targetHighlightMod}
           onRouteToHistory={handleNavigateToHistory}
+          {currentTab}
         />
       </div>
 
@@ -635,6 +637,7 @@
           onStateChanged={refreshCountsOnly}
           {targetHighlightMod}
           onRouteToHistory={handleNavigateToHistory}
+          {currentTab}
         />
       </div>
 
@@ -645,6 +648,7 @@
           onStateChanged={refreshCountsOnly}
           {targetHighlightMod}
           onRouteToHistory={handleNavigateToHistory}
+          {currentTab}
         />
       </div>
 
@@ -655,6 +659,7 @@
           onStateChanged={refreshCountsOnly}
           {targetHighlightMod}
           onRouteToHistory={handleNavigateToHistory}
+          {currentTab}
         />
       </div>
 
@@ -665,6 +670,8 @@
           bind:newModsHours
           {targetHighlightMod}
           onNavigateToMod={handleNavigateToMod}
+          {currentTab}
+          {scanResult}
         />
       </div>
 

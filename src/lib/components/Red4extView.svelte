@@ -1,24 +1,27 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import type { Red4extPluginItem, FileNode } from '$lib/types';
-  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen, Clock } from 'lucide-svelte';
+  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen, Clock, MessageSquare } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { tick } from 'svelte';
   import { loadConfigFromDisk } from '$lib/theme';
+  import NoteModal from '$lib/components/NoteModal.svelte';
 
   let {
     plugins = $bindable([]),
     gamePath = '',
     onStateChanged,
     targetHighlightMod = null,
-    onRouteToHistory
+    onRouteToHistory,
+    currentTab = 'red4ext'
   }: {
     plugins: Red4extPluginItem[];
     gamePath: string;
     onStateChanged?: () => void;
     targetHighlightMod?: string | null;
     onRouteToHistory?: (modName: string) => void;
+    currentTab?: string;
   } = $props();
 
   let searchQuery = $state('');
@@ -34,6 +37,11 @@
   let expandedFolders = $state<Record<string, boolean>>({});
   let folderContents = $state<Record<string, FileNode[]>>({});
   let loadingFolders = $state<Record<string, boolean>>({});
+
+  // Notes State
+  let notesConfig = $state<Record<string, string>>({});
+  let isNoteModalOpen = $state(false);
+  let targetNoteModName = $state('');
 
   let contextMenu = $state<{
     visible: boolean;
@@ -68,6 +76,23 @@
     loadConfigFromDisk().then(config => {
       customEditorPath = config.customTextEditorPath || '';
     });
+  });
+
+  $effect(() => {
+    if (gamePath) {
+      invoke<Record<string, string>>('load_notes_config').then(res => {
+        notesConfig = res;
+      }).catch(err => console.error('Failed to load notes config:', err));
+    }
+  });
+
+  // Strict Search Clearing
+  $effect(() => {
+    if (currentTab !== 'red4ext' && searchQuery !== '') {
+      untrack(() => {
+        searchQuery = '';
+      });
+    }
   });
 
   // Intersection Observer for Auto-Collapse on Tab Exit
@@ -139,22 +164,37 @@
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
+  let toggleDebounceTimer: number | null = null;
+
   async function handleToggle(plugin: Red4extPluginItem) {
     if (!gamePath) return;
     const nextState = !plugin.enabled;
-    try {
-      await invoke('toggle_plugin_state', {
-        gamePath,
-        modType: 'red4ext',
-        modName: plugin.name,
-        enable: nextState
-      });
-      plugin.enabled = nextState;
-      plugins = [...plugins];
-      if (onStateChanged) onStateChanged();
-    } catch (err) {
-      console.error(`Failed to toggle RED4ext plugin ${plugin.name}:`, err);
-    }
+    
+    // Optimistic UI Update
+    plugin.enabled = nextState;
+    plugins = [...plugins];
+
+    // Fire backend operations asynchronously
+    (async () => {
+      try {
+        await invoke('toggle_plugin_state', {
+          gamePath,
+          modType: 'red4ext',
+          modName: plugin.name,
+          enable: nextState
+        });
+        
+        if (toggleDebounceTimer) clearTimeout(toggleDebounceTimer);
+        toggleDebounceTimer = window.setTimeout(() => {
+          if (onStateChanged) onStateChanged();
+        }, 600);
+      } catch (err) {
+        console.error(`Failed to toggle RED4ext plugin ${plugin.name}:`, err);
+        // Revert on failure
+        plugin.enabled = !nextState;
+        plugins = [...plugins];
+      }
+    })();
   }
 
   async function toggleFolder(path: string) {
@@ -197,7 +237,7 @@
     copiedFeedback = false;
 
     const menuWidth = 230;
-    const menuHeight = 160;
+    const menuHeight = 200;
     const posX = (event.clientX + menuWidth > window.innerWidth) ? (window.innerWidth - menuWidth - 10) : event.clientX;
     const posY = (event.clientY + menuHeight > window.innerHeight) ? (window.innerHeight - menuHeight - 10) : event.clientY;
 
@@ -268,6 +308,23 @@
     } catch (err) {
       console.error('Failed to copy name:', err);
       closeContextMenu();
+    }
+  }
+
+  async function handleNoteConfirm(note: string) {
+    if (!targetNoteModName) return;
+    const targetName = targetNoteModName;
+    
+    if (note.trim() === '') {
+      delete notesConfig[targetName];
+    } else {
+      notesConfig[targetName] = note.trim();
+    }
+    notesConfig = { ...notesConfig };
+    try {
+      await invoke('save_notes_config', { notes: notesConfig });
+    } catch (err) {
+      console.error('Failed to save notes:', err);
     }
   }
 
@@ -363,6 +420,23 @@
           <span>Open in Editor</span>
         </button>
       {/if}
+
+      <div class="h-px bg-nvidia-border/50 my-1 mx-1"></div>
+
+      <button
+        type="button"
+        onclick={() => { 
+          targetNoteModName = (contextMenu.targetType === 'plugin' ? contextMenu.plugin?.name : contextMenu.fileNode?.name) || ''; 
+          closeContextMenu(); 
+          isNoteModalOpen = true; 
+        }}
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+      >
+        <MessageSquare class="h-3.5 w-3.5 text-amber-400" />
+        <span>{notesConfig[(contextMenu.targetType === 'plugin' ? contextMenu.plugin?.name : contextMenu.fileNode?.name) || ''] ? 'Edit Note...' : 'Add Note...'}</span>
+      </button>
+
+      <div class="h-px bg-nvidia-border/50 my-1 mx-1"></div>
 
       <button
         type="button"
@@ -528,12 +602,12 @@
             style={isHighlighted ? 'box-shadow: 0 0 15px color-mix(in srgb, var(--theme-accent) 35%, transparent);' : ''}
           >
             <div class="flex items-center gap-2.5 min-w-0 flex-1">
-              <!-- Subtle Calmed Switch -->
+              <!-- 15% Tinted Switch -->
               <button
                 type="button"
                 onclick={(e) => { e.stopPropagation(); handleToggle(plugin); }}
                 aria-label={plugin.enabled ? "Disable plugin " + plugin.name : "Enable plugin " + plugin.name}
-                class="w-7 h-4 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer {plugin.enabled ? 'bg-zinc-700/80 border border-zinc-600' : 'bg-zinc-900/90 border border-zinc-800'}"
+                class="w-7 h-4 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer {plugin.enabled ? 'bg-[#22c55e]/15 border border-[#22c55e]/30' : 'bg-[#ef4444]/15 border border-[#ef4444]/30'}"
               >
                 <div class="h-2.5 w-2.5 rounded-full transition-transform transform {plugin.enabled ? 'translate-x-3 bg-zinc-100 shadow-xs' : 'translate-x-0 bg-zinc-500'}"></div>
               </button>
@@ -567,6 +641,19 @@
 
             <!-- Fixed-Width Laser-Aligned Right Column -->
             <div class="flex items-center gap-2 shrink-0">
+              <!-- Notes Icon -->
+              <div class="w-4 flex items-center justify-center shrink-0">
+                {#if notesConfig[plugin.name]}
+                  <button 
+                    type="button"
+                    onclick={(e) => { e.stopPropagation(); targetNoteModName = plugin.name; isNoteModalOpen = true; }}
+                    class="hover:scale-110 transition-transform cursor-pointer"
+                  >
+                    <MessageSquare class="h-3.5 w-3.5 text-amber-400" />
+                  </button>
+                {/if}
+              </div>
+
               <div class="w-20 justify-end hidden lg:flex">
                 <span class="px-1.5 py-0.2 rounded bg-nvidia-accent/15 border border-nvidia-accent/30 text-[10px] text-nvidia-accent font-semibold truncate">
                   {plugin.file_count} {plugin.file_count === 1 ? 'file' : 'files'}
@@ -597,3 +684,11 @@
     {/if}
   </div>
 </div>
+
+<NoteModal
+  bind:isOpen={isNoteModalOpen}
+  modName={targetNoteModName}
+  initialNote={notesConfig[targetNoteModName] || ''}
+  onConfirm={handleNoteConfirm}
+  onCancel={() => isNoteModalOpen = false}
+/>

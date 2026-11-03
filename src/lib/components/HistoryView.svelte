@@ -1,9 +1,9 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { onMount, untrack, tick } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { loadConfigFromDisk, saveConfigToDisk } from '$lib/theme';
-  import type { LedgerEntry } from '$lib/types';
+  import type { LedgerEntry, ScanResult } from '$lib/types';
   import {
     Clock,
     FolderSearch,
@@ -19,12 +19,16 @@
     gamePath = '',
     newModsHours = $bindable(6),
     targetHighlightMod = null,
-    onNavigateToMod
+    onNavigateToMod,
+    currentTab = 'history',
+    scanResult = null
   }: {
     gamePath: string;
     newModsHours: number;
     targetHighlightMod?: string | null;
     onNavigateToMod: (tab: string, modName: string) => void;
+    currentTab?: string;
+    scanResult?: ScanResult | null;
   } = $props();
 
   let recentMods = $state<LedgerEntry[]>([]);
@@ -70,6 +74,25 @@
       }
     };
   }
+
+  // Strict Search Clearing
+  $effect(() => {
+    if (currentTab !== 'history' && searchQuery !== '') {
+      untrack(() => {
+        searchQuery = '';
+      });
+    }
+  });
+
+  // Sync & Rescan Trigger Fix
+  $effect(() => {
+    const trigger = scanResult;
+    if (trigger && gamePath) {
+      untrack(() => {
+        loadRecentMods();
+      });
+    }
+  });
 
   // Auto-switch to "All Time" when searching manually
   $effect(() => {

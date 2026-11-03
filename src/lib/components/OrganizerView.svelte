@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import type { ArchiveItem, LabelsConfig, CategoryLabel } from '$lib/types';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -21,15 +21,20 @@
     Archive,
     RotateCcw,
     Package,
-    Search
+    Search,
+    MessageSquare,
+    Columns
   } from 'lucide-svelte';
   import CategoryModal from './CategoryModal.svelte';
   import DialogModal from './DialogModal.svelte';
   import MoveCategoryModal from './MoveCategoryModal.svelte';
+  import NoteModal from './NoteModal.svelte';
+  import { loadConfigFromDisk, saveConfigToDisk } from '$lib/theme';
 
   let {
     archives = [],
     labelsConfig = $bindable({ categories: [], assignments: {}, orders: {} }),
+    notesConfig = $bindable({}),
     gamePath = '',
     showCategoryLabelsInLoadOrder = $bindable(true),
     onLabelsToggle,
@@ -40,6 +45,7 @@
   }: {
     archives: ArchiveItem[];
     labelsConfig: LabelsConfig;
+    notesConfig: Record<string, string>;
     gamePath: string;
     showCategoryLabelsInLoadOrder?: boolean;
     onLabelsToggle?: (val: boolean) => void;
@@ -57,6 +63,11 @@
   let catToDelete = $state<CategoryLabel | null>(null);
 
   let isMoveCatModalOpen = $state(false);
+  
+  let isNoteModalOpen = $state(false);
+  let targetNoteModName = $state('');
+
+  let organizerColumns = $state<'auto' | '1' | '2' | '3'>('auto');
 
   // --- Collapse State ---
   let collapsedCategories = $state<Record<string, boolean>>({});
@@ -67,6 +78,26 @@
   let totalActiveCategories = $derived(activeCategories.length);
   let collapsedCount = $derived(activeCategories.filter(c => collapsedCategories[c.id]).length);
   let isAllCollapsed = $derived(totalActiveCategories > 0 && collapsedCount === totalActiveCategories);
+
+  $effect(() => {
+    if (gamePath) {
+      loadConfigFromDisk().then(config => {
+        if (config.organizerColumns) {
+          organizerColumns = config.organizerColumns as 'auto' | '1' | '2' | '3';
+        }
+      }).catch(err => console.error('Failed to load organizer columns config:', err));
+    }
+  });
+
+  async function handleColumnsChange() {
+    try {
+      const config = await loadConfigFromDisk();
+      config.organizerColumns = organizerColumns;
+      await saveConfigToDisk(config);
+    } catch (err) {
+      console.error('Failed to save column preference:', err);
+    }
+  }
 
   function toggleAllCategories() {
     if (isAllCollapsed) {
@@ -185,6 +216,13 @@
     modName: string | null;
   }>({ visible: false, x: 0, y: 0, modName: null });
 
+  let categoryContextMenu = $state<{
+    visible: boolean;
+    x: number;
+    y: number;
+    cat: CategoryLabel | null;
+  }>({ visible: false, x: 0, y: 0, cat: null });
+
   async function saveConfig() {
     try {
       await invoke('save_labels_config', { gamePath, config: labelsConfig });
@@ -214,8 +252,22 @@
   }
 
   function handleCatModalConfirm(data: { id: string; name: string; color: string }) {
+    const newId = data.id || crypto.randomUUID();
+    
     if (catModalMode === 'create') {
-      labelsConfig.categories = [...labelsConfig.categories, { ...data, stashed: false }];
+      labelsConfig.categories = [...labelsConfig.categories, { ...data, id: newId, stashed: false }];
+      
+      // BUG FIX: Auto-assign selected mods to the newly created category
+      if (selectedMods.size > 0) {
+        const newAssignments = { ...labelsConfig.assignments };
+        for (const mod of selectedMods) {
+          newAssignments[mod] = newId;
+        }
+        labelsConfig.assignments = newAssignments;
+        selectedMods.clear();
+        selectedMods = new Set();
+        lastSelectedMod = null;
+      }
     } else {
       const idx = labelsConfig.categories.findIndex(c => c.id === data.id);
       if (idx !== -1) {
@@ -223,6 +275,7 @@
       }
     }
     saveConfig();
+    isCatModalOpen = false;
   }
 
   function confirmDelete(cat: CategoryLabel) {
@@ -261,9 +314,9 @@
     }
 
     const menuWidth = 200;
-    const menuHeight = 160;
-    const posX = (e.clientX + menuWidth > window.innerWidth) ? (window.innerWidth - menuWidth - 10) : event.clientX;
-    const posY = (e.clientY + menuHeight > window.innerHeight) ? (window.innerHeight - menuHeight - 10) : event.clientY;
+    const menuHeight = 200;
+    const posX = (e.clientX + menuWidth > window.innerWidth) ? (window.innerWidth - menuWidth - 10) : e.clientX;
+    const posY = (e.clientY + menuHeight > window.innerHeight) ? (window.innerHeight - menuHeight - 10) : e.clientY;
     
     contextMenu = { visible: true, x: posX, y: posY, modName };
   }
@@ -272,6 +325,23 @@
     if (contextMenu.visible) {
       contextMenu.visible = false;
       contextMenu.modName = null;
+    }
+  }
+
+  function openCategoryContextMenu(e: MouseEvent, cat: CategoryLabel) {
+    e.preventDefault();
+    e.stopPropagation();
+    const menuWidth = 180;
+    const menuHeight = 140;
+    const posX = (e.clientX + menuWidth > window.innerWidth) ? (window.innerWidth - menuWidth - 10) : e.clientX;
+    const posY = (e.clientY + menuHeight > window.innerHeight) ? (window.innerHeight - menuHeight - 10) : e.clientY;
+    categoryContextMenu = { visible: true, x: posX, y: posY, cat };
+  }
+
+  function closeCategoryContextMenu() {
+    if (categoryContextMenu.visible) {
+      categoryContextMenu.visible = false;
+      categoryContextMenu.cat = null;
     }
   }
 
@@ -323,6 +393,22 @@
     labelsConfig.assignments = newAssignments;
     saveConfig();
     isMoveCatModalOpen = false;
+  }
+
+  async function handleNoteConfirm(note: string) {
+    if (!targetNoteModName) return;
+    const modName = targetNoteModName;
+    if (note.trim() === '') {
+      delete notesConfig[modName];
+    } else {
+      notesConfig[modName] = note.trim();
+    }
+    notesConfig = { ...notesConfig };
+    try {
+      await invoke('save_notes_config', { notes: notesConfig });
+    } catch (err) {
+      console.error('Failed to save notes:', err);
+    }
   }
 
   // --- Custom Pointer DnD Engine Logic ---
@@ -556,7 +642,7 @@
   }
 </script>
 
-<svelte:window onpointermove={handlePointerMove} onpointerup={handlePointerUp} onclick={closeContextMenu} />
+<svelte:window onpointermove={handlePointerMove} onpointerup={handlePointerUp} onclick={() => { closeContextMenu(); closeCategoryContextMenu(); }} />
 
 <!-- Mod Drag Ghost -->
 {#if isDragging && !activeCategoryDragId}
@@ -592,7 +678,7 @@
   {/if}
 {/if}
 
-<!-- Context Menu -->
+<!-- Mod Context Menu -->
 {#if contextMenu.visible && contextMenu.modName}
   <div
     class="fixed z-50 w-56 rounded-md border border-nvidia-border bg-nvidia-card py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
@@ -634,6 +720,21 @@
 
       <button
         type="button"
+        onclick={() => { 
+          targetNoteModName = contextMenu.modName || ''; 
+          closeContextMenu(); 
+          isNoteModalOpen = true; 
+        }}
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+      >
+        <MessageSquare class="h-3.5 w-3.5 text-amber-400" />
+        <span>{notesConfig[contextMenu.modName] ? 'Edit Note...' : 'Add Note...'}</span>
+      </button>
+
+      <div class="h-px bg-nvidia-border/50 my-1 mx-1"></div>
+
+      <button
+        type="button"
         onclick={() => { closeContextMenu(); isMoveCatModalOpen = true; }}
         class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
       >
@@ -653,9 +754,51 @@
   </div>
 {/if}
 
+<!-- Category Context Menu -->
+{#if categoryContextMenu.visible && categoryContextMenu.cat}
+  <div
+    class="fixed z-50 w-48 rounded-md border border-nvidia-border bg-nvidia-card py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
+    style="left: {categoryContextMenu.x}px; top: {categoryContextMenu.y}px;"
+    onclick={(e) => e.stopPropagation()}
+    oncontextmenu={(e) => e.preventDefault()}
+  >
+    <div class="px-3 py-1.5 border-b border-nvidia-border/60 bg-nvidia-surface/40 flex items-center gap-2">
+      <div class="h-2.5 w-2.5 rounded-full shrink-0 shadow-sm" style="background-color: {categoryContextMenu.cat.color};"></div>
+      <span class="font-bold text-nvidia-text-primary truncate uppercase tracking-wider">{categoryContextMenu.cat.name}</span>
+    </div>
+    <div class="p-1 space-y-0.5">
+      <button
+        type="button"
+        onclick={() => { toggleStashCategory(categoryContextMenu.cat!); closeCategoryContextMenu(); }}
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+      >
+        <Archive class="h-3.5 w-3.5 text-amber-400" />
+        <span>Move to Stash</span>
+      </button>
+      <button
+        type="button"
+        onclick={() => { openEditModal(categoryContextMenu.cat!); closeCategoryContextMenu(); }}
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+      >
+        <Pencil class="h-3.5 w-3.5 text-cyan-400" />
+        <span>Edit Category</span>
+      </button>
+      <div class="h-px bg-nvidia-border/50 my-1 mx-1"></div>
+      <button
+        type="button"
+        onclick={() => { confirmDelete(categoryContextMenu.cat!); closeCategoryContextMenu(); }}
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-red-500/10 text-red-400 transition text-left cursor-pointer group"
+      >
+        <Trash2 class="h-3.5 w-3.5 text-red-400" />
+        <span>Delete Category</span>
+      </button>
+    </div>
+  </div>
+{/if}
+
 <div class="flex h-full gap-4 overflow-hidden select-none" onpointerdown={clearSelection}>
   
-  <!-- Left: Vertical Active Category Stack -->
+  <!-- Left: Grid Active Category Layout -->
   <div class="flex-1 flex flex-col min-w-0 overflow-hidden" onpointerdown={clearSelection}>
     <div class="flex items-center justify-between mb-4 shrink-0">
       <div class="flex items-center gap-2">
@@ -664,6 +807,21 @@
       </div>
       
       <div class="flex items-center gap-4">
+        <!-- Column Control Dropdown -->
+        <div class="flex items-center gap-2 bg-nvidia-surface/40 px-2 py-1 rounded border border-nvidia-border/60">
+          <Columns class="h-3.5 w-3.5 text-nvidia-text-muted" />
+          <select
+            bind:value={organizerColumns}
+            onchange={handleColumnsChange}
+            class="py-0.5 px-1 bg-transparent text-[11px] font-semibold text-nvidia-text-primary focus:outline-none cursor-pointer uppercase tracking-wider"
+          >
+            <option value="auto" class="bg-nvidia-surface text-nvidia-text-primary">Auto Cols</option>
+            <option value="1" class="bg-nvidia-surface text-nvidia-text-primary">1 Column</option>
+            <option value="2" class="bg-nvidia-surface text-nvidia-text-primary">2 Columns</option>
+            <option value="3" class="bg-nvidia-surface text-nvidia-text-primary">3 Columns</option>
+          </select>
+        </div>
+
         <!-- Show Labels in Load Order Toggle -->
         <div class="flex items-center gap-2 bg-nvidia-surface/40 px-3 py-1.5 rounded border border-nvidia-border/60">
           <Tag class="h-3.5 w-3.5 text-nvidia-text-muted" />
@@ -714,12 +872,19 @@
           <p class="text-[10px] mt-1 opacity-70">Click "Add Category" or restore shelved categories from The Stash.</p>
         </div>
       {:else}
-        <div class="flex flex-col space-y-2" onpointerdown={clearSelection}>
+        <!-- Grid Layout Implementation -->
+        {@const gridColsClass = organizerColumns === '1' ? 'grid-cols-1' : 
+                                organizerColumns === '2' ? 'grid-cols-2' : 
+                                organizerColumns === '3' ? 'grid-cols-3' : 
+                                'grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3'}
+        <div class="grid {gridColsClass} gap-3" onpointerdown={clearSelection}>
           {#each activeCategories as cat (cat.id)}
             {@const mods = sortedCategorizedMods.get(cat.id) || []}
             {@const matchesSearch = doesCategoryMatch(cat, mods)}
+            {@const isHovered = isDragging && !activeCategoryDragId && activeDropTarget === cat.id}
             
-            <div class="relative flex flex-col transition-opacity duration-200 {isSearching && !matchesSearch ? 'opacity-25' : 'opacity-100'}">
+            <!-- Span-Full Logic -->
+            <div class="relative flex flex-col transition-opacity duration-200 {isSearching && !matchesSearch ? 'opacity-25' : 'opacity-100'} {!collapsedCategories[cat.id] ? 'col-span-full' : ''}">
               
               <!-- Drop Indicator Before Category -->
               {#if isDragging && activeCategoryDragId && categoryDropTargetId === cat.id && categoryDropPlacement === 'before'}
@@ -728,9 +893,10 @@
 
               <!-- Category Header -->
               <div
-                class="organizer-category-header group rounded-lg border transition-all duration-300 border-nvidia-border {activeCategoryDragId === cat.id ? 'opacity-30 border-dashed' : ''}"
+                class="organizer-category-header group rounded-lg border transition-all duration-300 {activeCategoryDragId === cat.id ? 'opacity-30 border-dashed' : ''} {isHovered ? 'ring-1' : 'border-nvidia-border'}"
                 data-category-id={cat.id}
-                style="background-color: color-mix(in srgb, {cat.color} 15%, transparent);"
+                style="background-color: color-mix(in srgb, {cat.color} {isHovered ? '25%' : '15%'}, transparent); {isHovered ? `border-color: ${cat.color}; box-shadow: 0 0 15px color-mix(in srgb, ${cat.color} 40%, transparent);` : ''}"
+                oncontextmenu={(e) => openCategoryContextMenu(e, cat)}
               >
                 <div class="flex items-center justify-between px-3 gap-2 density-row relative overflow-hidden">
                   <div class="absolute left-0 top-0 bottom-0 w-1" style="background-color: {cat.color};"></div>
@@ -767,30 +933,32 @@
                   </div>
 
                   <div class="flex items-center gap-1.5 shrink-0">
-                    <button 
-                      type="button"
-                      onclick={() => toggleStashCategory(cat)} 
-                      class="p-1 rounded text-nvidia-text-muted hover:text-amber-400 hover:bg-amber-500/10 transition cursor-pointer" 
-                      title="Move Category to Stash (Also suppresses label in load order)"
-                    >
-                      <Archive class="h-3.5 w-3.5" />
-                    </button>
-                    <button 
-                      type="button"
-                      onclick={() => openEditModal(cat)} 
-                      class="p-1 rounded text-nvidia-text-muted hover:text-cyan-400 hover:bg-nvidia-surface/80 transition cursor-pointer" 
-                      title="Edit Category"
-                    >
-                      <Pencil class="h-3.5 w-3.5" />
-                    </button>
-                    <button 
-                      type="button"
-                      onclick={() => confirmDelete(cat)} 
-                      class="p-1 rounded text-nvidia-text-muted hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer" 
-                      title="Delete Category"
-                    >
-                      <Trash2 class="h-3.5 w-3.5" />
-                    </button>
+                    {#if !collapsedCategories[cat.id]}
+                      <button 
+                        type="button"
+                        onclick={() => toggleStashCategory(cat)} 
+                        class="p-1 rounded text-nvidia-text-muted hover:text-amber-400 hover:bg-amber-500/10 transition cursor-pointer" 
+                        title="Move Category to Stash (Also suppresses label in load order)"
+                      >
+                        <Archive class="h-3.5 w-3.5" />
+                      </button>
+                      <button 
+                        type="button"
+                        onclick={() => openEditModal(cat)} 
+                        class="p-1 rounded text-nvidia-text-muted hover:text-cyan-400 hover:bg-nvidia-surface/80 transition cursor-pointer" 
+                        title="Edit Category"
+                      >
+                        <Pencil class="h-3.5 w-3.5" />
+                      </button>
+                      <button 
+                        type="button"
+                        onclick={() => confirmDelete(cat)} 
+                        class="p-1 rounded text-nvidia-text-muted hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer" 
+                        title="Delete Category"
+                      >
+                        <Trash2 class="h-3.5 w-3.5" />
+                      </button>
+                    {/if}
                   </div>
                 </div>
               </div>
@@ -808,38 +976,47 @@
                       Drag mods here
                     </div>
                   {:else}
-                    {#each mods as mod}
-                      {@const isTargetMatch = doesModMatch(mod.file_name)}
-                      <div class="relative flex flex-col ml-3">
-                        <div class="absolute -left-2 -top-1 bottom-0 w-[1px] bg-nvidia-border/45 z-0"></div>
-                        <div class="absolute -left-2 top-1/2 w-2 h-[1px] bg-nvidia-border/45 z-0"></div>
-                        
-                        {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'before' && !selectedMods.has(mod.file_name)}
-                          <div class="absolute -top-1 left-0 right-0 h-[2.5px] bg-cyan-400 z-30 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
-                        {/if}
+                    <!-- Multi-column grid for mods inside the expanded category -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-2 ml-3 pl-2 border-l border-nvidia-border/45 pt-1">
+                      {#each mods as mod}
+                        {@const isTargetMatch = doesModMatch(mod.file_name)}
+                        <div class="relative flex flex-col">
+                          
+                          {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'before' && !selectedMods.has(mod.file_name)}
+                            <div class="absolute -top-1 left-0 right-0 h-[2.5px] bg-cyan-400 z-30 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
+                          {/if}
 
-                        <div
-                          onpointerdown={(e) => handlePointerDown(e, mod.file_name)}
-                          oncontextmenu={(e) => openContextMenu(e, mod.file_name)}
-                          ondblclick={() => onShowInLoadOrder && onShowInLoadOrder(mod.file_name)}
-                          class="flex items-center gap-2 px-2 py-1.5 rounded border transition density-row cursor-pointer z-10 
-                            {selectedMods.has(mod.file_name) ? 'border-cyan-500/60 bg-cyan-500/15 opacity-50' : 
-                            (isTargetMatch ? 'border-cyan-400 ring-1 ring-cyan-400 bg-cyan-950/40' : 'border-nvidia-border/50 bg-nvidia-surface hover:border-nvidia-border')}"
-                          data-mod-name={mod.file_name}
-                          title="Double-click to locate in Load Order"
-                        >
-                          <GripVertical class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
-                          <FileArchive class="h-3.5 w-3.5 {isTargetMatch ? 'text-cyan-400' : 'text-nvidia-text-muted'} shrink-0" />
-                          <span class="text-[11px] font-mono truncate {isTargetMatch ? 'text-cyan-300 font-bold' : (mod.enabled ? 'text-nvidia-text-primary' : 'opacity-50 line-through')}">
-                            {mod.file_name}
-                          </span>
+                          <div
+                            onpointerdown={(e) => handlePointerDown(e, mod.file_name)}
+                            oncontextmenu={(e) => openContextMenu(e, mod.file_name)}
+                            ondblclick={() => onShowInLoadOrder && onShowInLoadOrder(mod.file_name)}
+                            class="flex items-center justify-between px-2 py-1.5 rounded border transition density-row cursor-pointer z-10 
+                              {selectedMods.has(mod.file_name) ? 'border-cyan-500/60 bg-cyan-500/15 opacity-50' : 
+                              (isTargetMatch ? 'border-cyan-400 ring-1 ring-cyan-400 bg-cyan-950/40' : 'border-nvidia-border/50 bg-nvidia-surface hover:border-nvidia-border')}"
+                            data-mod-name={mod.file_name}
+                            title="Double-click to locate in Load Order"
+                          >
+                            <div class="flex items-center gap-2 min-w-0">
+                              <GripVertical class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+                              <FileArchive class="h-3.5 w-3.5 {isTargetMatch ? 'text-cyan-400' : 'text-nvidia-text-muted'} shrink-0" />
+                              <span class="text-[11px] font-mono truncate {isTargetMatch ? 'text-cyan-300 font-bold' : (mod.enabled ? 'text-nvidia-text-primary' : 'opacity-50 line-through')}">
+                                {mod.file_name}
+                              </span>
+                            </div>
+                            
+                            {#if notesConfig[mod.file_name]}
+                              <div class="shrink-0 ml-2" title={notesConfig[mod.file_name]}>
+                                <MessageSquare class="h-3.5 w-3.5 text-amber-400" />
+                              </div>
+                            {/if}
+                          </div>
+
+                          {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'after' && !selectedMods.has(mod.file_name)}
+                            <div class="absolute -bottom-1 left-0 right-0 h-[2.5px] bg-cyan-400 z-30 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
+                          {/if}
                         </div>
-
-                        {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'after' && !selectedMods.has(mod.file_name)}
-                          <div class="absolute -bottom-1 left-0 right-0 h-[2.5px] bg-cyan-400 z-30 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
-                        {/if}
-                      </div>
-                    {/each}
+                      {/each}
+                    </div>
                   {/if}
                 </div>
               {/if}
@@ -942,17 +1119,25 @@
                     onpointerdown={(e) => handlePointerDown(e, mod.file_name)}
                     oncontextmenu={(e) => openContextMenu(e, mod.file_name)}
                     ondblclick={() => onShowInLoadOrder && onShowInLoadOrder(mod.file_name)}
-                    class="flex items-center gap-2 px-2 py-1.5 rounded border transition density-row cursor-pointer 
+                    class="flex items-center justify-between px-2 py-1.5 rounded border transition density-row cursor-pointer 
                       {selectedMods.has(mod.file_name) ? 'border-cyan-500/60 bg-cyan-500/15 opacity-50' : 
                       (isTargetMatch ? 'border-cyan-400 ring-1 ring-cyan-400 bg-cyan-950/40' : 'border-nvidia-border/50 bg-nvidia-surface hover:border-nvidia-border')}"
                     data-mod-name={mod.file_name}
                     title="Double-click to locate in Load Order"
                   >
-                    <GripVertical class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
-                    <FileArchive class="h-3.5 w-3.5 {isTargetMatch ? 'text-cyan-400' : 'text-nvidia-text-muted'} shrink-0" />
-                    <span class="text-[11px] font-mono truncate {isTargetMatch ? 'text-cyan-300 font-bold' : (mod.enabled ? 'text-nvidia-text-primary' : 'opacity-50 line-through')}">
-                      {mod.file_name}
-                    </span>
+                    <div class="flex items-center gap-2 min-w-0">
+                      <GripVertical class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+                      <FileArchive class="h-3.5 w-3.5 {isTargetMatch ? 'text-cyan-400' : 'text-nvidia-text-muted'} shrink-0" />
+                      <span class="text-[11px] font-mono truncate {isTargetMatch ? 'text-cyan-300 font-bold' : (mod.enabled ? 'text-nvidia-text-primary' : 'opacity-50 line-through')}">
+                        {mod.file_name}
+                      </span>
+                    </div>
+
+                    {#if notesConfig[mod.file_name]}
+                      <div class="shrink-0 ml-2" title={notesConfig[mod.file_name]}>
+                        <MessageSquare class="h-3.5 w-3.5 text-amber-400" />
+                      </div>
+                    {/if}
                   </div>
 
                   {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'after' && !selectedMods.has(mod.file_name)}
@@ -995,4 +1180,12 @@
   hasExistingLabel={selectedMods.size > 0 && Array.from(selectedMods).some(m => labelsConfig.assignments[m])}
   onConfirm={handleMoveToCategory}
   onCancel={() => isMoveCatModalOpen = false}
+/>
+
+<NoteModal
+  bind:isOpen={isNoteModalOpen}
+  modName={targetNoteModName}
+  initialNote={notesConfig[targetNoteModName] || ''}
+  onConfirm={handleNoteConfirm}
+  onCancel={() => isNoteModalOpen = false}
 />

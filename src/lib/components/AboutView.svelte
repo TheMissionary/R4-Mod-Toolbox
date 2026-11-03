@@ -23,6 +23,18 @@
 
   const changelog = [
     {
+      version: "0.42.3 (RC1)",
+      date: "October 2026",
+      changes: [
+        "Optimistic UI Toggling: Instant visual switch flipping across all framework tabs with debounced backend execution for a highly responsive feel.",
+        "Personal Mod Notes: Added the ability to attach personal notes to any mod via the right-click context menu, complete with a dedicated UI modal and visual indicators.",
+        "Organizer View Enhancements: Introduced a responsive Grid Layout (Span-Full) for categories, a Column Control dropdown (Auto, 1, 2, or 3 columns), and dynamic hover illumination for drag-and-drop targeting.",
+        "Strict Search Decoupling: Search queries are now strictly isolated and automatically cleared when navigating between Load Order, Organizer, and framework tabs.",
+        "Mod List Export: Added a new utility in the Settings tab to export the entire load order and framework mod lists to a formatted .txt file.",
+        "UI/UX Refinements: Redesigned the About page for better symmetry, updated visual switch backgrounds (tinted green/red), and implemented gray conflict dots for disabled mods."
+      ]
+    },
+    {
       version: "0.42.2 (RC1 Hotfix)",
       date: "October 2026",
       changes: [
@@ -42,15 +54,6 @@
         "Universal History Routing: Added 'Show in History' across all framework tabs, automatically routing users to the mod ledger with all-time context.",
         "Antivirus Compliance & Verifiable Cloud Builds: Excised all background process commands, implemented clean OS-native handlers, and integrated GitHub Actions CI/CD for public build provenance (0/62 clean MSI scan).",
         "Special Acknowledgement: Dedicated card in About R4 honoring community collaborator rapsodyas for their essential feedback and design insights throughout the Organizer View's development."
-      ]
-    },
-    {
-      version: "0.41.0 (Beta 6)",
-      date: "October 2026",
-      changes: [
-        "Organizer View Foundation: Initial vertical stack prototype for decoupled mod categorization.",
-        "Custom Pointer DnD Engine: High-performance 60fps drag-and-drop bypassing WebView2 HTML5 drag limitations.",
-        "Universal History Routing: 'Show in History' context menu across framework tabs."
       ]
     }
   ];
@@ -98,90 +101,108 @@
   <div class="flex-1 overflow-y-auto p-6 space-y-6">
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl">
       
+      <!-- Application Info Card -->
       <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col">
         <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center gap-2.5">
           <ShieldCheck class="h-4 w-4 text-nvidia-accent" />
           <h3 class="text-sm font-bold uppercase tracking-wider">Application Info</h3>
         </div>
-        <div class="p-5 space-y-4 flex-1">
-          <div class="flex items-center justify-between gap-4">
-            <div class="flex items-center gap-4">
-              <div class="h-14 w-14 rounded-xl bg-nvidia-accent flex items-center justify-center text-black font-black text-2xl shadow-lg shrink-0">
-                R4
-              </div>
-              <div>
-                <div class="text-lg font-bold text-nvidia-text-primary">R4 Mod Toolbox</div>
-                <div class="text-xs font-mono text-nvidia-text-muted mt-0.5">Version 0.42.2 (RC1 Hotfix)</div>
-              </div>
+        <div class="p-5 flex-1 flex items-center">
+          <div class="flex items-center gap-4">
+            <div class="h-14 w-14 rounded-xl bg-nvidia-accent flex items-center justify-center text-black font-black text-2xl shadow-lg shrink-0">
+              R4
             </div>
-            
-            <button
-              type="button"
-              onclick={() => handleOpenLink('https://www.nexusmods.com/cyberpunk2077/mods/34691')}
-              class="flex items-center gap-2 px-3 py-2 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border transition cursor-pointer shrink-0 shadow-xs group"
-            >
-              <Download class="h-3.5 w-3.5 text-nvidia-accent group-hover:brightness-110" />
-              <span class="text-[11px] font-bold text-nvidia-text-primary">Check for Updates</span>
-            </button>
+            <div>
+              <div class="text-lg font-bold text-nvidia-text-primary">R4 Mod Toolbox</div>
+              <div class="text-xs font-mono text-nvidia-text-muted mt-0.5">Version 0.42.3-rc1</div>
+            </div>
           </div>
-          <div class="text-xs text-nvidia-text-muted leading-relaxed pt-2 border-t border-nvidia-border/50">
-            Engineered to provide deterministic load order management, real-time archive conflict resolution, and seamless integration across all major Cyberpunk 2077 modding frameworks.
-          </div>
+        </div>
+        <!-- Dual Update Action Bar -->
+        <div class="grid grid-cols-2 border-t border-nvidia-border/50 divide-x divide-nvidia-border/50 bg-nvidia-surface/30">
+          <button
+            type="button"
+            onclick={() => handleOpenLink('https://www.nexusmods.com/cyberpunk2077/mods/34691')}
+            class="flex items-center justify-center gap-2 py-3 hover:bg-nvidia-surface transition group cursor-pointer"
+          >
+            <Download class="h-4 w-4 text-nvidia-accent group-hover:brightness-110" />
+            <span class="text-xs font-bold text-nvidia-text-primary">Update via Nexus</span>
+          </button>
+          <button
+            type="button"
+            onclick={() => handleOpenLink('https://github.com/TheMissionary/R4-Mod-Toolbox/releases')}
+            class="flex items-center justify-center gap-2 py-3 hover:bg-nvidia-surface transition group cursor-pointer"
+          >
+            <Code class="h-4 w-4 text-nvidia-text-muted group-hover:text-nvidia-text-primary" />
+            <span class="text-xs font-bold text-nvidia-text-primary">Update via GitHub</span>
+          </button>
         </div>
       </div>
 
+      <!-- Developer Card -->
       <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col">
         <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center gap-2.5">
           <Heart class="h-4 w-4 text-amber-500" />
           <h3 class="text-sm font-bold uppercase tracking-wider">Developer</h3>
         </div>
-        <div class="p-5 space-y-4 flex-1 flex flex-col justify-between">
-          <div class="flex items-center justify-between gap-4">
-            <div class="flex items-center gap-4">
-              <div class="h-14 w-14 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 shadow-inner">
-                <svg viewBox="0 0 100 100" class="h-8 w-8 drop-shadow-md" fill="none" stroke="#e08528" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M 48 34 C 44 20 22 10 13 26 C 3 44 18 68 49 92 C 80 68 97 44 87 22 C 77 0 54 8 48 34 Z" />
-                </svg>
-              </div>
-              <div>
-                <div class="text-lg font-bold text-nvidia-text-primary">Mi55ionary</div>
-                <div class="text-xs font-mono text-nvidia-text-muted mt-0.5">Developer</div>
-              </div>
+        <div class="p-5 flex-1 flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <div class="h-14 w-14 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 shadow-inner">
+              <svg viewBox="0 0 100 100" class="h-8 w-8 drop-shadow-md" fill="none" stroke="#e08528" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M 48 34 C 44 20 22 10 13 26 C 3 44 18 68 49 92 C 80 68 97 44 87 22 C 77 0 54 8 48 34 Z" />
+              </svg>
             </div>
-
-            <div class="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onclick={() => handleOpenLink('https://www.nexusmods.com/profile/Mi55ionary')}
-                class="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border transition cursor-pointer group"
-                title="Nexus Mods Profile"
-              >
-                <ExternalLink class="h-3.5 w-3.5 text-amber-500 group-hover:brightness-110" />
-                <span class="text-[10px] font-bold text-nvidia-text-primary">Nexus</span>
-              </button>
-              <button
-                type="button"
-                onclick={() => handleOpenLink('https://github.com/TheMissionary/R4-Mod-Toolbox')}
-                class="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border transition cursor-pointer group"
-                title="GitHub Repository"
-              >
-                <Code class="h-3.5 w-3.5 text-nvidia-text-muted group-hover:text-nvidia-text-primary" />
-                <span class="text-[10px] font-bold text-nvidia-text-primary">GitHub</span>
-              </button>
+            <div>
+              <div class="text-lg font-bold text-nvidia-text-primary">Mi55ionary</div>
+              <div class="text-xs font-mono text-nvidia-text-muted mt-0.5">Developer</div>
             </div>
           </div>
-          
-          <div class="pt-4 border-t border-nvidia-border/50">
+          <div class="flex flex-col gap-2 shrink-0">
             <button
-              use:watchVisibility
               type="button"
-              onclick={() => handleOpenLink('https://ko-fi.com/themissionary')}
-              class="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded bg-nvidia-card hover:bg-cyan-500/10 border transition-all duration-700 cursor-pointer group {isKofiGlowing ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.4)]' : 'border-nvidia-border hover:border-cyan-500/50'}"
+              onclick={() => handleOpenLink('https://www.nexusmods.com/profile/Mi55ionary')}
+              class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border transition cursor-pointer group"
             >
-              <Coffee class="h-4 w-4 text-cyan-400 group-hover:brightness-110 {isKofiGlowing ? 'animate-pulse' : ''}" />
-              <span class="text-xs font-bold text-nvidia-text-primary">Buy me a Coffee. Keep the Engine Running.</span>
+              <ExternalLink class="h-3 w-3 text-amber-500 group-hover:brightness-110" />
+              <span class="text-[10px] font-bold text-nvidia-text-primary">Nexus Profile</span>
+            </button>
+            <button
+              type="button"
+              onclick={() => handleOpenLink('https://github.com/TheMissionary')}
+              class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border transition cursor-pointer group"
+            >
+              <Code class="h-3 w-3 text-nvidia-text-muted group-hover:text-nvidia-text-primary" />
+              <span class="text-[10px] font-bold text-nvidia-text-primary">GitHub Profile</span>
             </button>
           </div>
+        </div>
+        <!-- 3-Column Support Action Bar -->
+        <div class="grid grid-cols-3 border-t border-nvidia-border/50 divide-x divide-nvidia-border/50 bg-nvidia-surface/30">
+          <button
+            type="button"
+            onclick={() => handleOpenLink('https://www.nexusmods.com/cyberpunk2077/mods/34691')}
+            class="flex flex-col items-center justify-center gap-1.5 py-2.5 hover:bg-nvidia-surface transition group cursor-pointer"
+          >
+            <Heart class="h-4 w-4 text-amber-500 group-hover:scale-110 transition-transform" />
+            <span class="text-[10px] font-bold text-nvidia-text-primary">Endorse on Nexus</span>
+          </button>
+          <button
+            type="button"
+            onclick={() => handleOpenLink('https://github.com/TheMissionary/R4-Mod-Toolbox')}
+            class="flex flex-col items-center justify-center gap-1.5 py-2.5 hover:bg-nvidia-surface transition group cursor-pointer"
+          >
+            <Star class="h-4 w-4 text-amber-400 group-hover:scale-110 transition-transform" />
+            <span class="text-[10px] font-bold text-nvidia-text-primary">Star on GitHub</span>
+          </button>
+          <button
+            use:watchVisibility
+            type="button"
+            onclick={() => handleOpenLink('https://ko-fi.com/themissionary')}
+            class="flex flex-col items-center justify-center gap-1.5 py-2.5 hover:bg-cyan-500/10 transition-all duration-700 group cursor-pointer {isKofiGlowing ? 'bg-cyan-500/5 shadow-[inset_0_0_15px_rgba(34,211,238,0.2)]' : ''}"
+          >
+            <Coffee class="h-4 w-4 text-cyan-400 group-hover:scale-110 transition-transform {isKofiGlowing ? 'animate-pulse' : ''}" />
+            <span class="text-[10px] font-bold text-nvidia-text-primary">Buy me a Coffee</span>
+          </button>
         </div>
       </div>
 

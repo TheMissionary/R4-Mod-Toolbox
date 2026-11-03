@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { slide } from 'svelte/transition';
@@ -132,17 +132,17 @@
         {#if openSection === 'organizer'}
           <div transition:slide={{ duration: 200 }} class="border-t border-nvidia-border/60 bg-nvidia-bg/30">
             <div class="p-5 space-y-4 text-xs text-nvidia-text-muted leading-relaxed">
-              <div class="p-3 rounded border border-nvidia-accent/30 bg-nvidia-accent/10 text-nvidia-text-primary mb-2">
-                <strong class="text-nvidia-accent">Note:</strong> This feature is disabled by default to preserve the pure 1:1 load order experience. To enable it, go to <strong>Settings &gt; Advanced Integrations</strong> and toggle <strong>Enable Organizer View</strong>.
+              <div class="p-3 rounded border border-cyan-500/30 bg-cyan-500/10 text-nvidia-text-primary mb-2">
+                <strong class="text-cyan-400">Note:</strong> The Organizer View is a completely decoupled visual tool. It allows you to view and organize your mods in a way that works best for you, <strong>without impacting your physical load order or game performance in any way</strong>.
               </div>
               <p>
                 The Organizer View is a purely visual layer that allows you to group your mods into custom-named, color-coded categories (like "Vehicles", "Weapons", or "Clothing") without altering their physical load order.
               </p>
               <p>
                 <strong>How it works:</strong><br/>
-                • <strong>Bento Box UI:</strong> When enabled, you can toggle the Archive tab into "Organizer View". This displays your categories as a grid of boxes.<br/>
+                • <strong>Grid UI:</strong> When enabled, you can toggle the Archive tab into "Organizer View". This displays your categories as a grid of boxes.<br/>
                 • <strong>Zero Load Order Impact:</strong> Dragging a mod into a category here only assigns it a visual label. It does not move the file on your hard drive or change its conflict priority.<br/>
-                • <strong>The Bridge:</strong> When you switch back to the standard "Load Order View", your mods will display their assigned colored labels, giving you visual context while you manage physical conflicts.
+                • <strong>Labels in Load Order:</strong> You can enable an optional feature to display these category labels directly within the standard Load Order view, giving you visual context while managing physical conflicts.
               </p>
             </div>
           </div>

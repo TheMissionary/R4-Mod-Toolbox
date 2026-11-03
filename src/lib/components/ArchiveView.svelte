@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import type { ArchiveItem, ArchiveScanReport, XlItem, LabelsConfig } from '$lib/types';
   import FolderDelimiterRow from '$lib/components/FolderDelimiterRow.svelte';
   import DialogModal from '$lib/components/DialogModal.svelte';
@@ -7,6 +7,7 @@
   import OrganizerView from '$lib/components/OrganizerView.svelte';
   import CategoryModal from '$lib/components/CategoryModal.svelte';
   import MoveCategoryModal from '$lib/components/MoveCategoryModal.svelte';
+  import NoteModal from '$lib/components/NoteModal.svelte';
   import {
     GripVertical,
     ChevronDown,
@@ -36,11 +37,12 @@
     LayoutGrid,
     ListTree,
     Clock,
-    Tag
+    Tag,
+    MessageSquare
   } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
 
   let {
     archives = $bindable([]),
@@ -52,7 +54,8 @@
     onRouteToHistory,
     enableOrganizerView = false,
     showCategoryLabelsInLoadOrder = true,
-    onLabelsToggle
+    onLabelsToggle,
+    currentTab = 'archive'
   }: {
     archives: ArchiveItem[];
     gamePath: string;
@@ -64,6 +67,7 @@
     enableOrganizerView?: boolean;
     showCategoryLabelsInLoadOrder?: boolean;
     onLabelsToggle?: (val: boolean) => void;
+    currentTab?: string;
   } = $props();
 
   let searchQuery = $state('');
@@ -76,6 +80,7 @@
 
   // Organizer View State
   let labelsConfig = $state<LabelsConfig>({ categories: [], assignments: {}, orders: {} });
+  let notesConfig = $state<Record<string, string>>({});
   let activeViewMode = $state<'load_order' | 'organizer'>('load_order');
   let showUncategorizedDrawer = $state(true);
 
@@ -93,6 +98,10 @@
   // XL Link State
   let isLinkModalOpen = $state(false);
   let targetXlToLink = $state<string | null>(null);
+  
+  // Notes State
+  let isNoteModalOpen = $state(false);
+  let targetNoteModName = $state('');
 
   let dialogState = $state<{
     isOpen: boolean;
@@ -213,6 +222,7 @@
   $effect(() => {
     if (targetHighlightMod) {
       activeViewMode = 'load_order';
+      searchQuery = ''; // Clear search when routed from history
       focusModInMainList(targetHighlightMod);
     }
   });
@@ -222,12 +232,26 @@
       invoke<LabelsConfig>('load_labels_config', { gamePath }).then(res => {
         labelsConfig = res;
       }).catch(err => console.error('Failed to load labels config:', err));
+      
+      invoke<Record<string, string>>('load_notes_config').then(res => {
+        notesConfig = res;
+      }).catch(err => console.error('Failed to load notes config:', err));
     }
   });
 
   $effect(() => {
     if (!enableOrganizerView && activeViewMode !== 'load_order') {
       activeViewMode = 'load_order';
+      searchQuery = '';
+    }
+  });
+
+  // Strict Search Clearing on Tab Change
+  $effect(() => {
+    if (currentTab !== 'archive' && searchQuery !== '') {
+      untrack(() => {
+        searchQuery = '';
+      });
     }
   });
 
@@ -289,6 +313,22 @@
     labelsConfig = { ...labelsConfig };
     saveLabels();
     isMoveCategoryModalOpen = false;
+  }
+
+  async function handleNoteConfirm(note: string) {
+    if (!targetNoteModName) return;
+    const modName = targetNoteModName;
+    if (note.trim() === '') {
+      delete notesConfig[modName];
+    } else {
+      notesConfig[modName] = note.trim();
+    }
+    notesConfig = { ...notesConfig };
+    try {
+      await invoke('save_notes_config', { notes: notesConfig });
+    } catch (err) {
+      console.error('Failed to save notes:', err);
+    }
   }
 
   function addFolder() {
@@ -391,26 +431,40 @@
     };
   }
 
+  let toggleDebounceTimer: number | null = null;
+
   async function toggleMod(archive: ArchiveItem) {
     const next = !archive.enabled;
+    
+    // Optimistic UI Update
     archive.enabled = next;
     
-    try {
-      await invoke('toggle_mod_state', {
-        gamePath,
-        modName: archive.file_name,
-        enable: next
-      });
+    if (archive.is_delimiter) {
+      const startIndex = localArchives.findIndex(a => a.file_name === archive.file_name);
+      if (startIndex !== -1) {
+        for (let i = startIndex + 1; i < localArchives.length; i++) {
+          const child = localArchives[i];
+          if (child.is_delimiter) break;
+          child.enabled = next;
+        }
+      }
+    }
 
-      if (archive.is_delimiter) {
-        const startIndex = localArchives.findIndex(a => a.file_name === archive.file_name);
-        if (startIndex !== -1) {
-          for (let i = startIndex + 1; i < localArchives.length; i++) {
-            const child = localArchives[i];
-            if (child.is_delimiter) break;
-            
-            if (child.enabled !== next) {
-              child.enabled = next;
+    // Fire backend operations asynchronously
+    (async () => {
+      try {
+        await invoke('toggle_mod_state', {
+          gamePath,
+          modName: archive.file_name,
+          enable: next
+        });
+
+        if (archive.is_delimiter) {
+          const startIndex = localArchives.findIndex(a => a.file_name === archive.file_name);
+          if (startIndex !== -1) {
+            for (let i = startIndex + 1; i < localArchives.length; i++) {
+              const child = localArchives[i];
+              if (child.is_delimiter) break;
               await invoke('toggle_mod_state', {
                 gamePath,
                 modName: child.file_name,
@@ -419,13 +473,20 @@
             }
           }
         }
-      }
 
-      persistState();
-      if (onStateChanged) onStateChanged();
-    } catch (err) {
-      console.error('Failed to toggle mod/folder:', err);
-    }
+        // Debounce the rescan so rapid clicks don't lag
+        if (toggleDebounceTimer) clearTimeout(toggleDebounceTimer);
+        toggleDebounceTimer = window.setTimeout(() => {
+          persistState();
+          if (onStateChanged) onStateChanged();
+        }, 600);
+
+      } catch (err) {
+        console.error('Failed to toggle mod/folder:', err);
+        // Revert on failure
+        archive.enabled = !next;
+      }
+    })();
   }
 
   async function focusModInMainList(modName: string) {
@@ -770,7 +831,7 @@
     else if (targetType === 'xl') menuHeight = 180;
     else if (targetType === 'archive') {
       const archive = target as ArchiveItem;
-      menuHeight = archive.is_delimiter ? 190 : (selectedMods.size > 0 ? 280 : 180);
+      menuHeight = archive.is_delimiter ? 190 : (selectedMods.size > 0 ? 320 : 220);
     }
 
     const posX = (event.clientX + menuWidth > window.innerWidth) ? (window.innerWidth - menuWidth - 10) : event.clientX;
@@ -803,23 +864,32 @@
     if (!contextMenu.archive.is_delimiter && selectedMods.size > 1 && selectedMods.has(contextMenu.archive.file_name)) {
       const itemsToToggle = localArchives.filter(a => selectedMods.has(a.file_name) && a.enabled !== targetState);
       
+      // Optimistic UI for multi-select
       for (const item of itemsToToggle) {
         item.enabled = targetState;
-        try {
-          await invoke('toggle_mod_state', {
-            gamePath,
-            modName: item.file_name,
-            enable: targetState
-          });
-        } catch (err) {
-          console.error(`Failed to toggle ${item.file_name}:`, err);
-        }
       }
-      
-      await persistState();
-      if (onStateChanged) onStateChanged();
+
+      (async () => {
+        for (const item of itemsToToggle) {
+          try {
+            await invoke('toggle_mod_state', {
+              gamePath,
+              modName: item.file_name,
+              enable: targetState
+            });
+          } catch (err) {
+            console.error(`Failed to toggle ${item.file_name}:`, err);
+          }
+        }
+        
+        if (toggleDebounceTimer) clearTimeout(toggleDebounceTimer);
+        toggleDebounceTimer = window.setTimeout(() => {
+          persistState();
+          if (onStateChanged) onStateChanged();
+        }, 600);
+      })();
     } else {
-      await toggleMod(contextMenu.archive);
+      toggleMod(contextMenu.archive);
     }
     
     closeContextMenu();
@@ -1145,6 +1215,22 @@
         </button>
       {/if}
 
+      <!-- Notes Assignment -->
+      {#if contextMenu.targetType === 'archive' && !contextMenu.archive?.is_delimiter}
+        <button
+          type="button"
+          onclick={() => { 
+            targetNoteModName = contextMenu.archive?.file_name || ''; 
+            closeContextMenu(); 
+            isNoteModalOpen = true; 
+          }}
+          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        >
+          <MessageSquare class="h-3.5 w-3.5 text-amber-400" />
+          <span>{notesConfig[contextMenu.archive?.file_name || ''] ? 'Edit Note...' : 'Add Note...'}</span>
+        </button>
+      {/if}
+
       <!-- Category Label Assignment in Load Order -->
       {#if enableOrganizerView && contextMenu.targetType === 'archive' && !contextMenu.archive?.is_delimiter && selectedMods.size > 0}
         {@const hasExistingLabel = Array.from(selectedMods).some(m => labelsConfig.assignments[m])}
@@ -1240,7 +1326,7 @@
         <div class="flex items-center p-0.5 rounded border border-nvidia-border bg-nvidia-bg shrink-0">
           <button
             type="button"
-            onclick={() => activeViewMode = 'load_order'}
+            onclick={() => { activeViewMode = 'load_order'; searchQuery = ''; }}
             class="flex items-center gap-1.5 px-3 py-1 rounded-sm text-[11px] font-bold uppercase tracking-wider transition cursor-pointer {activeViewMode === 'load_order' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
           >
             <ListTree class="h-3.5 w-3.5 {activeViewMode === 'load_order' ? 'text-nvidia-accent' : ''}" />
@@ -1248,7 +1334,7 @@
           </button>
           <button
             type="button"
-            onclick={() => activeViewMode = 'organizer'}
+            onclick={() => { activeViewMode = 'organizer'; searchQuery = ''; }}
             class="flex items-center gap-1.5 px-3 py-1 rounded-sm text-[11px] font-bold uppercase tracking-wider transition cursor-pointer {activeViewMode === 'organizer' ? 'bg-nvidia-card text-nvidia-text-primary shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:text-nvidia-text-primary'}"
           >
             <LayoutGrid class="h-3.5 w-3.5 {activeViewMode === 'organizer' ? 'text-cyan-400' : ''}" />
@@ -1349,6 +1435,7 @@
       <div class="flex-1 overflow-hidden pt-2">
         <OrganizerView 
           bind:labelsConfig 
+          bind:notesConfig
           {archives} 
           {gamePath} 
           bind:showCategoryLabelsInLoadOrder
@@ -1357,6 +1444,7 @@
           {searchQuery}
           onShowInLoadOrder={(modName) => {
             activeViewMode = 'load_order';
+            searchQuery = '';
             setTimeout(() => focusModInMainList(modName), 100);
           }}
           {onRouteToHistory}
@@ -1439,10 +1527,11 @@
                         <GripVertical class="h-3.5 w-3.5" />
                       </div>
 
+                      <!-- 15% Tinted Switch -->
                       <button
                         onclick={(e) => { e.stopPropagation(); toggleMod(archive); }}
                         aria-label={archive.enabled ? "Disable mod " + archive.file_name : "Enable mod " + archive.file_name}
-                        class="w-7 h-4 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer {archive.enabled ? 'bg-zinc-700/80 border border-zinc-600' : 'bg-zinc-900/90 border border-zinc-800'}"
+                        class="w-7 h-4 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer {archive.enabled ? 'bg-[#22c55e]/15 border border-[#22c55e]/30' : 'bg-[#ef4444]/15 border border-[#ef4444]/30'}"
                       >
                         <div class="h-2.5 w-2.5 rounded-full transition-transform transform {archive.enabled ? 'translate-x-3 bg-zinc-100 shadow-xs' : 'translate-x-0 bg-zinc-500'}"></div>
                       </button>
@@ -1491,8 +1580,24 @@
                         {/if}
                       </div>
 
+                      <!-- Notes Icon -->
+                      <div class="w-4 flex items-center justify-center shrink-0">
+                        {#if notesConfig[archive.file_name]}
+                          <button 
+                            type="button"
+                            onclick={(e) => { e.stopPropagation(); targetNoteModName = archive.file_name; isNoteModalOpen = true; }}
+                            class="hover:scale-110 transition-transform cursor-pointer"
+                          >
+                            <MessageSquare class="h-3.5 w-3.5 text-amber-400" />
+                          </button>
+                        {/if}
+                      </div>
+
+                      <!-- Conflict Dot (Gray when disabled) -->
                       <div class="w-3 flex items-center justify-center shrink-0">
-                        {#if activeConflicts.loses.length > 0}
+                        {#if !archive.enabled}
+                          <div class="h-2.5 w-2.5 rounded-full bg-zinc-600" title="Disabled (No conflicts)"></div>
+                        {:else if activeConflicts.loses.length > 0}
                           <div class="h-2.5 w-2.5 rounded-full bg-[#ef4444] shadow-[0_0_6px_rgba(239,68,68,0.7)]" title="Overwritten by higher mod"></div>
                         {:else if activeConflicts.wins.length > 0}
                           <div class="h-2.5 w-2.5 rounded-full bg-[#22c55e] shadow-[0_0_6px_rgba(34,197,94,0.7)]" title="Winning overwrites"></div>
@@ -1773,4 +1878,12 @@
   hasExistingLabel={selectedMods.size > 0 && Array.from(selectedMods).some(m => labelsConfig.assignments[m])}
   onConfirm={handleMoveCategoryConfirm}
   onCancel={() => isMoveCategoryModalOpen = false}
+/>
+
+<NoteModal
+  bind:isOpen={isNoteModalOpen}
+  modName={targetNoteModName}
+  initialNote={notesConfig[targetNoteModName] || ''}
+  onConfirm={handleNoteConfirm}
+  onCancel={() => isNoteModalOpen = false}
 />

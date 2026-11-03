@@ -1,4 +1,4 @@
-﻿mod archive;
+mod archive;
 
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
@@ -102,6 +102,8 @@ pub struct AppConfig {
     pub enable_organizer_view: Option<bool>,
     #[serde(default)]
     pub show_category_labels_in_load_order: Option<bool>,
+    #[serde(default)]
+    pub organizer_columns: Option<String>,
     pub theme: ThemeConfig,
 }
 
@@ -122,6 +124,7 @@ impl Default for AppConfig {
             custom_photo_path: None,
             enable_organizer_view: Some(false),
             show_category_labels_in_load_order: Some(true),
+            organizer_columns: Some("auto".to_string()),
             theme: ThemeConfig::default(),
         }
     }
@@ -144,6 +147,16 @@ fn get_ledger_path() -> PathBuf {
         PathBuf::from(userprofile).join("AppData").join("Roaming").join("r4-mod-toolbox").join("mod_history.json")
     } else {
         PathBuf::from("mod_history.json")
+    }
+}
+
+fn get_notes_path() -> PathBuf {
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        PathBuf::from(appdata).join("r4-mod-toolbox").join("r4_notes.json")
+    } else if let Ok(userprofile) = std::env::var("USERPROFILE") {
+        PathBuf::from(userprofile).join("AppData").join("Roaming").join("r4-mod-toolbox").join("r4_notes.json")
+    } else {
+        PathBuf::from("r4_notes.json")
     }
 }
 
@@ -305,6 +318,30 @@ fn save_app_config(config: AppConfig) -> Result<(), String> {
         let _ = fs::create_dir_all(parent);
     }
     let serialized = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    fs::write(&path, serialized).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn load_notes_config() -> Result<std::collections::HashMap<String, String>, String> {
+    let path = get_notes_path();
+    if path.exists() {
+        if let Ok(content) = fs::read_to_string(&path) {
+            if let Ok(notes) = serde_json::from_str(&content) {
+                return Ok(notes);
+            }
+        }
+    }
+    Ok(std::collections::HashMap::new())
+}
+
+#[tauri::command]
+fn save_notes_config(notes: std::collections::HashMap<String, String>) -> Result<(), String> {
+    let path = get_notes_path();
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let serialized = serde_json::to_string_pretty(&notes).map_err(|e| e.to_string())?;
     fs::write(&path, serialized).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -957,6 +994,72 @@ fn open_custom_folder(folder_path: String) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn export_mod_list(game_path: String, export_path: String) -> Result<(), String> {
+    let mut output = String::new();
+    output.push_str("R4 Mod Toolbox - Exported Mod List\r\n");
+    output.push_str("==================================\r\n\r\n");
+
+    // Archive
+    output.push_str("[ ARCHIVE MODS ]\r\n");
+    if let Ok(report) = archive::scan_archives(&game_path) {
+        let mut archives: Vec<_> = report.archives.into_iter().filter(|a| !a.is_delimiter).collect();
+        archives.sort_by(|a, b| a.file_name.to_lowercase().cmp(&b.file_name.to_lowercase()));
+        for a in archives {
+            let status = if a.enabled { "[ACTIVE]  " } else { "[DISABLED]" };
+            output.push_str(&format!("{} {}\r\n", status, a.file_name));
+        }
+    }
+    output.push_str("\r\n");
+
+    // CET
+    output.push_str("[ CET PLUGINS ]\r\n");
+    if let Ok(mut cet) = get_cet_details(game_path.clone()) {
+        cet.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        for a in cet {
+            let status = if a.enabled { "[ACTIVE]  " } else { "[DISABLED]" };
+            output.push_str(&format!("{} {}\r\n", status, a.name));
+        }
+    }
+    output.push_str("\r\n");
+
+    // RED4ext
+    output.push_str("[ RED4EXT PLUGINS ]\r\n");
+    if let Ok(mut r4e) = get_red4ext_details(game_path.clone()) {
+        r4e.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        for a in r4e {
+            let status = if a.enabled { "[ACTIVE]  " } else { "[DISABLED]" };
+            output.push_str(&format!("{} {}\r\n", status, a.name));
+        }
+    }
+    output.push_str("\r\n");
+
+    // Redscript
+    output.push_str("[ R6\\SCRIPTS ]\r\n");
+    if let Ok(mut rs) = get_redscript_details(game_path.clone()) {
+        rs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        for a in rs {
+            let status = if a.enabled { "[ACTIVE]  " } else { "[DISABLED]" };
+            output.push_str(&format!("{} {}\r\n", status, a.name));
+        }
+    }
+    output.push_str("\r\n");
+
+    // R6Tweaks
+    output.push_str("[ R6\\TWEAKS ]\r\n");
+    if let Ok(mut tw) = get_r6tweaks_details(game_path.clone()) {
+        tw.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        for a in tw {
+            let status = if a.enabled { "[ACTIVE]  " } else { "[DISABLED]" };
+            output.push_str(&format!("{} {}\r\n", status, a.name));
+        }
+    }
+    output.push_str("\r\n");
+
+    fs::write(export_path, output).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1013,6 +1116,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load_app_config,
             save_app_config,
+            load_notes_config,
+            save_notes_config,
             validate_and_resolve_game_path,
             scan_game_directory,
             get_archive_details,
@@ -1040,7 +1145,8 @@ pub fn run() {
             open_log_folder,
             clear_user_log,
             launch_game,
-            open_custom_folder
+            open_custom_folder,
+            export_mod_list
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

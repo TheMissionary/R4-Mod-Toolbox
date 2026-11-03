@@ -1,7 +1,7 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
-  import { open, message } from '@tauri-apps/plugin-dialog';
+  import { open, message, save } from '@tauri-apps/plugin-dialog';
   import {
     APP_FONT_PRESETS,
     MOD_FONT_PRESETS,
@@ -28,7 +28,8 @@
     GripVertical,
     Folder,
     FileCode,
-    LayoutGrid
+    LayoutGrid,
+    FileText
   } from 'lucide-svelte';
 
   let { 
@@ -53,6 +54,8 @@
   let isDirty = $state(false);
   
   let showAdvancedIntegrations = $state(false);
+  let isExporting = $state(false);
+  let exportSuccess = $state(false);
 
   let activeColors = $derived(draft.mode === 'light' ? draft.lightColors : draft.darkColors);
 
@@ -223,6 +226,28 @@
       }
     } catch (err) {
       console.error('Failed to select photo folder:', err);
+    }
+  }
+
+  async function handleExportModList() {
+    if (!gamePath) return;
+    try {
+      const savePath = await save({
+        filters: [{ name: 'Text Document', extensions: ['txt'] }],
+        defaultPath: 'R4_Mod_List.txt',
+        title: 'Export Mod List'
+      });
+      
+      if (savePath) {
+        isExporting = true;
+        await invoke('export_mod_list', { gamePath, exportPath: savePath });
+        exportSuccess = true;
+        setTimeout(() => { exportSuccess = false; }, 2500);
+      }
+    } catch (err) {
+      console.error('Failed to export mod list:', err);
+    } finally {
+      isExporting = false;
     }
   }
 
@@ -586,6 +611,30 @@
                     Browse...
                   </button>
                 </div>
+              </div>
+
+              <div class="h-px bg-nvidia-border/50"></div>
+
+              <!-- Export Mod List -->
+              <div class="space-y-2">
+                <span class="text-xs font-semibold text-nvidia-text-primary">Export Mod List</span>
+                <p class="text-[11px] text-nvidia-text-muted leading-tight">
+                  Generate a comprehensive text file containing your entire load order and framework mod lists.
+                </p>
+                <button
+                  type="button"
+                  onclick={handleExportModList}
+                  disabled={isExporting || !gamePath}
+                  class="px-4 py-1.5 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-xs text-nvidia-text-primary transition cursor-pointer shadow-xs flex items-center gap-2 w-fit disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {#if exportSuccess}
+                    <Check class="h-3.5 w-3.5 text-nvidia-accent" />
+                    <span class="text-nvidia-accent font-semibold">Exported Successfully!</span>
+                  {:else}
+                    <FileText class="h-3.5 w-3.5 text-nvidia-text-muted" />
+                    <span>{isExporting ? 'Exporting...' : 'Export to .txt'}</span>
+                  {/if}
+                </button>
               </div>
 
             </div>

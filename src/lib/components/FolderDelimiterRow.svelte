@@ -60,11 +60,11 @@
         <GripVertical class="h-4 w-4" />
       </div>
 
-      <!-- Completely Neutral, De-Emphasized Switch -->
+      <!-- 15% Tinted Switch -->
       <button
         onclick={() => onToggle(archive)}
         aria-label={archive.enabled ? "Disable folder marker" : "Enable folder marker"}
-        class="w-7 h-4 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer {archive.enabled ? 'bg-zinc-700/80 border border-zinc-600' : 'bg-zinc-900/90 border border-zinc-800'}"
+        class="w-7 h-4 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer {archive.enabled ? 'bg-[#22c55e]/15 border border-[#22c55e]/30' : 'bg-[#ef4444]/15 border border-[#ef4444]/30'}"
       >
         <div class="h-2.5 w-2.5 rounded-full transition-transform transform {archive.enabled ? 'translate-x-3 bg-zinc-100 shadow-xs' : 'translate-x-0 bg-zinc-500'}"></div>
       </button>
