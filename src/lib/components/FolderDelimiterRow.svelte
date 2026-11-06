@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ArchiveItem } from '$lib/types';
-  import { GripVertical, Folder, FolderOpen, Pencil, Trash2, MoreVertical, ChevronDown, ChevronRight } from 'lucide-svelte';
+  import { GripVertical, Folder, FolderOpen, Pencil, Trash2, MoreVertical, ChevronDown, ChevronRight, Check } from 'lucide-svelte';
 
   let {
     archive,
@@ -37,92 +37,101 @@
 
 <div
   role="group"
-  aria-label="Folder: {archive.category_name || archive.file_name}"
+  aria-label="Group: {archive.category_name || archive.file_name}"
   use:registerNode={archive.file_name}
   onpointermove={(e) => onPointerMove(e, originalIndex)}
   oncontextmenu={(e) => onContextMenu(e, archive, 'archive')}
-  class="group rounded-lg border transition-all duration-300 {isHighlighted ? 'border-nvidia-accent ring-2 ring-nvidia-accent bg-nvidia-accent/20 scale-[1.008]' : 'border-nvidia-accent/35 bg-nvidia-accent/8 hover:bg-nvidia-accent/12 hover:border-nvidia-accent/65 shadow-xs'} {archive.enabled ? 'opacity-100' : 'opacity-50'} {isSource ? 'opacity-20 border-dashed border-nvidia-accent/50' : ''} mt-3.5 mb-1.5"
-  style={isHighlighted ? 'box-shadow: 0 0 15px color-mix(in srgb, var(--theme-accent) 35%, transparent);' : ''}
+  class="group transition-all duration-200 border-b {isHighlighted ? 'ring-1 z-10 relative' : ''} {archive.enabled ? 'opacity-100' : 'opacity-50'} {isSource ? 'opacity-20 border-dashed' : ''}"
+  style="border-color: var(--theme-border); {isHighlighted ? 'background-color: color-mix(in srgb, var(--theme-accent) 15%, transparent); border-color: var(--theme-accent);' : 'background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent);'}"
 >
-  <div class="flex items-center justify-between px-3 gap-2 density-row relative overflow-hidden">
-    <div class="absolute left-0 top-0 bottom-0 w-1 bg-nvidia-accent"></div>
+  <div class="flex items-center justify-between px-2 gap-2 density-row relative overflow-hidden">
+    <div class="absolute left-0 top-0 bottom-0 w-0.5" style="background-color: var(--theme-accent);"></div>
 
-    <div class="flex items-center gap-3 min-w-0 flex-1 pl-1">
+    <div class="flex items-center gap-3 min-w-0 flex-1 pl-2">
       <div
         role="button"
         tabindex="0"
         aria-label="Drag to adjust load order"
         onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
         onpointerdown={(e) => { e.stopPropagation(); onDragStart(e, originalIndex); }}
-        class="cursor-grab active:cursor-grabbing p-1 text-nvidia-text-muted hover:text-nvidia-accent shrink-0 rounded hover:bg-nvidia-surface/60 transition"
+        class="cursor-grab active:cursor-grabbing p-1 rounded transition shrink-0 hover:bg-[var(--theme-surface)]"
+        style="color: var(--theme-text-muted);"
         title="Drag to adjust load order"
       >
-        <GripVertical class="h-4 w-4" />
+        <GripVertical class="h-3.5 w-3.5" />
       </div>
 
-      <!-- 15% Tinted Switch -->
+      <!-- Minimal Checkbox -->
       <button
-        onclick={() => onToggle(archive)}
-        aria-label={archive.enabled ? "Disable folder marker" : "Enable folder marker"}
-        class="w-7 h-4 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer {archive.enabled ? 'bg-[#22c55e]/15 border border-[#22c55e]/30' : 'bg-[#ef4444]/15 border border-[#ef4444]/30'}"
+        type="button"
+        onclick={(e) => { e.stopPropagation(); onToggle(archive); }}
+        aria-label={archive.enabled ? "Disable group" : "Enable group"}
+        class="w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+        style="border-color: {archive.enabled ? 'var(--theme-accent)' : 'var(--theme-text-muted)'}; background-color: {archive.enabled ? 'var(--theme-accent)' : 'transparent'};"
       >
-        <div class="h-2.5 w-2.5 rounded-full transition-transform transform {archive.enabled ? 'translate-x-3 bg-zinc-100 shadow-xs' : 'translate-x-0 bg-zinc-500'}"></div>
+        {#if archive.enabled}
+          <Check class="h-3 w-3" style="color: var(--theme-accent-contrast);" strokeWidth={3} />
+        {/if}
       </button>
 
       <!-- Unified Chevron + Folder + Name Toggle -->
       <button
         type="button"
         onclick={() => onToggleCollapse && onToggleCollapse(archive.file_name)}
-        class="flex items-center gap-1.5 text-nvidia-text-primary hover:text-nvidia-accent transition cursor-pointer min-w-0"
-        title={collapsed ? "Expand folder" : "Collapse folder"}
+        class="flex items-center gap-1.5 transition cursor-pointer min-w-0 hover:brightness-125"
+        style="color: var(--theme-text-primary);"
+        title={collapsed ? "Expand group" : "Collapse group"}
       >
         {#if collapsed}
-          <ChevronRight class="h-4 w-4 text-nvidia-text-muted shrink-0" />
-          <Folder class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+          <ChevronRight class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
+          <Folder class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
         {:else}
-          <ChevronDown class="h-4 w-4 text-nvidia-text-muted shrink-0" />
-          <FolderOpen class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+          <ChevronDown class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
+          <FolderOpen class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
         {/if}
-        <span class="font-bold uppercase tracking-wider truncate">
+        <span class="font-bold uppercase tracking-wider truncate text-[11px]">
           {archive.category_name || archive.file_name.replace('[DIR] ', '').replace('.txt', '')}
         </span>
       </button>
 
       <!-- Dynamic Nested Mod Count Badge -->
-      <span class="text-[10px] font-mono text-nvidia-text-muted shrink-0 opacity-80">
-        ({modCount} {modCount === 1 ? 'mod' : 'mods'})
+      <span class="text-[10px] font-mono shrink-0 opacity-80" style="color: var(--theme-text-muted);">
+        ({modCount})
       </span>
     </div>
 
-    <!-- Right Controls: In-line Rename, Delete, and Hover Context Menu -->
+    <!-- Right Controls -->
     <div class="flex items-center gap-1.5 shrink-0">
       <button
         type="button"
         onclick={(e) => { e.stopPropagation(); onRenameFolder && onRenameFolder(archive); }}
-        class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-accent hover:bg-nvidia-surface/80 transition cursor-pointer"
-        title="Rename folder"
+        class="p-1 rounded transition cursor-pointer hover:bg-[var(--theme-surface)]"
+        style="color: var(--theme-text-muted);"
+        title="Rename group"
       >
-        <Pencil class="h-3.5 w-3.5" />
+        <Pencil class="h-3.5 w-3.5 hover:text-[var(--theme-accent)]" />
       </button>
 
       <button
         type="button"
         onclick={(e) => { e.stopPropagation(); onDeleteFolder && onDeleteFolder(archive); }}
-        class="p-1 rounded text-nvidia-text-muted hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer"
-        title="Delete folder (mods remain preserved)"
+        class="p-1 rounded transition cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-danger)_15%,transparent)]"
+        style="color: var(--theme-text-muted);"
+        title="Delete group (mods remain preserved)"
       >
-        <Trash2 class="h-3.5 w-3.5" />
+        <Trash2 class="h-3.5 w-3.5 hover:text-[var(--color-danger)]" />
       </button>
 
-      <div class="w-[1px] h-3 bg-nvidia-border/60 mx-0.5"></div>
+      <div class="w-[1px] h-3 mx-0.5" style="background-color: var(--theme-border);"></div>
 
       <button
         type="button"
         onclick={(e) => { e.stopPropagation(); onContextMenu(e, archive, 'archive'); }}
-        class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-text-primary hover:bg-nvidia-surface/80 transition cursor-pointer opacity-0 group-hover:opacity-100"
+        class="p-1 rounded transition cursor-pointer opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-surface)]"
+        style="color: var(--theme-text-muted);"
         title="More options"
       >
-        <MoreVertical class="h-3.5 w-3.5" />
+        <MoreVertical class="h-3.5 w-3.5 hover:text-[var(--theme-text-primary)]" />
       </button>
     </div>
   </div>

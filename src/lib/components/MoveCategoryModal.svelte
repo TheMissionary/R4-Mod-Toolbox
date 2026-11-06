@@ -1,6 +1,6 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { tick } from 'svelte';
-  import { X, FolderInput, Search, Plus, Tag, Trash2 } from 'lucide-svelte';
+  import { X, Search, Plus, Tag, Trash2 } from 'lucide-svelte';
   import type { CategoryLabel } from '$lib/types';
 
   let {
@@ -65,33 +65,36 @@
     role="presentation"
   >
     <div
-      class="w-full max-w-md rounded-xl border border-nvidia-border bg-nvidia-card shadow-2xl overflow-hidden flex flex-col"
+      class="w-full max-w-md rounded-xl border shadow-2xl overflow-hidden flex flex-col"
+      style="background-color: var(--theme-card); border-color: var(--theme-border);"
       onclick={(e) => e.stopPropagation()}
       role="dialog"
     >
-      <div class="px-5 py-3.5 border-b border-nvidia-border flex items-center justify-between bg-nvidia-surface/40">
+      <div class="px-5 py-3.5 border-b flex items-center justify-between" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
         <div class="flex items-center gap-2.5">
-          <Tag class="h-4 w-4 text-cyan-400" />
-          <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Assign Category Label</span>
+          <Tag class="h-4 w-4" style="color: var(--color-info);" />
+          <span class="text-xs font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">Assign Category Label</span>
         </div>
         <button
           type="button"
           onclick={() => { isOpen = false; onCancel(); }}
-          class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-text-primary hover:bg-nvidia-surface transition cursor-pointer"
+          class="p-1 rounded transition cursor-pointer hover:bg-[var(--theme-bg)]"
+          style="color: var(--theme-text-muted);"
         >
-          <X class="h-4 w-4" />
+          <X class="h-4 w-4 hover:text-[var(--theme-text-primary)]" />
         </button>
       </div>
 
-      <div class="p-3 border-b border-nvidia-border bg-nvidia-surface/20 relative">
-        <Search class="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-nvidia-text-muted" />
+      <div class="p-3 border-b relative" style="background-color: color-mix(in srgb, var(--theme-surface) 50%, transparent); border-color: var(--theme-border);">
+        <Search class="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4" style="color: var(--theme-text-muted);" />
         <input
           bind:this={inputEl}
           type="text"
           bind:value={searchQuery}
           oninput={() => selectedIndex = -1}
           placeholder="Search categories..."
-          class="w-full pl-9 pr-3 py-2 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-cyan-400 font-sans"
+          class="w-full pl-9 pr-3 py-2 border rounded text-xs focus:outline-none font-sans"
+          style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
         />
       </div>
 
@@ -100,7 +103,8 @@
         <button
           type="button"
           onclick={() => onConfirm('[CREATE_NEW]')}
-          class="w-full text-left px-3 py-2 rounded text-xs font-bold transition flex items-center gap-2 cursor-pointer text-cyan-400 border {selectedIndex === -1 ? 'bg-cyan-500/15 border-cyan-500/30' : 'border-transparent hover:bg-cyan-500/10'}"
+          class="w-full text-left px-3 py-2 rounded text-xs font-bold transition flex items-center gap-2 cursor-pointer border"
+          style="color: var(--color-info); border-color: {selectedIndex === -1 ? 'var(--color-info)' : 'transparent'}; background-color: {selectedIndex === -1 ? 'color-mix(in srgb, var(--color-info) 15%, transparent)' : 'transparent'};"
         >
           <Plus class="h-4 w-4" />
           <span>{searchQuery.trim() ? `+ Create "${searchQuery.trim()}" Category...` : '+ Create New Category...'}</span>
@@ -110,27 +114,29 @@
           <button
             type="button"
             onclick={() => onConfirm('[REMOVE]')}
-            class="w-full text-left px-3 py-2 rounded text-xs font-semibold transition flex items-center gap-2 cursor-pointer text-red-400 border border-transparent hover:bg-red-500/10 hover:border-red-500/20"
+            class="w-full text-left px-3 py-2 rounded text-xs font-semibold transition flex items-center gap-2 cursor-pointer border border-transparent hover:bg-[color-mix(in_srgb,var(--color-danger)_10%,transparent)] hover:border-[color-mix(in_srgb,var(--color-danger)_20%,transparent)]"
+            style="color: var(--color-danger);"
           >
-            <Trash2 class="h-4 w-4 text-red-400" />
+            <Trash2 class="h-4 w-4" style="color: var(--color-danger);" />
             <span>Remove Category Label</span>
           </button>
         {/if}
 
-        <div class="h-px bg-nvidia-border/50 my-1 mx-1"></div>
+        <div class="h-px my-1 mx-1" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
 
         {#each filtered as cat, i}
           <button
             type="button"
             onclick={() => onConfirm(cat.id)}
-            class="w-full text-left px-3 py-2 rounded text-xs font-medium transition flex items-center justify-between gap-2.5 cursor-pointer text-nvidia-text-primary border {i === selectedIndex ? 'bg-nvidia-surface border-nvidia-border shadow-sm' : 'border-transparent hover:bg-nvidia-surface/60'}"
+            class="w-full text-left px-3 py-2 rounded text-xs font-medium transition flex items-center justify-between gap-2.5 cursor-pointer border"
+            style="color: var(--theme-text-primary); border-color: {i === selectedIndex ? 'var(--theme-border)' : 'transparent'}; background-color: {i === selectedIndex ? 'var(--theme-surface)' : 'transparent'};"
           >
             <div class="flex items-center gap-2.5 truncate">
               <div class="h-2.5 w-2.5 rounded-full shrink-0 shadow-sm" style="background-color: {cat.color};"></div>
               <span class="truncate">{cat.name}</span>
             </div>
             {#if cat.stashed}
-              <span class="text-[9px] font-mono uppercase px-1.5 py-0.2 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0">
+              <span class="text-[9px] font-mono uppercase px-1.5 py-0.2 rounded border shrink-0" style="background-color: color-mix(in srgb, var(--color-warning) 10%, transparent); border-color: color-mix(in srgb, var(--color-warning) 30%, transparent); color: var(--color-warning);">
                 In Stash
               </span>
             {/if}
@@ -138,7 +144,7 @@
         {/each}
         
         {#if filtered.length === 0 && searchQuery.trim() !== ''}
-          <div class="p-3 text-center text-xs text-nvidia-text-muted">
+          <div class="p-3 text-center text-xs" style="color: var(--theme-text-muted);">
             Press Enter or click above to create this category.
           </div>
         {/if}

@@ -1,19 +1,8 @@
 <script lang="ts">
   import { openUrl } from '@tauri-apps/plugin-opener';
   import {
-    Info,
-    Code,
-    Coffee,
-    ExternalLink,
-    Cpu,
-    Layers,
-    ShieldCheck,
-    Heart,
-    Download,
-    History,
-    ChevronDown,
-    ChevronRight,
-    Star
+    Info, Code, Coffee, ExternalLink, Cpu, Layers, ShieldCheck, Heart,
+    Download, History, ChevronDown, ChevronRight, Star
   } from 'lucide-svelte';
 
   let isKofiGlowing = $state(false);
@@ -86,14 +75,14 @@
   }
 </script>
 
-<div class="flex flex-col h-full overflow-hidden bg-nvidia-bg text-nvidia-text-primary select-none">
-  <div class="p-6 pb-4 shrink-0 border-b border-nvidia-border/50 bg-nvidia-surface/20">
-    <div class="flex items-center gap-2 text-xs font-mono text-nvidia-accent mb-2">
+<div class="flex flex-col h-full overflow-hidden select-none" style="background-color: var(--theme-bg); color: var(--theme-text-primary);">
+  <div class="p-6 pb-4 shrink-0 border-b" style="border-color: color-mix(in srgb, var(--theme-border) 50%, transparent); background-color: color-mix(in srgb, var(--theme-surface) 20%, transparent);">
+    <div class="flex items-center gap-2 text-xs font-mono mb-2" style="color: var(--theme-accent);">
       <Info class="h-4 w-4" />
       <span>ABOUT R4</span>
     </div>
-    <h2 class="text-xl font-bold text-nvidia-text-primary mb-1">R4 Mod Toolbox</h2>
-    <p class="text-xs text-nvidia-text-muted max-w-2xl">
+    <h2 class="text-xl font-bold mb-1" style="color: var(--theme-text-primary);">R4 Mod Toolbox</h2>
+    <p class="text-xs max-w-2xl" style="color: var(--theme-text-muted);">
       Advanced Mod Manager and Conflict Resolution Engine for Cyberpunk 2077.
     </p>
   </div>
@@ -102,136 +91,140 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl">
       
       <!-- Application Info Card -->
-      <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col">
-        <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center gap-2.5">
-          <ShieldCheck class="h-4 w-4 text-nvidia-accent" />
-          <h3 class="text-sm font-bold uppercase tracking-wider">Application Info</h3>
+      <div class="rounded-xl border overflow-hidden flex flex-col" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
+        <div class="px-4 py-3 border-b flex items-center gap-2.5" style="border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-surface) 60%, transparent);">
+          <ShieldCheck class="h-4 w-4" style="color: var(--theme-accent);" />
+          <h3 class="text-sm font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">Application Info</h3>
         </div>
         <div class="p-5 flex-1 flex items-center">
           <div class="flex items-center gap-4">
-            <div class="h-14 w-14 rounded-xl bg-nvidia-accent flex items-center justify-center text-black font-black text-2xl shadow-lg shrink-0">
+            <div class="h-14 w-14 rounded-xl flex items-center justify-center font-black text-2xl shadow-lg shrink-0" style="background-color: var(--theme-accent); color: var(--theme-accent-contrast);">
               R4
             </div>
             <div>
-              <div class="text-lg font-bold text-nvidia-text-primary">R4 Mod Toolbox</div>
-              <div class="text-xs font-mono text-nvidia-text-muted mt-0.5">Version 0.42.3-rc1</div>
+              <div class="text-lg font-bold" style="color: var(--theme-text-primary);">R4 Mod Toolbox</div>
+              <div class="text-xs font-mono mt-0.5" style="color: var(--theme-text-muted);">Version 0.42.3-rc1</div>
             </div>
           </div>
         </div>
         <!-- Dual Update Action Bar -->
-        <div class="grid grid-cols-2 border-t border-nvidia-border/50 divide-x divide-nvidia-border/50 bg-nvidia-surface/30">
+        <div class="grid grid-cols-2 border-t divide-x" style="border-color: color-mix(in srgb, var(--theme-border) 50%, transparent); background-color: color-mix(in srgb, var(--theme-surface) 30%, transparent);">
           <button
             type="button"
             onclick={() => handleOpenLink('https://www.nexusmods.com/cyberpunk2077/mods/34691')}
-            class="flex items-center justify-center gap-2 py-3 hover:bg-nvidia-surface transition group cursor-pointer"
+            class="flex items-center justify-center gap-2 py-3 transition group cursor-pointer hover:bg-[var(--theme-surface)]"
           >
-            <Download class="h-4 w-4 text-nvidia-accent group-hover:brightness-110" />
-            <span class="text-xs font-bold text-nvidia-text-primary">Update via Nexus</span>
+            <Download class="h-4 w-4 group-hover:brightness-110" style="color: var(--theme-accent);" />
+            <span class="text-xs font-bold" style="color: var(--theme-text-primary);">Update via Nexus</span>
           </button>
           <button
             type="button"
             onclick={() => handleOpenLink('https://github.com/TheMissionary/R4-Mod-Toolbox/releases')}
-            class="flex items-center justify-center gap-2 py-3 hover:bg-nvidia-surface transition group cursor-pointer"
+            class="flex items-center justify-center gap-2 py-3 transition group cursor-pointer hover:bg-[var(--theme-surface)]"
           >
-            <Code class="h-4 w-4 text-nvidia-text-muted group-hover:text-nvidia-text-primary" />
-            <span class="text-xs font-bold text-nvidia-text-primary">Update via GitHub</span>
+            <Code class="h-4 w-4 group-hover:text-[var(--theme-text-primary)]" style="color: var(--theme-text-muted);" />
+            <span class="text-xs font-bold" style="color: var(--theme-text-primary);">Update via GitHub</span>
           </button>
         </div>
       </div>
 
       <!-- Developer Card -->
-      <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col">
-        <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center gap-2.5">
-          <Heart class="h-4 w-4 text-amber-500" />
-          <h3 class="text-sm font-bold uppercase tracking-wider">Developer</h3>
+      <div class="rounded-xl border overflow-hidden flex flex-col" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
+        <div class="px-4 py-3 border-b flex items-center gap-2.5" style="border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-surface) 60%, transparent);">
+          <Heart class="h-4 w-4" style="color: var(--color-warning);" />
+          <h3 class="text-sm font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">Developer</h3>
         </div>
         <div class="p-5 flex-1 flex items-center justify-between">
           <div class="flex items-center gap-4">
-            <div class="h-14 w-14 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 shadow-inner">
-              <svg viewBox="0 0 100 100" class="h-8 w-8 drop-shadow-md" fill="none" stroke="#e08528" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+            <div class="h-14 w-14 rounded-xl border flex items-center justify-center shrink-0 shadow-inner" style="background-color: color-mix(in srgb, var(--color-warning) 10%, transparent); border-color: color-mix(in srgb, var(--color-warning) 30%, transparent);">
+              <svg viewBox="0 0 100 100" class="h-8 w-8 drop-shadow-md" fill="none" stroke="currentColor" style="color: var(--color-warning);" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M 48 34 C 44 20 22 10 13 26 C 3 44 18 68 49 92 C 80 68 97 44 87 22 C 77 0 54 8 48 34 Z" />
               </svg>
             </div>
             <div>
-              <div class="text-lg font-bold text-nvidia-text-primary">Mi55ionary</div>
-              <div class="text-xs font-mono text-nvidia-text-muted mt-0.5">Developer</div>
+              <div class="text-lg font-bold" style="color: var(--theme-text-primary);">Mi55ionary</div>
+              <div class="text-xs font-mono mt-0.5" style="color: var(--theme-text-muted);">Developer</div>
             </div>
           </div>
           <div class="flex flex-col gap-2 shrink-0">
             <button
               type="button"
               onclick={() => handleOpenLink('https://www.nexusmods.com/profile/Mi55ionary')}
-              class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border transition cursor-pointer group"
+              class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border transition cursor-pointer group hover:bg-[var(--theme-surface)]"
+              style="background-color: var(--theme-card); border-color: var(--theme-border);"
             >
-              <ExternalLink class="h-3 w-3 text-amber-500 group-hover:brightness-110" />
-              <span class="text-[10px] font-bold text-nvidia-text-primary">Nexus Profile</span>
+              <ExternalLink class="h-3 w-3 group-hover:brightness-110" style="color: var(--color-warning);" />
+              <span class="text-[10px] font-bold" style="color: var(--theme-text-primary);">Nexus Profile</span>
             </button>
             <button
               type="button"
               onclick={() => handleOpenLink('https://github.com/TheMissionary')}
-              class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border transition cursor-pointer group"
+              class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border transition cursor-pointer group hover:bg-[var(--theme-surface)]"
+              style="background-color: var(--theme-card); border-color: var(--theme-border);"
             >
-              <Code class="h-3 w-3 text-nvidia-text-muted group-hover:text-nvidia-text-primary" />
-              <span class="text-[10px] font-bold text-nvidia-text-primary">GitHub Profile</span>
+              <Code class="h-3 w-3 group-hover:text-[var(--theme-text-primary)]" style="color: var(--theme-text-muted);" />
+              <span class="text-[10px] font-bold" style="color: var(--theme-text-primary);">GitHub Profile</span>
             </button>
           </div>
         </div>
         <!-- 3-Column Support Action Bar -->
-        <div class="grid grid-cols-3 border-t border-nvidia-border/50 divide-x divide-nvidia-border/50 bg-nvidia-surface/30">
+        <div class="grid grid-cols-3 border-t divide-x" style="border-color: color-mix(in srgb, var(--theme-border) 50%, transparent); background-color: color-mix(in srgb, var(--theme-surface) 30%, transparent);">
           <button
             type="button"
             onclick={() => handleOpenLink('https://www.nexusmods.com/cyberpunk2077/mods/34691')}
-            class="flex flex-col items-center justify-center gap-1.5 py-2.5 hover:bg-nvidia-surface transition group cursor-pointer"
+            class="flex flex-col items-center justify-center gap-1.5 py-2.5 transition group cursor-pointer hover:bg-[var(--theme-surface)]"
           >
-            <Heart class="h-4 w-4 text-amber-500 group-hover:scale-110 transition-transform" />
-            <span class="text-[10px] font-bold text-nvidia-text-primary">Endorse on Nexus</span>
+            <Heart class="h-4 w-4 group-hover:scale-110 transition-transform" style="color: var(--color-warning);" />
+            <span class="text-[10px] font-bold" style="color: var(--theme-text-primary);">Endorse on Nexus</span>
           </button>
           <button
             type="button"
             onclick={() => handleOpenLink('https://github.com/TheMissionary/R4-Mod-Toolbox')}
-            class="flex flex-col items-center justify-center gap-1.5 py-2.5 hover:bg-nvidia-surface transition group cursor-pointer"
+            class="flex flex-col items-center justify-center gap-1.5 py-2.5 transition group cursor-pointer hover:bg-[var(--theme-surface)]"
           >
-            <Star class="h-4 w-4 text-amber-400 group-hover:scale-110 transition-transform" />
-            <span class="text-[10px] font-bold text-nvidia-text-primary">Star on GitHub</span>
+            <Star class="h-4 w-4 group-hover:scale-110 transition-transform" style="color: var(--color-warning);" />
+            <span class="text-[10px] font-bold" style="color: var(--theme-text-primary);">Star on GitHub</span>
           </button>
           <button
             use:watchVisibility
             type="button"
             onclick={() => handleOpenLink('https://ko-fi.com/themissionary')}
-            class="flex flex-col items-center justify-center gap-1.5 py-2.5 hover:bg-cyan-500/10 transition-all duration-700 group cursor-pointer {isKofiGlowing ? 'bg-cyan-500/5 shadow-[inset_0_0_15px_rgba(34,211,238,0.2)]' : ''}"
+            class="flex flex-col items-center justify-center gap-1.5 py-2.5 transition-all duration-700 group cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-info)_10%,transparent)]"
+            style="{isKofiGlowing ? 'background-color: color-mix(in srgb, var(--color-info) 5%, transparent); box-shadow: inset 0 0 15px color-mix(in srgb, var(--color-info) 20%, transparent);' : ''}"
           >
-            <Coffee class="h-4 w-4 text-cyan-400 group-hover:scale-110 transition-transform {isKofiGlowing ? 'animate-pulse' : ''}" />
-            <span class="text-[10px] font-bold text-nvidia-text-primary">Buy me a Coffee</span>
+            <Coffee class="h-4 w-4 group-hover:scale-110 transition-transform {isKofiGlowing ? 'animate-pulse' : ''}" style="color: var(--color-info);" />
+            <span class="text-[10px] font-bold" style="color: var(--theme-text-primary);">Buy me a Coffee</span>
           </button>
         </div>
       </div>
 
       <!-- Special Acknowledgements Section -->
-      <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col lg:col-span-2">
-        <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/60 flex items-center gap-2.5">
-          <Star class="h-4 w-4 text-amber-400" />
-          <h3 class="text-sm font-bold uppercase tracking-wider">Special Acknowledgements</h3>
+      <div class="rounded-xl border overflow-hidden flex flex-col lg:col-span-2" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
+        <div class="px-4 py-3 border-b flex items-center gap-2.5" style="border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-surface) 60%, transparent);">
+          <Star class="h-4 w-4" style="color: var(--color-warning);" />
+          <h3 class="text-sm font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">Special Acknowledgements</h3>
         </div>
         <div class="p-5 space-y-5">
           
           <!-- rfuzzo tribute -->
-          <div class="text-xs text-nvidia-text-muted leading-relaxed flex items-start gap-4">
-            <div class="h-10 w-10 rounded-full bg-nvidia-card border border-nvidia-border flex items-center justify-center shrink-0 shadow-inner">
-              <Code class="h-5 w-5 text-nvidia-text-muted" />
+          <div class="text-xs leading-relaxed flex items-start gap-4" style="color: var(--theme-text-muted);">
+            <div class="h-10 w-10 rounded-full border flex items-center justify-center shrink-0 shadow-inner" style="background-color: var(--theme-card); border-color: var(--theme-border);">
+              <Code class="h-5 w-5" style="color: var(--theme-text-muted);" />
             </div>
             <div>
               <div class="flex items-center gap-2 mb-1">
-                <strong class="text-nvidia-text-primary text-sm">rfuzzo</strong>
-                <span class="text-[10px] font-mono text-nvidia-accent border border-nvidia-accent/30 bg-nvidia-accent/10 px-1.5 py-0.2 rounded">Core Technology</span>
+                <strong class="text-sm" style="color: var(--theme-text-primary);">rfuzzo</strong>
+                <span class="text-[10px] font-mono border px-1.5 py-0.2 rounded" style="color: var(--theme-accent); border-color: color-mix(in srgb, var(--theme-accent) 30%, transparent); background-color: color-mix(in srgb, var(--theme-accent) 10%, transparent);">Core Technology</span>
               </div>
               <p class="mb-2">
-                A massive thank you to <strong class="text-nvidia-text-primary">rfuzzo</strong> for their foundational work on Wolvenkit and the creation of <span class="font-mono text-nvidia-text-primary">red4lib</span>. 
+                A massive thank you to <strong style="color: var(--theme-text-primary);">rfuzzo</strong> for their foundational work on Wolvenkit and the creation of <span class="font-mono" style="color: var(--theme-text-primary);">red4lib</span>. 
                 Without their continuous innovation and dedication to the Cyberpunk 2077 modding ecosystem, the real-time archive conflict resolution engine powering R4 would not be possible.
               </p>
               <button
                 type="button"
                 onclick={() => handleOpenLink('https://github.com/rfuzzo')}
-                class="flex items-center gap-1.5 text-nvidia-accent hover:brightness-110 transition cursor-pointer font-semibold"
+                class="flex items-center gap-1.5 hover:brightness-110 transition cursor-pointer font-semibold"
+                style="color: var(--theme-accent);"
               >
                 <ExternalLink class="h-3 w-3" />
                 <span>Visit rfuzzo on GitHub</span>
@@ -240,22 +233,23 @@
           </div>
 
           <!-- rapsodyas tribute -->
-          <div class="pt-4 border-t border-nvidia-border/50 text-xs text-nvidia-text-muted leading-relaxed flex items-start gap-4">
-            <div class="h-10 w-10 rounded-full bg-nvidia-card border border-nvidia-border flex items-center justify-center shrink-0 shadow-inner">
-              <Heart class="h-5 w-5 text-amber-500" />
+          <div class="pt-4 border-t text-xs leading-relaxed flex items-start gap-4" style="border-color: color-mix(in srgb, var(--theme-border) 50%, transparent); color: var(--theme-text-muted);">
+            <div class="h-10 w-10 rounded-full border flex items-center justify-center shrink-0 shadow-inner" style="background-color: var(--theme-card); border-color: var(--theme-border);">
+              <Heart class="h-5 w-5" style="color: var(--color-warning);" />
             </div>
             <div>
               <div class="flex items-center gap-2 mb-1">
-                <strong class="text-nvidia-text-primary text-sm">rapsodyas</strong>
-                <span class="text-[10px] font-mono text-cyan-400 border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.2 rounded">Community Testing & Design Collaborator</span>
+                <strong class="text-sm" style="color: var(--theme-text-primary);">rapsodyas</strong>
+                <span class="text-[10px] font-mono border px-1.5 py-0.2 rounded" style="color: var(--color-info); border-color: color-mix(in srgb, var(--color-info) 30%, transparent); background-color: color-mix(in srgb, var(--color-info) 10%, transparent);">Community Testing & Design Collaborator</span>
               </div>
               <p class="mb-2">
-                A sincere thank you to <strong class="text-nvidia-text-primary">rapsodyas</strong> on NexusMods for their dedicated testing and design insight throughout the beta cycle. Their perspective on managing sensitive load orders without breaking file priorities was the direct catalyst for R4’s <strong class="text-nvidia-text-primary">Organizer View</strong>, along with key refinements to inline label assignment, custom color selection, and search ergonomics.
+                A sincere thank you to <strong style="color: var(--theme-text-primary);">rapsodyas</strong> on NexusMods for their dedicated testing and design insight throughout the beta cycle. Their perspective on managing sensitive load orders without breaking file priorities was the direct catalyst for R4’s <strong style="color: var(--theme-text-primary);">Organizer View</strong>, along with key refinements to inline label assignment, custom color selection, and search ergonomics.
               </p>
               <button
                 type="button"
                 onclick={() => handleOpenLink('https://www.nexusmods.com/profile/rapsodyas')}
-                class="flex items-center gap-1.5 text-cyan-400 hover:brightness-110 transition cursor-pointer font-semibold"
+                class="flex items-center gap-1.5 hover:brightness-110 transition cursor-pointer font-semibold"
+                style="color: var(--color-info);"
               >
                 <ExternalLink class="h-3 w-3" />
                 <span>Visit rapsodyas on NexusMods</span>
@@ -266,19 +260,20 @@
         </div>
       </div>
 
-      <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col lg:col-span-2">
+      <div class="rounded-xl border overflow-hidden flex flex-col lg:col-span-2" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
         <div
           role="button"
           tabindex="0"
           onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') showCoreTech = !showCoreTech; }}
           onclick={() => showCoreTech = !showCoreTech}
-          class="w-full px-4 py-3 bg-nvidia-surface/60 hover:bg-nvidia-surface/90 flex items-center justify-between cursor-pointer transition-colors"
+          class="w-full px-4 py-3 flex items-center justify-between cursor-pointer transition-colors hover:bg-[color-mix(in_srgb,var(--theme-surface)_90%,transparent)]"
+          style="background-color: color-mix(in srgb, var(--theme-surface) 60%, transparent);"
         >
           <div class="flex items-center gap-2.5">
-            <Layers class="h-4 w-4 text-nvidia-accent" />
-            <h3 class="text-sm font-bold uppercase tracking-wider">Core Technologies</h3>
+            <Layers class="h-4 w-4" style="color: var(--theme-accent);" />
+            <h3 class="text-sm font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">Core Technologies</h3>
           </div>
-          <div class="p-1 rounded hover:bg-nvidia-card text-nvidia-text-muted transition">
+          <div class="p-1 rounded transition hover:bg-[var(--theme-card)]" style="color: var(--theme-text-muted);">
             {#if showCoreTech}
               <ChevronDown class="h-4 w-4" />
             {:else}
@@ -288,64 +283,66 @@
         </div>
 
         {#if showCoreTech}
-          <div class="p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 border-t border-nvidia-border/60 bg-nvidia-bg/30">
-            <div class="p-3 rounded-lg bg-nvidia-card border border-nvidia-border flex flex-col gap-1.5">
+          <div class="p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 border-t" style="border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-bg) 30%, transparent);">
+            <div class="p-3 rounded-lg border flex flex-col gap-1.5" style="background-color: var(--theme-card); border-color: var(--theme-border);">
               <div class="flex items-center gap-2">
-                <Cpu class="h-4 w-4 text-nvidia-accent" />
-                <span class="text-xs font-bold text-nvidia-text-primary">Rust & Tauri</span>
+                <Cpu class="h-4 w-4" style="color: var(--theme-accent);" />
+                <span class="text-xs font-bold" style="color: var(--theme-text-primary);">Rust & Tauri</span>
               </div>
-              <span class="text-[10px] text-nvidia-text-muted leading-tight">High-performance systems backend and native desktop runtime.</span>
+              <span class="text-[10px] leading-tight" style="color: var(--theme-text-muted);">High-performance systems backend and native desktop runtime.</span>
             </div>
-            <div class="p-3 rounded-lg bg-nvidia-card border border-nvidia-border flex flex-col gap-1.5">
+            <div class="p-3 rounded-lg border flex flex-col gap-1.5" style="background-color: var(--theme-card); border-color: var(--theme-border);">
               <div class="flex items-center gap-2">
-                <Code class="h-4 w-4 text-amber-500" />
-                <span class="text-xs font-bold text-nvidia-text-primary">Svelte 5</span>
+                <Code class="h-4 w-4" style="color: var(--color-warning);" />
+                <span class="text-xs font-bold" style="color: var(--theme-text-primary);">Svelte 5</span>
               </div>
-              <span class="text-[10px] text-nvidia-text-muted leading-tight">Reactive frontend framework utilizing fine-grained runes.</span>
+              <span class="text-[10px] leading-tight" style="color: var(--theme-text-muted);">Reactive frontend framework utilizing fine-grained runes.</span>
             </div>
-            <div class="p-3 rounded-lg bg-nvidia-card border border-nvidia-border flex flex-col gap-1.5">
+            <div class="p-3 rounded-lg border flex flex-col gap-1.5" style="background-color: var(--theme-card); border-color: var(--theme-border);">
               <div class="flex items-center gap-2">
-                <Layers class="h-4 w-4 text-cyan-400" />
-                <span class="text-xs font-bold text-nvidia-text-primary">Tailwind CSS v4</span>
+                <Layers class="h-4 w-4" style="color: var(--color-info);" />
+                <span class="text-xs font-bold" style="color: var(--theme-text-primary);">Tailwind CSS v4</span>
               </div>
-              <span class="text-[10px] text-nvidia-text-muted leading-tight">Utility-first styling engine powering the generative theme system.</span>
+              <span class="text-[10px] leading-tight" style="color: var(--theme-text-muted);">Utility-first styling engine powering the generative theme system.</span>
             </div>
-            <div class="p-3 rounded-lg bg-nvidia-card border border-nvidia-border flex flex-col gap-1.5">
+            <div class="p-3 rounded-lg border flex flex-col gap-1.5" style="background-color: var(--theme-card); border-color: var(--theme-border);">
               <div class="flex items-center gap-2">
-                <ShieldCheck class="h-4 w-4 text-nvidia-text-muted" />
-                <span class="text-xs font-bold text-nvidia-text-primary">red4lib</span>
+                <ShieldCheck class="h-4 w-4" style="color: var(--theme-text-muted);" />
+                <span class="text-xs font-bold" style="color: var(--theme-text-primary);">red4lib</span>
               </div>
-              <span class="text-[10px] text-nvidia-text-muted leading-tight">Advanced REDengine archive parsing and hash extraction library.</span>
+              <span class="text-[10px] leading-tight" style="color: var(--theme-text-muted);">Advanced REDengine archive parsing and hash extraction library.</span>
             </div>
           </div>
         {/if}
       </div>
 
-      <div class="rounded-xl border border-nvidia-border bg-nvidia-surface/40 overflow-hidden flex flex-col lg:col-span-2">
+      <div class="rounded-xl border overflow-hidden flex flex-col lg:col-span-2" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
         <div
           role="button"
           tabindex="0"
           onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') showChangelog = !showChangelog; }}
           onclick={() => showChangelog = !showChangelog}
-          class="w-full px-4 py-3 bg-nvidia-surface/60 hover:bg-nvidia-surface/90 flex items-center justify-between cursor-pointer transition-colors"
+          class="w-full px-4 py-3 flex items-center justify-between cursor-pointer transition-colors hover:bg-[color-mix(in_srgb,var(--theme-surface)_90%,transparent)]"
+          style="background-color: color-mix(in srgb, var(--theme-surface) 60%, transparent);"
         >
           <div class="flex items-center gap-2.5">
-            <History class="h-4 w-4 text-nvidia-accent" />
-            <h3 class="text-sm font-bold uppercase tracking-wider">Release Notes & Changelog</h3>
+            <History class="h-4 w-4" style="color: var(--theme-accent);" />
+            <h3 class="text-sm font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">Release Notes & Changelog</h3>
           </div>
           
           <div class="flex items-center gap-4">
             <button
               type="button"
               onclick={(e) => { e.stopPropagation(); handleOpenLink('https://github.com/TheMissionary/R4-Mod-Toolbox/releases'); }}
-              class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border transition cursor-pointer"
+              class="flex items-center gap-1.5 px-2.5 py-1 rounded border transition cursor-pointer hover:bg-[var(--theme-surface)]"
+              style="background-color: var(--theme-card); border-color: var(--theme-border);"
               title="View all releases on GitHub"
             >
-              <span class="text-[10px] font-bold uppercase tracking-wider text-nvidia-text-primary">See All</span>
-              <ExternalLink class="h-3 w-3 text-nvidia-text-muted" />
+              <span class="text-[10px] font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">See All</span>
+              <ExternalLink class="h-3 w-3" style="color: var(--theme-text-muted);" />
             </button>
 
-            <div class="p-1 rounded hover:bg-nvidia-card text-nvidia-text-muted transition">
+            <div class="p-1 rounded transition hover:bg-[var(--theme-card)]" style="color: var(--theme-text-muted);">
               {#if showChangelog}
                 <ChevronDown class="h-4 w-4" />
               {:else}
@@ -356,17 +353,17 @@
         </div>
 
         {#if showChangelog}
-          <div class="p-5 border-t border-nvidia-border/60 space-y-6 bg-nvidia-bg/30">
+          <div class="p-5 border-t space-y-6" style="border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-bg) 30%, transparent);">
             {#each changelog as release}
               <div class="space-y-2">
                 <div class="flex items-baseline gap-3">
-                  <h4 class="text-sm font-bold text-nvidia-text-primary">{release.version}</h4>
-                  <span class="text-[10px] font-mono text-nvidia-text-muted">— {release.date}</span>
+                  <h4 class="text-sm font-bold" style="color: var(--theme-text-primary);">{release.version}</h4>
+                  <span class="text-[10px] font-mono" style="color: var(--theme-text-muted);">— {release.date}</span>
                 </div>
                 <ul class="space-y-1.5 pl-1">
                   {#each release.changes as change}
-                    <li class="text-xs text-nvidia-text-muted flex items-start gap-2">
-                      <span class="text-nvidia-accent mt-0.5">•</span>
+                    <li class="text-xs flex items-start gap-2" style="color: var(--theme-text-muted);">
+                      <span class="mt-0.5" style="color: var(--theme-accent);">•</span>
                       <span class="leading-relaxed">{change}</span>
                     </li>
                   {/each}

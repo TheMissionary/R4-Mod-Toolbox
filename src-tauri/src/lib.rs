@@ -9,67 +9,33 @@ use tauri::Manager;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct AppThemeColors {
-    pub accent: String,
-    pub accent_hover: String,
-    pub bg: String,
-    pub surface: String,
-    pub card: String,
-    pub border: String,
-    pub text_muted: String,
-    pub text_primary: String,
-}
-
-impl Default for AppThemeColors {
-    fn default() -> Self {
-        Self {
-            accent: "#76b900".to_string(),
-            accent_hover: "#88d600".to_string(),
-            bg: "#121517".to_string(),
-            surface: "#181c20".to_string(),
-            card: "#1e2328".to_string(),
-            border: "#2a323d".to_string(),
-            text_muted: "#94a3b8".to_string(),
-            text_primary: "#ffffff".to_string(),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
 pub struct ThemeConfig {
     pub mode: String,
-    pub dark_colors: AppThemeColors,
-    pub light_colors: AppThemeColors,
-    #[serde(default)]
-    pub font_family_base: String,
-    #[serde(default)]
+    #[serde(default = "default_atmosphere")]
+    pub atmosphere: String,
+    #[serde(default = "default_accent")]
+    pub accent_hex: String,
+    #[serde(default = "default_font_mods")]
     pub font_family_mods: String,
     #[serde(default)]
-    pub font_family: String,
-    #[serde(default)]
     pub is_compact: bool,
+    #[serde(default)]
+    pub hero_banner_path: Option<String>,
 }
+
+fn default_atmosphere() -> String { "graphite".to_string() }
+fn default_accent() -> String { "#76B900".to_string() }
+fn default_font_mods() -> String { "\"Cascadia Code\", \"Consolas\", monospace".to_string() }
 
 impl Default for ThemeConfig {
     fn default() -> Self {
         Self {
             mode: "dark".to_string(),
-            dark_colors: AppThemeColors::default(),
-            light_colors: AppThemeColors {
-                accent: "#5a8f00".to_string(),
-                accent_hover: "#4c7a00".to_string(),
-                bg: "#f1f5f9".to_string(),
-                surface: "#f8fafc".to_string(),
-                card: "#ffffff".to_string(),
-                border: "#cbd5e1".to_string(),
-                text_muted: "#64748b".to_string(),
-                text_primary: "#0f172a".to_string(),
-            },
-            font_family_base: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif".to_string(),
-            font_family_mods: "\"Cascadia Code\", \"Consolas\", monospace".to_string(),
-            font_family: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif".to_string(),
+            atmosphere: default_atmosphere(),
+            accent_hex: default_accent(),
+            font_family_mods: default_font_mods(),
             is_compact: true,
+            hero_banner_path: None,
         }
     }
 }

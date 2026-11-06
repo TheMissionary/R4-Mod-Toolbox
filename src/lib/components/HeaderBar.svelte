@@ -1,35 +1,37 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
+  import { convertFileSrc } from '@tauri-apps/api/core';
   import { info, error } from '@tauri-apps/plugin-log';
-  import { 
-    RefreshCw, 
-    CheckCircle2, 
-    AlertTriangle, 
-    AlertCircle,
-    Play
-  } from 'lucide-svelte';
-  import type { ScanResult } from '$lib/types';
+  import { ChevronRight, Play } from 'lucide-svelte';
+  import { loadThemeSettings } from '$lib/theme';
 
   let { 
     gamePath = '', 
-    isLoading = false,
-    scanResult = null,
     currentTab = 'archive',
-    isSidebarCollapsed = false,
-    onRefresh 
   }: { 
     gamePath: string; 
-    isLoading: boolean;
-    scanResult?: ScanResult | null;
     currentTab?: string;
-    isSidebarCollapsed?: boolean;
-    onRefresh: () => void;
   } = $props();
 
-  let isValid = $derived(scanResult ? scanResult.is_valid_game_path : (gamePath.length > 0));
-
-  // Process & Launch State
+  let isValid = $derived(gamePath.length > 0);
   let isLaunching = $state(false);
+  let heroBannerUrl = $state<string | null>(null);
+
+  function updateBanner() {
+    const settings = loadThemeSettings();
+    if (settings.heroBannerPath) {
+      heroBannerUrl = convertFileSrc(settings.heroBannerPath);
+    } else {
+      heroBannerUrl = null;
+    }
+  }
+
+  onMount(() => {
+    updateBanner();
+    window.addEventListener('theme-updated', updateBanner);
+    return () => window.removeEventListener('theme-updated', updateBanner);
+  });
 
   async function handleLaunchGame() {
     if (!gamePath || isLaunching) return;
@@ -37,8 +39,6 @@
     info('Initiating game launch sequence...');
     try {
       await invoke('launch_game', { gamePath });
-      
-      // Fire and forget: show loading state briefly so the user knows it clicked
       setTimeout(() => {
         isLaunching = false;
         info('Launch command sent successfully.');
@@ -48,72 +48,64 @@
       isLaunching = false;
     }
   }
+
+  let breadcrumbs = $derived.by(() => {
+    const base = ['Cyberpunk 2077'];
+    switch (currentTab) {
+      case 'archive': return [...base, 'archive', 'pc', 'mod'];
+      case 'cet': return [...base, 'bin', 'x64', 'plugins', 'cyber_engine_tweaks', 'mods'];
+      case 'red4ext': return [...base, 'red4ext', 'plugins'];
+      case 'redscript': return [...base, 'r6', 'scripts'];
+      case 'r6tweaks': return [...base, 'r6', 'tweaks'];
+      case 'history': return [...base, 'Mod History & Ledger'];
+      case 'settings': return [...base, 'Application Settings'];
+      case 'help': return [...base, 'Help & Documentation'];
+      case 'about': return [...base, 'About R4'];
+      default: return base;
+    }
+  });
 </script>
 
-<header data-tauri-drag-region class="h-16 border-b border-nvidia-border bg-nvidia-bg flex items-center justify-between px-6 select-none shrink-0">
-  <!-- Left: Context Title -->
-  <div class="flex items-center gap-6 pointer-events-none">
-    {#if isSidebarCollapsed}
-      <!-- Static App Title -->
-      <div class="flex items-center gap-3">
-        <h1 class="text-sm font-bold tracking-wider uppercase text-nvidia-text-primary leading-tight">
-          R4 MOD TOOLBOX
-        </h1>
-      </div>
-      <!-- Vertical Divider -->
-      <div class="h-8 w-px bg-nvidia-border/60"></div>
-    {/if}
+<header data-tauri-drag-region class="relative h-14 border-b flex items-center justify-between px-6 select-none shrink-0 overflow-hidden" style="background-color: var(--theme-bg); border-color: var(--theme-border);">
+  
+  <!-- Hero Banner Background Layer -->
+  {#if heroBannerUrl}
+    <div class="absolute inset-0 z-0 pointer-events-none">
+      <img 
+        src={heroBannerUrl} 
+        alt="" 
+        onerror={(e) => e.currentTarget.style.display = 'none'}
+        class="absolute inset-0 w-full h-full object-cover object-[center_20%] opacity-60" 
+      />
+      <!-- Gradient Mask: 60% dark at top to 100% solid theme-bg at bottom -->
+      <div class="absolute inset-0" style="background: linear-gradient(to bottom, color-mix(in srgb, var(--theme-bg) 60%, transparent) 0%, var(--theme-bg) 100%);"></div>
+    </div>
+  {/if}
+
+  <!-- Left: Breadcrumbs -->
+  <div class="relative z-10 flex items-center gap-2 pointer-events-none">
+    {#each breadcrumbs as crumb, i}
+      <span class="text-xs font-mono font-semibold" style="color: {i === breadcrumbs.length - 1 ? 'var(--theme-text-primary)' : 'var(--theme-text-muted)'};">
+        {crumb}
+      </span>
+      {#if i < breadcrumbs.length - 1}
+        <ChevronRight class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
+      {/if}
+    {/each}
   </div>
 
-  <!-- Right: Global Actions & Status -->
-  <div class="flex items-center gap-4 shrink-0">
-    
-    <!-- Status Indicator -->
-    <div class="flex items-center gap-2 mr-2">
-      {#if !gamePath}
-        <AlertTriangle class="h-4 w-4 text-amber-400" />
-        <span class="text-xs font-bold text-amber-400 uppercase tracking-wider">Setup Required</span>
-      {:else if !isValid}
-        <AlertCircle class="h-4 w-4 text-red-500" />
-        <span class="text-xs font-bold text-red-500 uppercase tracking-wider">Disconnected</span>
-      {:else}
-        <CheckCircle2 class="h-4 w-4 text-nvidia-accent" />
-        <span class="text-xs font-bold text-nvidia-accent uppercase tracking-wider">Connected</span>
-      {/if}
-    </div>
-
-    <button 
+  <!-- Right: Launch Game -->
+  <div class="relative z-10 flex items-center gap-4 shrink-0">
+    <button
       type="button"
-      onclick={onRefresh}
-      disabled={!gamePath || isLoading}
-      class="flex items-center gap-2 px-4 h-8 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-nvidia-text-primary font-semibold text-xs transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-xs"
+      onclick={handleLaunchGame}
+      disabled={!isValid || isLaunching}
+      class="flex items-center justify-center gap-2 px-5 h-8 rounded font-bold text-xs transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer hover:brightness-110"
+      style="background-color: var(--theme-accent); color: var(--theme-accent-contrast);"
+      title={!isValid ? 'Configure a valid game directory to enable launch' : 'Launch Cyberpunk 2077'}
     >
-      <RefreshCw class="h-3.5 w-3.5 {isLoading ? 'animate-spin text-nvidia-accent' : 'text-nvidia-text-muted'}" />
-      <span>{isLoading ? 'Analyzing...' : 'Sync & Rescan'}</span>
+      <Play class="h-3.5 w-3.5" style="fill: var(--theme-accent-contrast); color: var(--theme-accent-contrast);" />
+      <span>{isLaunching ? 'Starting...' : 'Launch Game'}</span>
     </button>
-
-    <div class="w-px h-6 bg-nvidia-border/60 mx-1"></div>
-
-    <!-- Launch Game -->
-    {#if isLaunching}
-      <button
-        disabled
-        class="flex items-center justify-center gap-2 px-4 h-8 rounded bg-amber-500/15 border border-amber-500/40 text-amber-400 font-semibold text-xs shadow-sm cursor-wait"
-      >
-        <RefreshCw class="h-3.5 w-3.5 animate-spin" />
-        <span>Starting...</span>
-      </button>
-    {:else}
-      <button
-        type="button"
-        onclick={handleLaunchGame}
-        disabled={!isValid}
-        class="flex items-center justify-center gap-2 px-4 h-8 rounded bg-nvidia-accent hover:brightness-105 text-black font-semibold text-xs transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-        title={!isValid ? 'Configure a valid game directory to enable launch' : 'Launch Cyberpunk 2077'}
-      >
-        <Play class="h-3.5 w-3.5 fill-black" />
-        <span>Launch Game</span>
-      </button>
-    {/if}
   </div>
 </header>

@@ -17,7 +17,8 @@
     showNewMods = $bindable(false),
     onNewModsConfigChanged,
     onRouteToHistory,
-    currentTab = 'r6tweaks'
+    currentTab = 'r6tweaks',
+    globalSelectedPath = $bindable('Ready')
   }: {
     tweaks: R6TweaksItem[];
     gamePath: string;
@@ -28,6 +29,7 @@
     onNewModsConfigChanged?: () => void;
     onRouteToHistory?: (modName: string) => void;
     currentTab?: string;
+    globalSelectedPath?: string;
   } = $props();
 
   let searchQuery = $state('');
@@ -348,35 +350,35 @@
 <!-- Custom Context Menu -->
 {#if contextMenu.visible && (contextMenu.tweak || contextMenu.fileNode)}
   <div
-    class="fixed z-50 w-56 rounded-md border border-nvidia-border bg-nvidia-card py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
-    style="left: {contextMenu.x}px; top: {contextMenu.y}px;"
+    class="fixed z-50 w-56 rounded-md border py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
+    style="left: {contextMenu.x}px; top: {contextMenu.y}px; background-color: var(--theme-card); border-color: var(--theme-border);"
     onclick={(e) => e.stopPropagation()}
     oncontextmenu={(e) => e.preventDefault()}
   >
-    <div class="px-3 py-1.5 border-b border-nvidia-border/60 bg-nvidia-surface/40 flex items-center justify-between gap-2">
+    <div class="px-3 py-1.5 border-b flex items-center justify-between gap-2" style="border-color: var(--theme-border); background-color: var(--theme-surface);">
       <div class="flex items-center gap-1.5 min-w-0 flex-1">
         {#if contextMenu.targetType === 'tweak'}
           {#if contextMenu.tweak!.is_dir}
-            <Folder class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+            <Folder class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
           {:else}
-            <FileCode class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+            <FileCode class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
           {/if}
-          <span class="font-mono text-[11px] font-bold text-nvidia-text-primary truncate" title={contextMenu.tweak!.name}>
+          <span class="font-mono text-[11px] font-bold truncate" style="color: var(--theme-text-primary);" title={contextMenu.tweak!.name}>
             {contextMenu.tweak!.name}
           </span>
         {:else}
           {#if contextMenu.fileNode!.is_dir}
-            <Folder class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+            <Folder class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
           {:else}
-            <FileCode class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
+            <FileCode class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
           {/if}
-          <span class="font-mono text-[11px] font-bold text-nvidia-text-primary truncate" title={contextMenu.fileNode!.name}>
+          <span class="font-mono text-[11px] font-bold truncate" style="color: var(--theme-text-primary);" title={contextMenu.fileNode!.name}>
             {contextMenu.fileNode!.name}
           </span>
         {/if}
       </div>
       {#if contextMenu.targetType === 'tweak'}
-        <span class="text-[9px] font-mono uppercase px-1 py-0.2 rounded border {contextMenu.tweak!.enabled ? 'bg-nvidia-accent/15 border-nvidia-accent/40 text-nvidia-accent' : 'bg-red-500/15 border-red-500/40 text-red-400'} shrink-0">
+        <span class="text-[9px] font-mono uppercase px-1 py-0.2 rounded border shrink-0" style="{contextMenu.tweak!.enabled ? 'background-color: color-mix(in srgb, var(--theme-accent) 15%, transparent); border-color: color-mix(in srgb, var(--theme-accent) 40%, transparent); color: var(--theme-accent);' : 'background-color: color-mix(in srgb, var(--color-danger) 15%, transparent); border-color: color-mix(in srgb, var(--color-danger) 40%, transparent); color: var(--color-danger);'}">
           {contextMenu.tweak!.enabled ? 'Active' : 'Disabled'}
         </span>
       {/if}
@@ -386,9 +388,10 @@
       <button
         type="button"
         onclick={handleContextMenuShowInExplorer}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+        style="color: var(--theme-text-primary);"
       >
-        <FolderSearch class="h-3.5 w-3.5 text-nvidia-accent group-hover:brightness-110" />
+        <FolderSearch class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
         <span>Show in Explorer</span>
       </button>
 
@@ -399,9 +402,10 @@
           if (name && onRouteToHistory) onRouteToHistory(name);
           closeContextMenu();
         }}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+        style="color: var(--theme-text-primary);"
       >
-        <Clock class="h-3.5 w-3.5 text-nvidia-accent group-hover:brightness-110" />
+        <Clock class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
         <span>Show in History</span>
       </button>
 
@@ -409,9 +413,10 @@
         <button
           type="button"
           onclick={handleContextMenuToggle}
-          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+          style="color: var(--theme-text-primary);"
         >
-          <Power class="h-3.5 w-3.5 {contextMenu.tweak!.enabled ? 'text-amber-400' : 'text-nvidia-accent'}" />
+          <Power class="h-3.5 w-3.5" style="color: {contextMenu.tweak!.enabled ? 'var(--color-warning)' : 'var(--theme-accent)'};" />
           <span>{contextMenu.tweak!.enabled ? 'Disable Mod' : 'Enable Mod'}</span>
         </button>
       {/if}
@@ -420,14 +425,15 @@
         <button
           type="button"
           onclick={handleOpenInEditor}
-          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+          style="color: var(--theme-text-primary);"
         >
-          <FileEdit class="h-3.5 w-3.5 text-cyan-400 group-hover:brightness-110" />
+          <FileEdit class="h-3.5 w-3.5" style="color: var(--color-info);" />
           <span>Open in Editor</span>
         </button>
       {/if}
 
-      <div class="h-px bg-nvidia-border/50 my-1 mx-1"></div>
+      <div class="h-px my-1 mx-1" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
 
       <button
         type="button"
@@ -436,25 +442,27 @@
           closeContextMenu(); 
           isNoteModalOpen = true; 
         }}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+        style="color: var(--theme-text-primary);"
       >
-        <MessageSquare class="h-3.5 w-3.5 text-amber-400" />
+        <MessageSquare class="h-3.5 w-3.5" style="color: var(--color-warning);" />
         <span>{notesConfig[(contextMenu.targetType === 'tweak' ? contextMenu.tweak?.name : contextMenu.fileNode?.name) || ''] ? 'Edit Note...' : 'Add Note...'}</span>
       </button>
 
-      <div class="h-px bg-nvidia-border/50 my-1 mx-1"></div>
+      <div class="h-px my-1 mx-1" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
 
       <button
         type="button"
         onclick={handleContextMenuCopyName}
-        class="w-full flex items-center justify-between px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        class="w-full flex items-center justify-between px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+        style="color: var(--theme-text-primary);"
       >
         <div class="flex items-center gap-2.5">
           {#if copiedFeedback}
-            <Check class="h-3.5 w-3.5 text-nvidia-accent" />
-            <span class="text-nvidia-accent font-medium">Copied!</span>
+            <Check class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
+            <span class="font-medium" style="color: var(--theme-accent);">Copied!</span>
           {:else}
-            <Copy class="h-3.5 w-3.5 text-nvidia-text-muted group-hover:text-nvidia-text-primary" />
+            <Copy class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
             <span>Copy Name</span>
           {/if}
         </div>
@@ -466,56 +474,60 @@
 <!-- Recursive Folder Snippet -->
 {#snippet folderTree(parentPath: string, depth: number)}
   {#if loadingFolders[parentPath]}
-    <div class="flex items-center pr-3 py-1 text-[10px] font-mono text-nvidia-text-muted" style="padding-left: {4.5 + (depth - 1) * 1.375}rem">
-      <div class="h-3 w-3 rounded-full border-2 border-nvidia-surface border-t-nvidia-accent animate-spin mr-2"></div>
+    <div class="flex items-center pr-3 py-1 text-[10px] font-mono" style="padding-left: {4.5 + (depth - 1) * 1.375}rem; color: var(--theme-text-muted);">
+      <div class="h-3 w-3 rounded-full border-2 animate-spin mr-2" style="border-color: var(--theme-surface); border-top-color: var(--theme-accent);"></div>
       Loading contents...
     </div>
   {:else if folderContents[parentPath]}
     {#each folderContents[parentPath] as node}
       <div
         oncontextmenu={(e) => openContextMenu(e, node, 'file')}
-        class="group flex items-center justify-between pr-3 rounded border-b border-nvidia-border/30 hover:bg-nvidia-surface/70 transition density-row cursor-context-menu"
-        style="padding-left: {4.5 + (depth - 1) * 1.375}rem"
+        onpointerenter={() => globalSelectedPath = node.path}
+        onpointerleave={() => globalSelectedPath = 'Ready'}
+        class="group flex items-center justify-between pr-2 border-b transition density-row cursor-context-menu hover:bg-[var(--theme-surface)]"
+        style="padding-left: {4.5 + (depth - 1) * 1.375}rem; border-color: var(--theme-border);"
       >
         <div class="flex items-center gap-2.5 min-w-0 flex-1">
           {#if node.is_dir}
             <button
               type="button"
               onclick={(e) => { e.stopPropagation(); toggleFolder(node.path); }}
-              class="flex items-center gap-1.5 text-nvidia-text-primary hover:text-nvidia-accent transition cursor-pointer min-w-0"
+              class="flex items-center gap-1.5 transition cursor-pointer min-w-0 hover:brightness-125"
+              style="color: var(--theme-text-primary);"
             >
               {#if expandedFolders[node.path]}
-                <ChevronDown class="h-4 w-4 text-nvidia-text-muted shrink-0" />
-                <FolderOpen class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+                <ChevronDown class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
+                <FolderOpen class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
               {:else}
-                <ChevronRight class="h-4 w-4 text-nvidia-text-muted shrink-0" />
-                <Folder class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+                <ChevronRight class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
+                <Folder class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
               {/if}
               <span class="font-bold truncate text-[11px]">{node.name}</span>
             </button>
           {:else}
             <div class="flex items-center gap-1.5 min-w-0">
               <div class="w-4 shrink-0"></div>
-              <FileCode class="h-4 w-4 text-nvidia-text-muted shrink-0" />
-              <span class="font-mono text-nvidia-text-primary truncate text-[11px]">{node.name}</span>
+              <FileCode class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
+              <span class="font-mono truncate text-[11px]" style="color: var(--theme-text-primary);">{node.name}</span>
             </div>
           {/if}
         </div>
         
         <!-- Fixed-Width Laser-Aligned Right Column for Inner Files -->
         <div class="flex items-center gap-2 shrink-0">
-          <div class="w-20 hidden lg:block"></div> <!-- Empty space for file count alignment -->
-          <div class="w-16 justify-end text-[10px] font-mono text-nvidia-text-muted hidden lg:flex">
+          <div class="w-20 hidden lg:block"></div>
+          <div class="w-16 justify-end text-[10px] font-mono hidden lg:flex" style="color: var(--theme-text-muted);">
             {#if !node.is_dir}{formatBytes(node.size_bytes)}{/if}
           </div>
           <div class="w-6 flex justify-end">
             <button
               type="button"
               onclick={(e) => { e.stopPropagation(); openContextMenu(e, node, 'file'); }}
-              class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-text-primary hover:bg-nvidia-card transition cursor-pointer opacity-0 group-hover:opacity-100"
+              class="p-1 rounded transition cursor-pointer opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-card)]"
+              style="color: var(--theme-text-muted);"
               title="More options"
             >
-              <MoreVertical class="h-3.5 w-3.5" />
+              <MoreVertical class="h-3.5 w-3.5 hover:text-[var(--theme-text-primary)]" />
             </button>
           </div>
         </div>
@@ -529,48 +541,38 @@
 
 <div use:watchVisibility class="flex flex-col h-full select-none" oncontextmenu={(e) => e.preventDefault()}>
   
-  <!-- Standardized Header -->
-  <div class="mb-4 shrink-0">
-    <h2 class="text-lg font-bold text-nvidia-text-primary uppercase tracking-wider">R6\Tweaks</h2>
-    <div class="flex items-center gap-2 text-xs text-nvidia-text-muted mt-1">
-      <span class="font-mono bg-nvidia-surface px-1.5 py-0.5 rounded border border-nvidia-border">r6\tweaks</span>
-      <span>TweakXL modifications and game parameter overrides.</span>
-    </div>
-  </div>
-
   <div class="flex items-center justify-between gap-3 mb-3 shrink-0">
     <div class="flex items-center gap-3 flex-1 max-w-md">
       <div class="relative flex-1">
-        <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-nvidia-text-muted" />
+        <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
         <input
           type="text"
           bind:value={searchQuery}
           placeholder="Filter R6 Tweaks..."
-          class="w-full pl-9 pr-8 py-1.5 rounded border border-nvidia-border bg-nvidia-surface/80 text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/60 focus:outline-hidden focus:border-nvidia-accent font-sans"
+          class="w-full pl-9 pr-8 py-1.5 rounded text-xs focus:outline-none border"
+          style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
         />
         {#if searchQuery !== ''}
           <button
             type="button"
             onclick={() => searchQuery = ''}
-            class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer"
+            class="absolute right-2 top-1/2 -translate-y-1/2 p-1 transition cursor-pointer hover:brightness-125"
+            style="color: var(--theme-text-muted);"
             title="Clear search"
           >
             <X class="h-3.5 w-3.5" />
           </button>
         {/if}
       </div>
-      <div class="text-xs font-mono text-nvidia-text-muted shrink-0">
-        Active: <span class="text-nvidia-accent font-semibold">{activeCount}</span> of {tweaks.length}
-      </div>
     </div>
     
     <div class="flex items-center gap-2.5 shrink-0">
-      <!-- Vanishing Global Highlight Button -->
       {#if showNewMods}
         <button
           type="button"
           onclick={() => { showNewMods = false; }}
-          class="flex items-center gap-2 px-3 py-1.5 rounded border border-nvidia-accent/60 bg-nvidia-accent/10 hover:bg-nvidia-accent/20 transition cursor-pointer shadow-sm"
+          class="flex items-center gap-2 px-3 py-1.5 rounded border transition cursor-pointer shadow-sm hover:brightness-125"
+          style="background-color: color-mix(in srgb, var(--theme-accent) 10%, transparent); border-color: color-mix(in srgb, var(--theme-accent) 60%, transparent);"
           title="Clear new mod highlights"
         >
           <span
@@ -579,7 +581,7 @@
           >
             NEW
           </span>
-          <EyeOff class="h-3.5 w-3.5 text-nvidia-accent" />
+          <EyeOff class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
         </button>
       {/if}
 
@@ -587,22 +589,23 @@
         type="button"
         onclick={toggleAllFolders}
         disabled={topLevelFolders.length === 0}
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-125"
+        style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
       >
         {#if isAllExpanded}
-          <Folder class="h-3.5 w-3.5 text-nvidia-accent" />
+          <Folder class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
           <span>Collapse All</span>
         {:else}
-          <FolderOpen class="h-3.5 w-3.5 text-nvidia-accent" />
+          <FolderOpen class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
           <span>Expand All</span>
         {/if}
       </button>
     </div>
   </div>
 
-  <div class="flex-1 overflow-y-auto space-y-1 pr-1">
+  <div class="flex-1 overflow-y-auto space-y-0 pr-1">
     {#if filteredTweaks.length === 0}
-      <div class="p-8 rounded border border-nvidia-border/60 bg-nvidia-surface/30 text-center text-xs font-mono text-nvidia-text-muted">
+      <div class="p-6 text-center text-xs border rounded" style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-muted);">
         No R6 Tweaks detected.
       </div>
     {:else}
@@ -613,27 +616,31 @@
           <div
             use:registerModNode={tweak.name}
             onclick={() => selectedMod = tweak.name}
+            onpointerenter={() => globalSelectedPath = tweak.path}
+            onpointerleave={() => globalSelectedPath = 'Ready'}
             data-mod-item="true"
             data-mod-name={tweak.name}
             data-mod-path={tweak.path}
             data-mod-type="r6tweaks"
             data-is-file={!tweak.is_dir}
             oncontextmenu={(e) => openContextMenu(e, tweak, 'tweak')}
-            class="group flex items-center justify-between px-3 rounded border transition-all duration-300 density-row cursor-context-menu
-              {isHighlighted ? 'border-nvidia-accent ring-2 ring-nvidia-accent bg-nvidia-accent/20 scale-[1.008] z-10 relative' : 
-              (isSelected ? 'border-nvidia-accent/60 bg-nvidia-accent/10' : 'border-nvidia-border/70 bg-nvidia-surface/40 hover:bg-nvidia-surface/70')}
-              {tweak.enabled ? 'text-nvidia-text-primary' : 'opacity-50 text-nvidia-text-muted'}"
-            style={isHighlighted ? 'box-shadow: 0 0 15px color-mix(in srgb, var(--theme-accent) 35%, transparent);' : ''}
+            class="group flex items-center justify-between px-2 rounded-none border-b transition-all duration-200 density-row cursor-context-menu
+              {isHighlighted ? 'ring-1 z-10 relative' : ''}
+              {tweak.enabled ? 'opacity-100' : 'opacity-50'}"
+            style="border-color: var(--theme-border); {isHighlighted ? 'background-color: color-mix(in srgb, var(--theme-accent) 15%, transparent); border-color: var(--theme-accent); box-shadow: 0 0 15px color-mix(in srgb, var(--theme-accent) 35%, transparent);' : (isSelected ? 'background-color: color-mix(in srgb, var(--theme-accent) 10%, transparent); border-color: color-mix(in srgb, var(--theme-accent) 60%, transparent);' : 'hover:background-color: var(--theme-surface);')}"
           >
             <div class="flex items-center gap-2.5 min-w-0 flex-1">
-              <!-- 15% Tinted Switch -->
+              <!-- Minimal Checkbox -->
               <button
                 type="button"
                 onclick={(e) => { e.stopPropagation(); handleToggle(tweak); }}
                 aria-label={tweak.enabled ? "Disable tweak " + tweak.name : "Enable tweak " + tweak.name}
-                class="w-7 h-4 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer {tweak.enabled ? 'bg-[#22c55e]/15 border border-[#22c55e]/30' : 'bg-[#ef4444]/15 border border-[#ef4444]/30'}"
+                class="w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                style="border-color: {tweak.enabled ? 'var(--theme-accent)' : 'var(--theme-text-muted)'}; background-color: {tweak.enabled ? 'var(--theme-accent)' : 'transparent'};"
               >
-                <div class="h-2.5 w-2.5 rounded-full transition-transform transform {tweak.enabled ? 'translate-x-3 bg-zinc-100 shadow-xs' : 'translate-x-0 bg-zinc-500'}"></div>
+                {#if tweak.enabled}
+                  <Check class="h-3 w-3" style="color: var(--theme-accent-contrast);" strokeWidth={3} />
+                {/if}
               </button>
 
               <!-- Unified Chevron + Folder + Name Toggle -->
@@ -641,22 +648,23 @@
                 <button
                   type="button"
                   onclick={(e) => { e.stopPropagation(); toggleFolder(tweak.path); }}
-                  class="flex items-center gap-1.5 text-nvidia-text-primary hover:text-nvidia-accent transition cursor-pointer min-w-0"
+                  class="flex items-center gap-1.5 transition cursor-pointer min-w-0 hover:brightness-125"
+                  style="color: var(--theme-text-primary);"
                 >
                   {#if expandedFolders[tweak.path]}
-                    <ChevronDown class="h-4 w-4 text-nvidia-text-muted shrink-0" />
-                    <FolderOpen class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+                    <ChevronDown class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
+                    <FolderOpen class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
                   {:else}
-                    <ChevronRight class="h-4 w-4 text-nvidia-text-muted shrink-0" />
-                    <Folder class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+                    <ChevronRight class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
+                    <Folder class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
                   {/if}
-                  <span class="font-bold truncate {tweak.enabled ? '' : 'opacity-50'}">{tweak.name}</span>
+                  <span class="font-bold truncate">{tweak.name}</span>
                 </button>
               {:else}
                 <div class="flex items-center gap-1.5 min-w-0">
                   <div class="w-4 shrink-0"></div>
-                  <FileCode class="h-4 w-4 text-nvidia-text-muted shrink-0" />
-                  <span class="font-mono truncate {tweak.enabled ? 'text-nvidia-text-primary' : 'line-through text-nvidia-text-muted'}">
+                  <FileCode class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
+                  <span class="font-mono truncate" style="{tweak.enabled ? 'color: var(--theme-text-primary);' : 'color: var(--theme-text-muted); text-decoration: line-through;'}">
                     {tweak.name}
                   </span>
                 </div>
@@ -673,7 +681,7 @@
               {/if}
             </div>
 
-            <!-- Fixed-Width Laser-Aligned Right Column -->
+            <!-- Right Column -->
             <div class="flex items-center gap-2 shrink-0">
               <!-- Notes Icon -->
               <div class="w-4 flex items-center justify-center shrink-0">
@@ -683,27 +691,28 @@
                     onclick={(e) => { e.stopPropagation(); targetNoteModName = tweak.name; isNoteModalOpen = true; }}
                     class="hover:scale-110 transition-transform cursor-pointer"
                   >
-                    <MessageSquare class="h-3.5 w-3.5 text-amber-400" />
+                    <MessageSquare class="h-3.5 w-3.5" style="color: var(--color-warning);" />
                   </button>
                 {/if}
               </div>
 
               <div class="w-20 justify-end hidden lg:flex">
-                <span class="px-1.5 py-0.2 rounded bg-nvidia-accent/15 border border-nvidia-accent/30 text-[10px] text-nvidia-accent font-semibold truncate">
+                <span class="px-1.5 py-0.2 rounded border text-[10px] font-semibold truncate" style="background-color: color-mix(in srgb, var(--theme-accent) 15%, transparent); border-color: color-mix(in srgb, var(--theme-accent) 30%, transparent); color: var(--theme-accent);">
                   {tweak.file_count} {tweak.file_count === 1 ? 'file' : 'files'}
                 </span>
               </div>
-              <div class="w-16 justify-end text-[11px] font-mono text-nvidia-text-muted hidden lg:flex">
+              <div class="w-16 justify-end text-[10px] font-mono hidden lg:flex" style="color: var(--theme-text-muted);">
                 {formatBytes(tweak.size_bytes)}
               </div>
               <div class="w-6 flex justify-end">
                 <button
                   type="button"
                   onclick={(e) => { e.stopPropagation(); openContextMenu(e, tweak, 'tweak'); }}
-                  class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-text-primary hover:bg-nvidia-card transition cursor-pointer opacity-0 group-hover:opacity-100"
+                  class="p-1 rounded transition cursor-pointer opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-surface)]"
+                  style="color: var(--theme-text-muted);"
                   title="More options"
                 >
-                  <MoreVertical class="h-3.5 w-3.5" />
+                  <MoreVertical class="h-3.5 w-3.5 hover:text-[var(--theme-text-primary)]" />
                 </button>
               </div>
             </div>

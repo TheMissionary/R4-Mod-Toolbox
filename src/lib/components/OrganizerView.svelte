@@ -3,27 +3,9 @@
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { 
-    Plus, 
-    Pencil, 
-    Trash2, 
-    GripVertical, 
-    FileArchive, 
-    LayoutGrid, 
-    Tag, 
-    ListTree, 
-    FolderSearch, 
-    FolderInput, 
-    X, 
-    ChevronDown, 
-    ChevronRight, 
-    Folder, 
-    FolderOpen,
-    Archive,
-    RotateCcw,
-    Package,
-    Search,
-    MessageSquare,
-    Columns
+    Plus, Pencil, Trash2, GripVertical, FileArchive, LayoutGrid, Tag, ListTree, 
+    FolderSearch, FolderInput, X, ChevronDown, ChevronRight, Folder, FolderOpen,
+    Archive, RotateCcw, Package, Search, MessageSquare, Columns
   } from 'lucide-svelte';
   import CategoryModal from './CategoryModal.svelte';
   import DialogModal from './DialogModal.svelte';
@@ -69,7 +51,6 @@
 
   let organizerColumns = $state<'auto' | '1' | '2' | '3'>('auto');
 
-  // --- Collapse State ---
   let collapsedCategories = $state<Record<string, boolean>>({});
   
   let activeCategories = $derived(labelsConfig.categories.filter(c => !c.stashed));
@@ -115,7 +96,6 @@
     collapsedCategories[catId] = !collapsedCategories[catId];
   }
 
-  // --- Search Engine Logic ---
   let isSearching = $derived(searchQuery.trim().length > 0);
   let normalizedSearch = $derived(searchQuery.trim().toLowerCase());
 
@@ -136,14 +116,13 @@
       for (const cat of activeCategories) {
         const mods = sortedCategorizedMods.get(cat.id) || [];
         if (doesCategoryMatch(cat, mods)) {
-          newCollapsed[cat.id] = false; // Auto-expand matching categories
+          newCollapsed[cat.id] = false;
         }
       }
       collapsedCategories = newCollapsed;
     }
   });
 
-  // Derived state for rendering
   let actualMods = $derived(archives.filter(a => !a.is_delimiter));
   
   let sortedUncategorizedMods = $derived.by(() => {
@@ -187,7 +166,6 @@
 
   let allVisibleMods = $derived([...sortedUncategorizedMods, ...Array.from(sortedCategorizedMods.values()).flat()]);
 
-  // --- Custom Pointer DnD Engine State ---
   let selectedMods = $state<Set<string>>(new Set());
   let lastSelectedMod = $state<string | null>(null);
 
@@ -198,17 +176,14 @@
   let currentX = $state(0);
   let currentY = $state(0);
   
-  // Mod Drag State
   let activeDropTarget = $state<string | null>(null);
   let dropTargetMod = $state<string | null>(null);
   let dropPlacement = $state<'before' | 'after' | null>(null);
 
-  // Category Drag State
   let activeCategoryDragId = $state<string | null>(null);
   let categoryDropTargetId = $state<string | null>(null);
   let categoryDropPlacement = $state<'before' | 'after' | null>(null);
 
-  // --- Context Menu State ---
   let contextMenu = $state<{
     visible: boolean;
     x: number;
@@ -231,14 +206,12 @@
     }
   }
 
-  // --- Category Shelving / Stashing ---
   function toggleStashCategory(cat: CategoryLabel) {
     cat.stashed = !cat.stashed;
     labelsConfig.categories = [...labelsConfig.categories];
     saveConfig();
   }
 
-  // --- Category CRUD ---
   function openCreateModal() {
     catModalMode = 'create';
     catModalData = { id: '', name: '', color: '#06B6D4' };
@@ -253,11 +226,8 @@
 
   function handleCatModalConfirm(data: { id: string; name: string; color: string }) {
     const newId = data.id || crypto.randomUUID();
-    
     if (catModalMode === 'create') {
       labelsConfig.categories = [...labelsConfig.categories, { ...data, id: newId, stashed: false }];
-      
-      // BUG FIX: Auto-assign selected mods to the newly created category
       if (selectedMods.size > 0) {
         const newAssignments = { ...labelsConfig.assignments };
         for (const mod of selectedMods) {
@@ -285,9 +255,7 @@
 
   function executeDelete() {
     if (!catToDelete) return;
-    
     labelsConfig.categories = labelsConfig.categories.filter(c => c.id !== catToDelete!.id);
-    
     const newAssignments = { ...labelsConfig.assignments };
     for (const [modName, catId] of Object.entries(newAssignments)) {
       if (catId === catToDelete.id) {
@@ -295,29 +263,24 @@
       }
     }
     labelsConfig.assignments = newAssignments;
-    
     saveConfig();
     isDeleteModalOpen = false;
     catToDelete = null;
   }
 
-  // --- Context Menu Logic ---
   function openContextMenu(e: MouseEvent, modName: string) {
     e.preventDefault();
     e.stopPropagation();
-    
     if (!selectedMods.has(modName)) {
       selectedMods.clear();
       selectedMods.add(modName);
       selectedMods = new Set(selectedMods);
       lastSelectedMod = modName;
     }
-
     const menuWidth = 200;
     const menuHeight = 200;
     const posX = (e.clientX + menuWidth > window.innerWidth) ? (window.innerWidth - menuWidth - 10) : e.clientX;
     const posY = (e.clientY + menuHeight > window.innerHeight) ? (window.innerHeight - menuHeight - 10) : e.clientY;
-    
     contextMenu = { visible: true, x: posX, y: posY, modName };
   }
 
@@ -379,13 +342,11 @@
       openCreateModal();
       return;
     }
-
     if (actionOrId === '[REMOVE]') {
       handleContextMenuRemoveFromCategory();
       isMoveCatModalOpen = false;
       return;
     }
-
     const newAssignments = { ...labelsConfig.assignments };
     for (const mod of selectedMods) {
       newAssignments[mod] = actionOrId;
@@ -411,7 +372,6 @@
     }
   }
 
-  // --- Custom Pointer DnD Engine Logic ---
   function handleCategoryPointerDown(e: PointerEvent, catId: string) {
     if (e.button !== 0) return;
     e.stopPropagation();
@@ -425,10 +385,8 @@
 
   function handlePointerDown(e: PointerEvent, modName: string) {
     if (e.button !== 0) return;
-    
     const isCtrl = e.ctrlKey || e.metaKey;
     const isShift = e.shiftKey;
-
     if (isShift && lastSelectedMod) {
       const startIdx = allVisibleMods.findIndex(m => m.file_name === lastSelectedMod);
       const endIdx = allVisibleMods.findIndex(m => m.file_name === modName);
@@ -455,7 +413,6 @@
       lastSelectedMod = modName;
     }
     selectedMods = new Set(selectedMods);
-
     isPointerDown = true;
     startX = e.clientX;
     startY = e.clientY;
@@ -465,7 +422,6 @@
 
   function handlePointerMove(e: PointerEvent) {
     if (!isPointerDown) return;
-
     if (!isDragging) {
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
@@ -473,13 +429,10 @@
         isDragging = true;
       }
     }
-
     if (isDragging) {
       currentX = e.clientX;
       currentY = e.clientY;
-
       if (activeCategoryDragId) {
-        // 1. Check if hovering over The Stash drawer
         const stashEl = document.getElementById('stash-drawer');
         let isOverStash = false;
         if (stashEl) {
@@ -493,16 +446,13 @@
             isOverStash = true;
           }
         }
-
         if (isOverStash) {
           categoryDropTargetId = 'stash';
           categoryDropPlacement = null;
         } else {
-          // 2. 1D Distance-based Active Category Reordering
           const catElements = Array.from(document.querySelectorAll('.organizer-category-header'));
           let closestCat: Element | null = null;
           let minDistance = Infinity;
-          
           for (const el of catElements) {
             const rect = el.getBoundingClientRect();
             const midY = rect.top + rect.height / 2;
@@ -512,7 +462,6 @@
               closestCat = el;
             }
           }
-          
           if (closestCat) {
             const targetId = closestCat.getAttribute('data-category-id');
             if (targetId && targetId !== activeCategoryDragId) {
@@ -529,7 +478,6 @@
         const el = document.elementFromPoint(e.clientX, e.clientY);
         const targetContainer = el?.closest('[data-category-id]');
         activeDropTarget = targetContainer ? targetContainer.getAttribute('data-category-id') : null;
-
         const modEl = el?.closest('[data-mod-name]');
         if (modEl && activeDropTarget) {
           const rect = modEl.getBoundingClientRect();
@@ -546,11 +494,9 @@
 
   function handlePointerUp(e: PointerEvent) {
     if (!isPointerDown) return;
-
     if (isDragging) {
       if (activeCategoryDragId) {
         if (categoryDropTargetId === 'stash') {
-          // Shelve category to The Stash
           const cat = labelsConfig.categories.find(c => c.id === activeCategoryDragId);
           if (cat) {
             cat.stashed = true;
@@ -558,18 +504,15 @@
             saveConfig();
           }
         } else if (categoryDropTargetId && categoryDropPlacement) {
-          // Restore / Reorder category in active list
           const cats = [...labelsConfig.categories];
           const dragIdx = cats.findIndex(c => c.id === activeCategoryDragId);
           const targetIdx = cats.findIndex(c => c.id === categoryDropTargetId);
-          
           if (dragIdx !== -1 && targetIdx !== -1) {
             const [draggedCat] = cats.splice(dragIdx, 1);
-            draggedCat.stashed = false; // Automatically un-stash if dragged into active list
+            draggedCat.stashed = false;
             const newTargetIdx = cats.findIndex(c => c.id === categoryDropTargetId);
             const insertIdx = categoryDropPlacement === 'before' ? newTargetIdx : newTargetIdx + 1;
             cats.splice(insertIdx, 0, draggedCat);
-            
             labelsConfig.categories = cats;
             saveConfig();
           }
@@ -577,7 +520,6 @@
       } else if (activeDropTarget && !activeCategoryDragId) {
         const newAssignments = { ...labelsConfig.assignments };
         const newOrders = { ...(labelsConfig.orders || {}) };
-
         for (const modName of selectedMods) {
           if (activeDropTarget === 'uncategorized') {
             delete newAssignments[modName];
@@ -585,16 +527,13 @@
             newAssignments[modName] = activeDropTarget;
           }
         }
-
         let currentVisualOrder: string[] = [];
         if (activeDropTarget === 'uncategorized') {
           currentVisualOrder = sortedUncategorizedMods.map(m => m.file_name);
         } else {
           currentVisualOrder = (sortedCategorizedMods.get(activeDropTarget) || []).map(m => m.file_name);
         }
-
         currentVisualOrder = currentVisualOrder.filter(m => !selectedMods.has(m));
-
         if (dropTargetMod && !selectedMods.has(dropTargetMod)) {
           const targetIdx = currentVisualOrder.indexOf(dropTargetMod);
           if (targetIdx !== -1) {
@@ -606,9 +545,7 @@
         } else {
           currentVisualOrder.push(...Array.from(selectedMods));
         }
-
         newOrders[activeDropTarget] = currentVisualOrder;
-
         labelsConfig.assignments = newAssignments;
         labelsConfig.orders = newOrders;
         saveConfig();
@@ -622,7 +559,6 @@
         }
       }
     }
-
     isPointerDown = false;
     isDragging = false;
     activeDropTarget = null;
@@ -648,12 +584,12 @@
 {#if isDragging && !activeCategoryDragId}
   <div
     id="dnd-ghost"
-    class="fixed pointer-events-none z-50 px-3 py-1.5 rounded-lg bg-nvidia-card border border-cyan-400 shadow-2xl shadow-black/60 flex items-center gap-2.5 backdrop-blur-md -translate-x-4 -translate-y-6"
-    style="left: {currentX}px; top: {currentY}px;"
+    class="fixed pointer-events-none z-50 px-3 py-1.5 rounded-lg border shadow-2xl shadow-black/60 flex items-center gap-2.5 backdrop-blur-md -translate-x-4 -translate-y-6"
+    style="left: {currentX}px; top: {currentY}px; background-color: var(--theme-card); border-color: var(--color-info);"
   >
-    <GripVertical class="h-3.5 w-3.5 text-cyan-400" />
-    <FileArchive class="h-3.5 w-3.5 text-cyan-400" />
-    <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">
+    <GripVertical class="h-3.5 w-3.5" style="color: var(--color-info);" />
+    <FileArchive class="h-3.5 w-3.5" style="color: var(--color-info);" />
+    <span class="text-xs font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">
       {#if selectedMods.size > 1}
         {selectedMods.size} Mods Selected
       {:else}
@@ -668,12 +604,12 @@
   {@const draggedCat = labelsConfig.categories.find(c => c.id === activeCategoryDragId)}
   {#if draggedCat}
     <div
-      class="fixed pointer-events-none z-50 px-3 py-2 rounded-lg bg-nvidia-card border shadow-2xl shadow-black/60 flex items-center gap-2.5 backdrop-blur-md -translate-x-4 -translate-y-6"
-      style="left: {currentX}px; top: {currentY}px; border-color: {draggedCat.color};"
+      class="fixed pointer-events-none z-50 px-3 py-2 rounded-lg border shadow-2xl shadow-black/60 flex items-center gap-2.5 backdrop-blur-md -translate-x-4 -translate-y-6"
+      style="left: {currentX}px; top: {currentY}px; background-color: var(--theme-card); border-color: {draggedCat.color};"
     >
-      <GripVertical class="h-3.5 w-3.5 text-nvidia-text-muted" />
+      <GripVertical class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
       <div class="h-2.5 w-2.5 rounded-full shrink-0 shadow-sm" style="background-color: {draggedCat.color};"></div>
-      <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">{draggedCat.name}</span>
+      <span class="text-xs font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">{draggedCat.name}</span>
     </div>
   {/if}
 {/if}
@@ -681,14 +617,14 @@
 <!-- Mod Context Menu -->
 {#if contextMenu.visible && contextMenu.modName}
   <div
-    class="fixed z-50 w-56 rounded-md border border-nvidia-border bg-nvidia-card py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
-    style="left: {contextMenu.x}px; top: {contextMenu.y}px;"
+    class="fixed z-50 w-56 rounded-md border py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
+    style="left: {contextMenu.x}px; top: {contextMenu.y}px; background-color: var(--theme-card); border-color: var(--theme-border);"
     onclick={(e) => e.stopPropagation()}
     oncontextmenu={(e) => e.preventDefault()}
   >
-    <div class="px-3 py-1.5 border-b border-nvidia-border/60 bg-nvidia-surface/40 flex items-center gap-2">
-      <FileArchive class="h-3.5 w-3.5 text-cyan-400 shrink-0" />
-      <span class="font-mono text-[11px] font-bold text-nvidia-text-primary truncate">
+    <div class="px-3 py-1.5 border-b flex items-center gap-2" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
+      <FileArchive class="h-3.5 w-3.5 shrink-0" style="color: var(--color-info);" />
+      <span class="font-mono text-[11px] font-bold truncate" style="color: var(--theme-text-primary);">
         {#if selectedMods.size > 1}
           {selectedMods.size} Mods Selected
         {:else}
@@ -701,53 +637,54 @@
       <button
         type="button"
         onclick={handleContextMenuShowInLoadOrder}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+        style="color: var(--theme-text-primary);"
       >
-        <ListTree class="h-3.5 w-3.5 text-nvidia-accent group-hover:brightness-110" />
+        <ListTree class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
         <span>Show in Load Order</span>
       </button>
 
       <button
         type="button"
         onclick={handleContextMenuShowInExplorer}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+        style="color: var(--theme-text-primary);"
       >
-        <FolderSearch class="h-3.5 w-3.5 text-nvidia-accent group-hover:brightness-110" />
+        <FolderSearch class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
         <span>Show in Explorer</span>
       </button>
 
-      <div class="h-px bg-nvidia-border/50 my-1 mx-1"></div>
+      <div class="h-px my-1 mx-1" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
 
       <button
         type="button"
-        onclick={() => { 
-          targetNoteModName = contextMenu.modName || ''; 
-          closeContextMenu(); 
-          isNoteModalOpen = true; 
-        }}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        onclick={() => { targetNoteModName = contextMenu.modName || ''; closeContextMenu(); isNoteModalOpen = true; }}
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+        style="color: var(--theme-text-primary);"
       >
-        <MessageSquare class="h-3.5 w-3.5 text-amber-400" />
+        <MessageSquare class="h-3.5 w-3.5" style="color: var(--color-warning);" />
         <span>{notesConfig[contextMenu.modName] ? 'Edit Note...' : 'Add Note...'}</span>
       </button>
 
-      <div class="h-px bg-nvidia-border/50 my-1 mx-1"></div>
+      <div class="h-px my-1 mx-1" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
 
       <button
         type="button"
         onclick={() => { closeContextMenu(); isMoveCatModalOpen = true; }}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+        style="color: var(--theme-text-primary);"
       >
-        <FolderInput class="h-3.5 w-3.5 text-cyan-400" />
+        <FolderInput class="h-3.5 w-3.5" style="color: var(--color-info);" />
         <span>Move to Category...</span>
       </button>
 
       <button
         type="button"
         onclick={handleContextMenuRemoveFromCategory}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-red-500/10 text-red-400 transition text-left cursor-pointer group"
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+        style="color: var(--color-danger);"
       >
-        <X class="h-3.5 w-3.5 text-red-400" />
+        <X class="h-3.5 w-3.5" style="color: var(--color-danger);" />
         <span>Remove from Category</span>
       </button>
     </div>
@@ -757,39 +694,42 @@
 <!-- Category Context Menu -->
 {#if categoryContextMenu.visible && categoryContextMenu.cat}
   <div
-    class="fixed z-50 w-48 rounded-md border border-nvidia-border bg-nvidia-card py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
-    style="left: {categoryContextMenu.x}px; top: {categoryContextMenu.y}px;"
+    class="fixed z-50 w-48 rounded-md border py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
+    style="left: {categoryContextMenu.x}px; top: {categoryContextMenu.y}px; background-color: var(--theme-card); border-color: var(--theme-border);"
     onclick={(e) => e.stopPropagation()}
     oncontextmenu={(e) => e.preventDefault()}
   >
-    <div class="px-3 py-1.5 border-b border-nvidia-border/60 bg-nvidia-surface/40 flex items-center gap-2">
+    <div class="px-3 py-1.5 border-b flex items-center gap-2" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
       <div class="h-2.5 w-2.5 rounded-full shrink-0 shadow-sm" style="background-color: {categoryContextMenu.cat.color};"></div>
-      <span class="font-bold text-nvidia-text-primary truncate uppercase tracking-wider">{categoryContextMenu.cat.name}</span>
+      <span class="font-bold truncate uppercase tracking-wider" style="color: var(--theme-text-primary);">{categoryContextMenu.cat.name}</span>
     </div>
     <div class="p-1 space-y-0.5">
       <button
         type="button"
         onclick={() => { toggleStashCategory(categoryContextMenu.cat!); closeCategoryContextMenu(); }}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+        style="color: var(--theme-text-primary);"
       >
-        <Archive class="h-3.5 w-3.5 text-amber-400" />
+        <Archive class="h-3.5 w-3.5" style="color: var(--color-warning);" />
         <span>Move to Stash</span>
       </button>
       <button
         type="button"
         onclick={() => { openEditModal(categoryContextMenu.cat!); closeCategoryContextMenu(); }}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+        style="color: var(--theme-text-primary);"
       >
-        <Pencil class="h-3.5 w-3.5 text-cyan-400" />
+        <Pencil class="h-3.5 w-3.5" style="color: var(--color-info);" />
         <span>Edit Category</span>
       </button>
-      <div class="h-px bg-nvidia-border/50 my-1 mx-1"></div>
+      <div class="h-px my-1 mx-1" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
       <button
         type="button"
         onclick={() => { confirmDelete(categoryContextMenu.cat!); closeCategoryContextMenu(); }}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-red-500/10 text-red-400 transition text-left cursor-pointer group"
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+        style="color: var(--color-danger);"
       >
-        <Trash2 class="h-3.5 w-3.5 text-red-400" />
+        <Trash2 class="h-3.5 w-3.5" style="color: var(--color-danger);" />
         <span>Delete Category</span>
       </button>
     </div>
@@ -802,39 +742,41 @@
   <div class="flex-1 flex flex-col min-w-0 overflow-hidden" onpointerdown={clearSelection}>
     <div class="flex items-center justify-between mb-4 shrink-0">
       <div class="flex items-center gap-2">
-        <LayoutGrid class="h-4 w-4 text-cyan-400" />
-        <h3 class="text-sm font-bold uppercase tracking-wider text-nvidia-text-primary">Virtual Categories</h3>
+        <LayoutGrid class="h-4 w-4" style="color: var(--color-info);" />
+        <h3 class="text-sm font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">Virtual Categories</h3>
       </div>
       
       <div class="flex items-center gap-4">
         <!-- Column Control Dropdown -->
-        <div class="flex items-center gap-2 bg-nvidia-surface/40 px-2 py-1 rounded border border-nvidia-border/60">
-          <Columns class="h-3.5 w-3.5 text-nvidia-text-muted" />
+        <div class="flex items-center gap-2 px-2 py-1 rounded border" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: color-mix(in srgb, var(--theme-border) 60%, transparent);">
+          <Columns class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
           <select
             bind:value={organizerColumns}
             onchange={handleColumnsChange}
-            class="py-0.5 px-1 bg-transparent text-[11px] font-semibold text-nvidia-text-primary focus:outline-none cursor-pointer uppercase tracking-wider"
+            class="py-0.5 px-1 bg-transparent text-[11px] font-semibold focus:outline-none cursor-pointer uppercase tracking-wider"
+            style="color: var(--theme-text-primary);"
           >
-            <option value="auto" class="bg-nvidia-surface text-nvidia-text-primary">Auto Cols</option>
-            <option value="1" class="bg-nvidia-surface text-nvidia-text-primary">1 Column</option>
-            <option value="2" class="bg-nvidia-surface text-nvidia-text-primary">2 Columns</option>
-            <option value="3" class="bg-nvidia-surface text-nvidia-text-primary">3 Columns</option>
+            <option value="auto" style="background-color: var(--theme-surface); color: var(--theme-text-primary);">Auto Cols</option>
+            <option value="1" style="background-color: var(--theme-surface); color: var(--theme-text-primary);">1 Column</option>
+            <option value="2" style="background-color: var(--theme-surface); color: var(--theme-text-primary);">2 Columns</option>
+            <option value="3" style="background-color: var(--theme-surface); color: var(--theme-text-primary);">3 Columns</option>
           </select>
         </div>
 
         <!-- Show Labels in Load Order Toggle -->
-        <div class="flex items-center gap-2 bg-nvidia-surface/40 px-3 py-1.5 rounded border border-nvidia-border/60">
-          <Tag class="h-3.5 w-3.5 text-nvidia-text-muted" />
-          <span class="text-[11px] font-semibold text-nvidia-text-primary uppercase tracking-wider">Labels in Load Order</span>
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded border" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: color-mix(in srgb, var(--theme-border) 60%, transparent);">
+          <Tag class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
+          <span class="text-[11px] font-semibold uppercase tracking-wider" style="color: var(--theme-text-primary);">Labels in Load Order</span>
           <button
             type="button"
             onclick={() => {
               showCategoryLabelsInLoadOrder = !showCategoryLabelsInLoadOrder;
               if (onLabelsToggle) onLabelsToggle(showCategoryLabelsInLoadOrder);
             }}
-            class="w-7 h-4 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer ml-1 {showCategoryLabelsInLoadOrder ? 'bg-cyan-500 border border-cyan-400' : 'bg-zinc-900/90 border border-zinc-800'}"
+            class="w-7 h-4 rounded-full transition-colors relative p-0.5 shrink-0 cursor-pointer ml-1 border"
+            style="{showCategoryLabelsInLoadOrder ? 'background-color: var(--color-info); border-color: var(--color-info);' : 'background-color: color-mix(in srgb, var(--theme-bg) 90%, transparent); border-color: var(--theme-border);'}"
           >
-            <div class="h-2.5 w-2.5 rounded-full transition-transform transform {showCategoryLabelsInLoadOrder ? 'translate-x-3 bg-black shadow-xs' : 'translate-x-0 bg-zinc-500'}"></div>
+            <div class="h-2.5 w-2.5 rounded-full transition-transform transform {showCategoryLabelsInLoadOrder ? 'translate-x-3 shadow-xs' : 'translate-x-0'}" style="background-color: {showCategoryLabelsInLoadOrder ? '#000000' : 'var(--theme-text-muted)'};"></div>
           </button>
         </div>
 
@@ -842,13 +784,14 @@
           type="button"
           onclick={toggleAllCategories}
           disabled={totalActiveCategories === 0}
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-nvidia-surface hover:bg-nvidia-card border border-nvidia-border text-xs text-nvidia-text-primary font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-125"
+          style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
         >
           {#if isAllCollapsed}
-            <FolderOpen class="h-3.5 w-3.5 text-cyan-400" />
+            <FolderOpen class="h-3.5 w-3.5" style="color: var(--color-info);" />
             <span>Expand All</span>
           {:else}
-            <Folder class="h-3.5 w-3.5 text-cyan-400" />
+            <Folder class="h-3.5 w-3.5" style="color: var(--color-info);" />
             <span>Collapse All</span>
           {/if}
         </button>
@@ -856,7 +799,8 @@
         <button
           type="button"
           onclick={openCreateModal}
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-xs font-bold text-cyan-400 transition cursor-pointer shadow-sm"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-bold transition cursor-pointer shadow-sm hover:brightness-125"
+          style="background-color: color-mix(in srgb, var(--color-info) 15%, transparent); border-color: color-mix(in srgb, var(--color-info) 30%, transparent); color: var(--color-info);"
         >
           <Plus class="h-3.5 w-3.5" />
           <span>Add Category</span>
@@ -866,7 +810,7 @@
 
     <div class="flex-1 overflow-y-auto pr-2 pb-4" onpointerdown={clearSelection}>
       {#if activeCategories.length === 0}
-        <div class="h-full flex flex-col items-center justify-center text-nvidia-text-muted border-2 border-dashed border-nvidia-border/60 rounded-xl bg-nvidia-surface/20">
+        <div class="h-full flex flex-col items-center justify-center border-2 border-dashed rounded-xl" style="color: var(--theme-text-muted); border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-surface) 20%, transparent);">
           <LayoutGrid class="h-8 w-8 mb-3 opacity-30" />
           <p class="text-xs font-medium">No active virtual categories.</p>
           <p class="text-[10px] mt-1 opacity-70">Click "Add Category" or restore shelved categories from The Stash.</p>
@@ -888,14 +832,14 @@
               
               <!-- Drop Indicator Before Category -->
               {#if isDragging && activeCategoryDragId && categoryDropTargetId === cat.id && categoryDropPlacement === 'before'}
-                <div class="absolute -top-1 left-0 right-0 h-[2.5px] bg-cyan-400 z-30 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
+                <div class="absolute -top-1 left-0 right-0 h-[2.5px] z-30" style="background-color: var(--color-info); box-shadow: 0 0 12px color-mix(in srgb, var(--color-info) 80%, transparent);"></div>
               {/if}
 
               <!-- Category Header -->
               <div
-                class="organizer-category-header group rounded-lg border transition-all duration-300 {activeCategoryDragId === cat.id ? 'opacity-30 border-dashed' : ''} {isHovered ? 'ring-1' : 'border-nvidia-border'}"
+                class="organizer-category-header group rounded-lg border transition-all duration-300 {activeCategoryDragId === cat.id ? 'opacity-30 border-dashed' : ''} {isHovered ? 'ring-1' : ''}"
                 data-category-id={cat.id}
-                style="background-color: color-mix(in srgb, {cat.color} {isHovered ? '25%' : '15%'}, transparent); {isHovered ? `border-color: ${cat.color}; box-shadow: 0 0 15px color-mix(in srgb, ${cat.color} 40%, transparent);` : ''}"
+                style="background-color: color-mix(in srgb, {cat.color} {isHovered ? '25%' : '15%'}, transparent); border-color: {isHovered ? cat.color : 'var(--theme-border)'}; {isHovered ? `box-shadow: 0 0 15px color-mix(in srgb, ${cat.color} 40%, transparent);` : ''}"
                 oncontextmenu={(e) => openCategoryContextMenu(e, cat)}
               >
                 <div class="flex items-center justify-between px-3 gap-2 density-row relative overflow-hidden">
@@ -906,7 +850,8 @@
                       role="button"
                       tabindex="0"
                       onpointerdown={(e) => handleCategoryPointerDown(e, cat.id)}
-                      class="cursor-grab active:cursor-grabbing p-1 text-nvidia-text-muted hover:text-nvidia-text-primary shrink-0 rounded hover:bg-nvidia-surface transition"
+                      class="cursor-grab active:cursor-grabbing p-1 rounded transition shrink-0 hover:bg-[var(--theme-surface)]"
+                      style="color: var(--theme-text-muted);"
                       title="Drag to reorder category"
                     >
                       <GripVertical class="h-4 w-4" />
@@ -915,19 +860,20 @@
                     <button
                       type="button"
                       onclick={() => toggleCategoryCollapse(cat.id)}
-                      class="flex items-center gap-1.5 text-nvidia-text-primary hover:text-cyan-400 transition cursor-pointer min-w-0"
+                      class="flex items-center gap-1.5 transition cursor-pointer min-w-0 hover:brightness-125"
+                      style="color: var(--theme-text-primary);"
                     >
                       {#if collapsedCategories[cat.id]}
-                        <ChevronRight class="h-4 w-4 text-nvidia-text-muted shrink-0" />
-                        <Folder class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+                        <ChevronRight class="h-4 w-4 shrink-0" style="color: var(--theme-text-muted);" />
+                        <Folder class="h-4 w-4 shrink-0" style="color: var(--theme-text-muted);" />
                       {:else}
-                        <ChevronDown class="h-4 w-4 text-nvidia-text-muted shrink-0" />
-                        <FolderOpen class="h-4 w-4 text-nvidia-text-muted shrink-0" />
+                        <ChevronDown class="h-4 w-4 shrink-0" style="color: var(--theme-text-muted);" />
+                        <FolderOpen class="h-4 w-4 shrink-0" style="color: var(--theme-text-muted);" />
                       {/if}
                       <span class="font-bold uppercase tracking-wider truncate">{cat.name}</span>
                     </button>
 
-                    <span class="text-[10px] font-mono text-nvidia-text-muted shrink-0 opacity-80">
+                    <span class="text-[10px] font-mono shrink-0 opacity-80" style="color: var(--theme-text-muted);">
                       ({mods.length} {mods.length === 1 ? 'mod' : 'mods'})
                     </span>
                   </div>
@@ -937,26 +883,29 @@
                       <button 
                         type="button"
                         onclick={() => toggleStashCategory(cat)} 
-                        class="p-1 rounded text-nvidia-text-muted hover:text-amber-400 hover:bg-amber-500/10 transition cursor-pointer" 
+                        class="p-1 rounded transition cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-warning)_10%,transparent)]" 
+                        style="color: var(--theme-text-muted);"
                         title="Move Category to Stash (Also suppresses label in load order)"
                       >
-                        <Archive class="h-3.5 w-3.5" />
+                        <Archive class="h-3.5 w-3.5 hover:text-[var(--color-warning)]" />
                       </button>
                       <button 
                         type="button"
                         onclick={() => openEditModal(cat)} 
-                        class="p-1 rounded text-nvidia-text-muted hover:text-cyan-400 hover:bg-nvidia-surface/80 transition cursor-pointer" 
+                        class="p-1 rounded transition cursor-pointer hover:bg-[var(--theme-surface)]" 
+                        style="color: var(--theme-text-muted);"
                         title="Edit Category"
                       >
-                        <Pencil class="h-3.5 w-3.5" />
+                        <Pencil class="h-3.5 w-3.5 hover:text-[var(--color-info)]" />
                       </button>
                       <button 
                         type="button"
                         onclick={() => confirmDelete(cat)} 
-                        class="p-1 rounded text-nvidia-text-muted hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer" 
+                        class="p-1 rounded transition cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-danger)_10%,transparent)]" 
+                        style="color: var(--theme-text-muted);"
                         title="Delete Category"
                       >
-                        <Trash2 class="h-3.5 w-3.5" />
+                        <Trash2 class="h-3.5 w-3.5 hover:text-[var(--color-danger)]" />
                       </button>
                     {/if}
                   </div>
@@ -965,25 +914,25 @@
 
               <!-- Drop Indicator After Category -->
               {#if isDragging && activeCategoryDragId && categoryDropTargetId === cat.id && categoryDropPlacement === 'after'}
-                <div class="absolute -bottom-1 left-0 right-0 h-[2.5px] bg-cyan-400 z-30 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
+                <div class="absolute -bottom-1 left-0 right-0 h-[2.5px] z-30" style="background-color: var(--color-info); box-shadow: 0 0 12px color-mix(in srgb, var(--color-info) 80%, transparent);"></div>
               {/if}
 
               <!-- Category Body (Mods) -->
               {#if !collapsedCategories[cat.id]}
                 <div class="flex flex-col space-y-1 mt-1 mb-2" data-category-id={cat.id} onpointerdown={clearSelection}>
                   {#if mods.length === 0}
-                    <div class="ml-3 pl-4 py-2 text-[10px] font-mono text-nvidia-text-muted/50 italic pointer-events-none border-l border-nvidia-border/45">
+                    <div class="ml-3 pl-4 py-2 text-[10px] font-mono italic pointer-events-none border-l" style="color: color-mix(in srgb, var(--theme-text-muted) 50%, transparent); border-color: color-mix(in srgb, var(--theme-border) 45%, transparent);">
                       Drag mods here
                     </div>
                   {:else}
                     <!-- Multi-column grid for mods inside the expanded category -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-2 ml-3 pl-2 border-l border-nvidia-border/45 pt-1">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-2 ml-3 pl-2 border-l pt-1" style="border-color: color-mix(in srgb, var(--theme-border) 45%, transparent);">
                       {#each mods as mod}
                         {@const isTargetMatch = doesModMatch(mod.file_name)}
                         <div class="relative flex flex-col">
                           
                           {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'before' && !selectedMods.has(mod.file_name)}
-                            <div class="absolute -top-1 left-0 right-0 h-[2.5px] bg-cyan-400 z-30 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
+                            <div class="absolute -top-1 left-0 right-0 h-[2.5px] z-30" style="background-color: var(--color-info); box-shadow: 0 0 12px color-mix(in srgb, var(--color-info) 80%, transparent);"></div>
                           {/if}
 
                           <div
@@ -991,28 +940,28 @@
                             oncontextmenu={(e) => openContextMenu(e, mod.file_name)}
                             ondblclick={() => onShowInLoadOrder && onShowInLoadOrder(mod.file_name)}
                             class="flex items-center justify-between px-2 py-1.5 rounded border transition density-row cursor-pointer z-10 
-                              {selectedMods.has(mod.file_name) ? 'border-cyan-500/60 bg-cyan-500/15 opacity-50' : 
-                              (isTargetMatch ? 'border-cyan-400 ring-1 ring-cyan-400 bg-cyan-950/40' : 'border-nvidia-border/50 bg-nvidia-surface hover:border-nvidia-border')}"
+                              {selectedMods.has(mod.file_name) ? 'opacity-50' : (isTargetMatch ? 'ring-1' : 'hover:brightness-125')}"
+                            style="{selectedMods.has(mod.file_name) ? 'background-color: color-mix(in srgb, var(--color-info) 15%, transparent); border-color: color-mix(in srgb, var(--color-info) 60%, transparent);' : (isTargetMatch ? 'background-color: color-mix(in srgb, var(--color-info) 20%, transparent); border-color: var(--color-info); box-shadow: 0 0 0 1px var(--color-info);' : 'background-color: var(--theme-surface); border-color: color-mix(in srgb, var(--theme-border) 50%, transparent);')}"
                             data-mod-name={mod.file_name}
                             title="Double-click to locate in Load Order"
                           >
                             <div class="flex items-center gap-2 min-w-0">
-                              <GripVertical class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
-                              <FileArchive class="h-3.5 w-3.5 {isTargetMatch ? 'text-cyan-400' : 'text-nvidia-text-muted'} shrink-0" />
-                              <span class="text-[11px] font-mono truncate {isTargetMatch ? 'text-cyan-300 font-bold' : (mod.enabled ? 'text-nvidia-text-primary' : 'opacity-50 line-through')}">
+                              <GripVertical class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
+                              <FileArchive class="h-3.5 w-3.5 shrink-0" style="color: {isTargetMatch ? 'var(--color-info)' : 'var(--theme-text-muted)'};" />
+                              <span class="text-[11px] font-mono truncate {isTargetMatch ? 'font-bold' : (mod.enabled ? '' : 'opacity-50 line-through')}" style="color: {isTargetMatch ? 'var(--color-info)' : 'var(--theme-text-primary)'};">
                                 {mod.file_name}
                               </span>
                             </div>
                             
                             {#if notesConfig[mod.file_name]}
                               <div class="shrink-0 ml-2" title={notesConfig[mod.file_name]}>
-                                <MessageSquare class="h-3.5 w-3.5 text-amber-400" />
+                                <MessageSquare class="h-3.5 w-3.5" style="color: var(--color-warning);" />
                               </div>
                             {/if}
                           </div>
 
                           {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'after' && !selectedMods.has(mod.file_name)}
-                            <div class="absolute -bottom-1 left-0 right-0 h-[2.5px] bg-cyan-400 z-30 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
+                            <div class="absolute -bottom-1 left-0 right-0 h-[2.5px] z-30" style="background-color: var(--color-info); box-shadow: 0 0 12px color-mix(in srgb, var(--color-info) 80%, transparent);"></div>
                           {/if}
                         </div>
                       {/each}
@@ -1031,26 +980,27 @@
   {#if showUncategorizedDrawer}
     <div 
       id="stash-drawer"
-      class="w-84 flex flex-col rounded-xl border transition-all duration-200 bg-nvidia-surface/40 overflow-hidden shrink-0 shadow-sm 
-        {((activeDropTarget === 'uncategorized' && !activeCategoryDragId) || (activeCategoryDragId && categoryDropTargetId === 'stash')) ? 'border-amber-400 ring-1 ring-amber-400 bg-amber-950/20' : 'border-nvidia-border'}"
+      class="w-84 flex flex-col rounded-xl border transition-all duration-200 overflow-hidden shrink-0 shadow-sm 
+        {((activeDropTarget === 'uncategorized' && !activeCategoryDragId) || (activeCategoryDragId && categoryDropTargetId === 'stash')) ? 'ring-1' : ''}"
+      style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: {((activeDropTarget === 'uncategorized' && !activeCategoryDragId) || (activeCategoryDragId && categoryDropTargetId === 'stash')) ? 'var(--color-warning)' : 'var(--theme-border)'}; {((activeDropTarget === 'uncategorized' && !activeCategoryDragId) || (activeCategoryDragId && categoryDropTargetId === 'stash')) ? 'background-color: color-mix(in srgb, var(--color-warning) 15%, transparent); box-shadow: 0 0 0 1px var(--color-warning);' : ''}"
       data-category-id="uncategorized"
     >
-      <div class="px-4 py-3 border-b border-nvidia-border/60 bg-nvidia-surface/80 flex items-center justify-between shrink-0">
+      <div class="px-4 py-3 border-b flex items-center justify-between shrink-0" style="background-color: color-mix(in srgb, var(--theme-surface) 80%, transparent); border-color: color-mix(in srgb, var(--theme-border) 60%, transparent);">
         <div class="flex items-center gap-2">
-          <Archive class="h-4 w-4 text-amber-400" />
-          <h3 class="text-sm font-bold uppercase tracking-wider text-nvidia-text-primary">The Stash</h3>
+          <Archive class="h-4 w-4" style="color: var(--color-warning);" />
+          <h3 class="text-sm font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">The Stash</h3>
         </div>
-        <span class="text-[10px] font-mono text-nvidia-text-muted bg-nvidia-bg px-2 py-0.5 rounded border border-nvidia-border">
+        <span class="text-[10px] font-mono px-2 py-0.5 rounded border" style="background-color: var(--theme-bg); border-color: var(--theme-border); color: var(--theme-text-muted);">
           {sortedUncategorizedMods.length} loose • {stashedCategories.length} shelved
         </span>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-3 space-y-4 bg-nvidia-bg/30" onpointerdown={clearSelection}>
+      <div class="flex-1 overflow-y-auto p-3 space-y-4" style="background-color: color-mix(in srgb, var(--theme-bg) 30%, transparent);" onpointerdown={clearSelection}>
         
         <!-- Shelved Categories Section -->
         {#if stashedCategories.length > 0}
           <div class="space-y-1.5">
-            <div class="text-[10px] font-bold uppercase tracking-wider text-amber-400/90 flex items-center gap-1.5 px-1">
+            <div class="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 px-1" style="color: color-mix(in srgb, var(--color-warning) 90%, transparent);">
               <Package class="h-3 w-3" />
               <span>Shelved Categories</span>
             </div>
@@ -1059,21 +1009,22 @@
               {#each stashedCategories as cat (cat.id)}
                 {@const catMods = sortedCategorizedMods.get(cat.id) || []}
                 <div 
-                  class="rounded-lg border border-nvidia-border/70 bg-nvidia-surface/70 p-2 flex items-center justify-between gap-2 shadow-xs group"
-                  style="border-left: 3px solid {cat.color};"
+                  class="rounded-lg border p-2 flex items-center justify-between gap-2 shadow-xs group"
+                  style="background-color: color-mix(in srgb, var(--theme-surface) 70%, transparent); border-color: color-mix(in srgb, var(--theme-border) 70%, transparent); border-left: 3px solid {cat.color};"
                 >
                   <div class="flex items-center gap-2 min-w-0">
                     <div
                       role="button"
                       tabindex="0"
                       onpointerdown={(e) => handleCategoryPointerDown(e, cat.id)}
-                      class="cursor-grab active:cursor-grabbing p-1 text-nvidia-text-muted hover:text-nvidia-text-primary shrink-0 rounded hover:bg-nvidia-surface transition"
+                      class="cursor-grab active:cursor-grabbing p-1 rounded transition shrink-0 hover:bg-[var(--theme-surface)]"
+                      style="color: var(--theme-text-muted);"
                       title="Drag category back to main list"
                     >
                       <GripVertical class="h-3.5 w-3.5" />
                     </div>
-                    <span class="text-xs font-bold text-nvidia-text-primary truncate">{cat.name}</span>
-                    <span class="text-[10px] font-mono text-nvidia-text-muted shrink-0">
+                    <span class="text-xs font-bold truncate" style="color: var(--theme-text-primary);">{cat.name}</span>
+                    <span class="text-[10px] font-mono shrink-0" style="color: var(--theme-text-muted);">
                       ({catMods.length} {catMods.length === 1 ? 'mod' : 'mods'})
                     </span>
                   </div>
@@ -1081,7 +1032,8 @@
                   <button
                     type="button"
                     onclick={() => toggleStashCategory(cat)}
-                    class="flex items-center gap-1 px-2 py-1 rounded bg-nvidia-card hover:bg-nvidia-surface border border-nvidia-border text-[10px] font-bold text-cyan-400 transition cursor-pointer shrink-0"
+                    class="flex items-center gap-1 px-2 py-1 rounded border text-[10px] font-bold transition cursor-pointer shrink-0 hover:bg-[var(--theme-surface)]"
+                    style="background-color: var(--theme-card); border-color: var(--theme-border); color: var(--color-info);"
                     title="Restore category to main view"
                   >
                     <RotateCcw class="h-3 w-3" />
@@ -1092,18 +1044,18 @@
             </div>
           </div>
 
-          <div class="h-px bg-nvidia-border/50"></div>
+          <div class="h-px" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
         {/if}
 
         <!-- Loose / Unassigned Mods Section -->
         <div class="space-y-1.5">
-          <div class="text-[10px] font-bold uppercase tracking-wider text-nvidia-text-muted flex items-center justify-between px-1">
+          <div class="text-[10px] font-bold uppercase tracking-wider flex items-center justify-between px-1" style="color: var(--theme-text-muted);">
             <span>Unassigned Mods</span>
             <span class="font-mono text-[9px]">{sortedUncategorizedMods.length}</span>
           </div>
 
           {#if sortedUncategorizedMods.length === 0}
-            <div class="p-6 text-center text-xs text-nvidia-text-muted pointer-events-none italic">
+            <div class="p-6 text-center text-xs pointer-events-none italic" style="color: var(--theme-text-muted);">
               All mods are categorized!
             </div>
           {:else}
@@ -1112,7 +1064,7 @@
                 {@const isTargetMatch = doesModMatch(mod.file_name)}
                 <div class="relative flex flex-col">
                   {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'before' && !selectedMods.has(mod.file_name)}
-                    <div class="absolute -top-1 left-0 right-0 h-[2.5px] bg-cyan-400 z-30 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
+                    <div class="absolute -top-1 left-0 right-0 h-[2.5px] z-30" style="background-color: var(--color-info); box-shadow: 0 0 12px color-mix(in srgb, var(--color-info) 80%, transparent);"></div>
                   {/if}
 
                   <div
@@ -1120,28 +1072,28 @@
                     oncontextmenu={(e) => openContextMenu(e, mod.file_name)}
                     ondblclick={() => onShowInLoadOrder && onShowInLoadOrder(mod.file_name)}
                     class="flex items-center justify-between px-2 py-1.5 rounded border transition density-row cursor-pointer 
-                      {selectedMods.has(mod.file_name) ? 'border-cyan-500/60 bg-cyan-500/15 opacity-50' : 
-                      (isTargetMatch ? 'border-cyan-400 ring-1 ring-cyan-400 bg-cyan-950/40' : 'border-nvidia-border/50 bg-nvidia-surface hover:border-nvidia-border')}"
+                      {selectedMods.has(mod.file_name) ? 'opacity-50' : (isTargetMatch ? 'ring-1' : 'hover:brightness-125')}"
+                    style="{selectedMods.has(mod.file_name) ? 'background-color: color-mix(in srgb, var(--color-info) 15%, transparent); border-color: color-mix(in srgb, var(--color-info) 60%, transparent);' : (isTargetMatch ? 'background-color: color-mix(in srgb, var(--color-info) 20%, transparent); border-color: var(--color-info); box-shadow: 0 0 0 1px var(--color-info);' : 'background-color: var(--theme-surface); border-color: color-mix(in srgb, var(--theme-border) 50%, transparent);')}"
                     data-mod-name={mod.file_name}
                     title="Double-click to locate in Load Order"
                   >
                     <div class="flex items-center gap-2 min-w-0">
-                      <GripVertical class="h-3.5 w-3.5 text-nvidia-text-muted shrink-0" />
-                      <FileArchive class="h-3.5 w-3.5 {isTargetMatch ? 'text-cyan-400' : 'text-nvidia-text-muted'} shrink-0" />
-                      <span class="text-[11px] font-mono truncate {isTargetMatch ? 'text-cyan-300 font-bold' : (mod.enabled ? 'text-nvidia-text-primary' : 'opacity-50 line-through')}">
+                      <GripVertical class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
+                      <FileArchive class="h-3.5 w-3.5 shrink-0" style="color: {isTargetMatch ? 'var(--color-info)' : 'var(--theme-text-muted)'};" />
+                      <span class="text-[11px] font-mono truncate {isTargetMatch ? 'font-bold' : (mod.enabled ? '' : 'opacity-50 line-through')}" style="color: {isTargetMatch ? 'var(--color-info)' : 'var(--theme-text-primary)'};">
                         {mod.file_name}
                       </span>
                     </div>
 
                     {#if notesConfig[mod.file_name]}
                       <div class="shrink-0 ml-2" title={notesConfig[mod.file_name]}>
-                        <MessageSquare class="h-3.5 w-3.5 text-amber-400" />
+                        <MessageSquare class="h-3.5 w-3.5" style="color: var(--color-warning);" />
                       </div>
                     {/if}
                   </div>
 
                   {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'after' && !selectedMods.has(mod.file_name)}
-                    <div class="absolute -bottom-1 left-0 right-0 h-[2.5px] bg-cyan-400 z-30 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
+                    <div class="absolute -bottom-1 left-0 right-0 h-[2.5px] z-30" style="background-color: var(--color-info); box-shadow: 0 0 12px color-mix(in srgb, var(--color-info) 80%, transparent);"></div>
                   {/if}
                 </div>
               {/each}

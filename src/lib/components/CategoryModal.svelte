@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { tick } from 'svelte';
   import { X, Palette, Check, FolderPlus, Pencil } from 'lucide-svelte';
 
@@ -75,51 +75,54 @@
     role="presentation"
   >
     <div
-      class="w-full max-w-md rounded-xl border border-nvidia-border bg-nvidia-card shadow-2xl overflow-hidden flex flex-col"
+      class="w-full max-w-md rounded-xl border shadow-2xl overflow-hidden flex flex-col"
+      style="background-color: var(--theme-card); border-color: var(--theme-border);"
       onclick={(e) => e.stopPropagation()}
       role="dialog"
     >
       <!-- Header -->
-      <div class="px-5 py-3.5 border-b border-nvidia-border flex items-center justify-between bg-nvidia-surface/40 shrink-0">
+      <div class="px-5 py-3.5 border-b flex items-center justify-between shrink-0" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
         <div class="flex items-center gap-2.5">
           {#if mode === 'create'}
-            <FolderPlus class="h-4 w-4 text-cyan-400" />
-            <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Create Category</span>
+            <FolderPlus class="h-4 w-4" style="color: var(--color-info);" />
+            <span class="text-xs font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">Create Category</span>
           {:else}
-            <Pencil class="h-4 w-4 text-cyan-400" />
-            <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Edit Category</span>
+            <Pencil class="h-4 w-4" style="color: var(--color-info);" />
+            <span class="text-xs font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">Edit Category</span>
           {/if}
         </div>
         <button
           type="button"
           onclick={handleClose}
-          class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-text-primary hover:bg-nvidia-surface transition cursor-pointer"
+          class="p-1 rounded transition cursor-pointer hover:bg-[var(--theme-bg)]"
+          style="color: var(--theme-text-muted);"
         >
-          <X class="h-4 w-4" />
+          <X class="h-4 w-4 hover:text-[var(--theme-text-primary)]" />
         </button>
       </div>
 
       <!-- Body -->
       <div class="p-5 space-y-5">
         <div class="space-y-2">
-          <label class="text-xs font-semibold text-nvidia-text-primary">Category Name</label>
+          <label class="text-xs font-semibold" style="color: var(--theme-text-primary);">Category Name</label>
           <input
             bind:this={inputEl}
             type="text"
             bind:value={name}
             placeholder="e.g., Weapons, Vehicles, UI..."
-            class="w-full px-3 py-2 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/60 focus:outline-none focus:border-cyan-400 font-sans"
+            class="w-full px-3 py-2 border rounded text-xs focus:outline-none font-sans"
+            style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
           />
         </div>
 
         <div class="space-y-2.5">
-          <div class="flex items-center gap-2 text-xs font-semibold text-nvidia-text-primary">
-            <Palette class="h-3.5 w-3.5 text-nvidia-text-muted" />
+          <div class="flex items-center gap-2 text-xs font-semibold" style="color: var(--theme-text-primary);">
+            <Palette class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
             <span>Label Color</span>
           </div>
 
           <div class="flex items-center gap-3 pt-1">
-            <div class="relative h-9 w-14 rounded-lg border border-nvidia-border overflow-hidden shrink-0 shadow-sm hover:border-cyan-400 transition cursor-pointer">
+            <div class="relative h-9 w-14 rounded-lg border overflow-hidden shrink-0 shadow-sm transition cursor-pointer" style="border-color: var(--theme-border);">
               <input
                 type="color"
                 bind:value={color}
@@ -134,13 +137,14 @@
               oninput={handleManualHex}
               placeholder="#06B6D4"
               maxlength="7"
-              class="w-28 px-3 py-2 bg-nvidia-surface border border-nvidia-border rounded text-xs font-mono text-nvidia-text-primary focus:outline-none focus:border-cyan-400 uppercase text-center font-bold tracking-wider"
+              class="w-28 px-3 py-2 border rounded text-xs font-mono focus:outline-none uppercase text-center font-bold tracking-wider"
+              style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
             />
 
             <div class="flex-1 flex items-center justify-end">
               <div 
                 class="px-3 py-1 rounded text-[11px] font-bold uppercase tracking-wider border shadow-xs"
-                style="background-color: {color}15; color: {color}; border-color: {color}40;"
+                style="background-color: color-mix(in srgb, {color} 15%, transparent); color: {color}; border-color: color-mix(in srgb, {color} 40%, transparent);"
               >
                 Preview Tag
               </div>
@@ -150,11 +154,12 @@
       </div>
 
       <!-- Footer -->
-      <div class="px-5 py-3 border-t border-nvidia-border bg-nvidia-surface/40 flex items-center justify-end gap-2.5 shrink-0">
+      <div class="px-5 py-3 border-t flex items-center justify-end gap-2.5 shrink-0" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
         <button
           type="button"
           onclick={handleClose}
-          class="px-3.5 py-1.5 rounded hover:bg-nvidia-surface text-xs text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer"
+          class="px-3.5 py-1.5 rounded text-xs transition cursor-pointer hover:bg-[var(--theme-bg)]"
+          style="color: var(--theme-text-muted);"
         >
           Cancel
         </button>
@@ -163,7 +168,8 @@
           type="button"
           onclick={handleSubmit}
           disabled={name.trim() === ''}
-          class="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold transition shadow-sm cursor-pointer bg-cyan-500 hover:bg-cyan-400 text-black disabled:opacity-50 disabled:cursor-not-allowed"
+          class="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold transition shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
+          style="background-color: var(--color-info); color: #000000;"
         >
           <Check class="h-3.5 w-3.5 stroke-[2.5]" />
           <span>{mode === 'create' ? 'Create' : 'Save Changes'}</span>

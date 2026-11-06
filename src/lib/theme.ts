@@ -14,23 +14,18 @@ export const ACCENT_PRESETS = [
   { label: 'Clean Slate', hex: '#64748B' },
 ] as const;
 
-export const DARK_BASE_FOUNDATION = {
-  bg: '#121517',
-  surface: '#181c20',
-  card: '#1e2328',
-  border: '#2a323d',
-  textMuted: '#94a3b8',
-  textPrimary: '#ffffff',
-} as const;
+export const DARK_ATMOSPHERES: Record<string, Omit<AppThemeColors, 'accent' | 'accentHover' | 'accentContrast'>> = {
+  obsidian: { bg: '#000000', surface: '#0a0a0a', card: '#141414', border: '#262626', textPrimary: '#ffffff', textMuted: '#a3a3a3' },
+  slate: { bg: '#0f172a', surface: '#1e293b', card: '#334155', border: '#475569', textPrimary: '#f8fafc', textMuted: '#94a3b8' },
+  graphite: { bg: '#121517', surface: '#181c20', card: '#1e2328', border: '#2a323d', textPrimary: '#ffffff', textMuted: '#94a3b8' },
+  mocha: { bg: '#1c1917', surface: '#292524', card: '#44403c', border: '#57534e', textPrimary: '#fafaf9', textMuted: '#a8a29e' }
+};
 
-export const LIGHT_BASE_FOUNDATION = {
-  bg: '#f1f5f9',
-  surface: '#f8fafc',
-  card: '#ffffff',
-  border: '#cbd5e1',
-  textMuted: '#64748b',
-  textPrimary: '#0f172a',
-} as const;
+export const LIGHT_ATMOSPHERES: Record<string, Omit<AppThemeColors, 'accent' | 'accentHover' | 'accentContrast'>> = {
+  pearl: { bg: '#ffffff', surface: '#f8fafc', card: '#f1f5f9', border: '#e2e8f0', textPrimary: '#0f172a', textMuted: '#64748b' },
+  cloud: { bg: '#f3f4f6', surface: '#e5e7eb', card: '#d1d5db', border: '#9ca3af', textPrimary: '#111827', textMuted: '#6b7280' },
+  parchment: { bg: '#fdfbf7', surface: '#f4f1ea', card: '#e8e3d9', border: '#d6cebf', textPrimary: '#292524', textMuted: '#78716c' }
+};
 
 export function adjustBrightness(hex: string, percent: number): string {
   let cleanHex = hex.replace('#', '').trim();
@@ -71,49 +66,22 @@ export function isModNew(createdAtMs?: number | null, hours: number = 6): boolea
   return createdAtMs >= cutoff;
 }
 
-export function generateThemeColors(mode: 'dark' | 'light', accentHex: string): AppThemeColors {
+export function generateThemeColors(mode: 'dark' | 'light', atmosphere: string, accentHex: string): AppThemeColors {
   const normHex = accentHex.startsWith('#') ? accentHex.toUpperCase() : `#${accentHex.toUpperCase()}`;
-  const base = mode === 'light' ? LIGHT_BASE_FOUNDATION : DARK_BASE_FOUNDATION;
   const hoverHex = mode === 'light' ? adjustBrightness(normHex, -22) : adjustBrightness(normHex, 20);
+  const contrast = getContrastColor(normHex);
+  
+  const base = mode === 'light' 
+    ? (LIGHT_ATMOSPHERES[atmosphere] || LIGHT_ATMOSPHERES.pearl)
+    : (DARK_ATMOSPHERES[atmosphere] || DARK_ATMOSPHERES.graphite);
 
   return {
     accent: normHex,
     accentHover: hoverHex,
-    bg: base.bg,
-    surface: base.surface,
-    card: base.card,
-    border: base.border,
-    textMuted: base.textMuted,
-    textPrimary: base.textPrimary,
+    accentContrast: contrast,
+    ...base
   };
 }
-
-export const DEFAULT_DARK_THEME: AppThemeColors = generateThemeColors('dark', ACCENT_PRESETS[0].hex);
-export const DEFAULT_LIGHT_THEME: AppThemeColors = generateThemeColors('light', '#5A8F00');
-export const DEFAULT_THEME = DEFAULT_DARK_THEME;
-
-export const THEME_COLOR_META = [
-  { key: 'accent', label: 'Accent', description: 'Active switches, winning badges, highlights', cssVar: '--theme-accent' },
-  { key: 'accentHover', label: 'Accent Hover', description: 'Button hovers, focus rings, pulse states', cssVar: '--theme-accent-hover' },
-  { key: 'bg', label: 'Background', description: 'Root canvas, main app backdrop', cssVar: '--theme-bg' },
-  { key: 'surface', label: 'Surface', description: 'Sidebar, list row backgrounds, inputs', cssVar: '--theme-surface' },
-  { key: 'card', label: 'Card', description: 'Mod item cards, category banners, menus', cssVar: '--theme-card' },
-  { key: 'border', label: 'Border', description: 'Structural lines, separators, dividers', cssVar: '--theme-border' },
-  { key: 'textPrimary', label: 'Primary Text', description: 'Headings, mod titles, primary copy', cssVar: '--theme-text-primary' },
-  { key: 'textMuted', label: 'Muted Text', description: 'Asset counts, file paths, helper text', cssVar: '--theme-text-muted' },
-] as const;
-
-export const APP_FONT_PRESETS = [
-  { label: 'Geist (Default)', value: "'Geist', -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif" },
-  { label: 'System Sans', value: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' },
-  { label: 'Segoe UI (Modern Windows)', value: '"Segoe UI", sans-serif' },
-  { label: 'Bahnschrift (Industrial DIN)', value: '"Bahnschrift", sans-serif' },
-  { label: 'Aptos (Modern Clean)', value: '"Aptos", sans-serif' },
-  { label: 'Verdana (High Legibility)', value: 'Verdana, sans-serif' },
-  { label: 'Tahoma (Compact UI)', value: 'Tahoma, sans-serif' },
-  { label: 'Trebuchet MS (Humanist UI)', value: '"Trebuchet MS", sans-serif' },
-  { label: 'Arial (Neutral)', value: 'Arial, sans-serif' },
-] as const;
 
 export const MOD_FONT_PRESETS = [
   { label: 'Geist Mono (Default)', value: "'GeistMono', \"Cascadia Code\", \"Consolas\", monospace" },
@@ -125,22 +93,17 @@ export const MOD_FONT_PRESETS = [
   { label: 'Segoe UI Mono (Clean Monospace)', value: '"Segoe UI Mono", "Segoe UI", monospace' },
 ] as const;
 
-export const FONT_PRESETS = APP_FONT_PRESETS;
-
-export type ThemeMode = 'default' | 'custom' | 'dark' | 'light';
-
 export const DEFAULT_THEME_SETTINGS: ThemeSettings = {
   mode: 'dark',
-  darkColors: { ...DEFAULT_DARK_THEME },
-  lightColors: { ...DEFAULT_LIGHT_THEME },
-  fontFamilyBase: APP_FONT_PRESETS[0].value,
+  atmosphere: 'graphite',
+  accentHex: '#76B900',
   fontFamilyMods: MOD_FONT_PRESETS[0].value,
   isCompact: true,
 };
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
   targetGamePath: '',
-  activeTab: 'home',
+  activeTab: 'archive',
   showConflictSummary: true,
   windowWidth: 1600,
   windowHeight: 1000,
@@ -155,77 +118,38 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   theme: { ...DEFAULT_THEME_SETTINGS },
 };
 
-const STORAGE_KEY = 'cp2077_theme_settings_v2';
-
-const LEGACY_DEFAULT_BASE = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
-const LEGACY_DEFAULT_MODS = '"Cascadia Code", "Consolas", monospace';
+const STORAGE_KEY = 'cp2077_theme_settings_v3';
 
 export function loadThemeSettings(): ThemeSettings {
-  if (typeof localStorage === 'undefined') {
-    return {
-      ...DEFAULT_THEME_SETTINGS,
-      darkColors: { ...DEFAULT_DARK_THEME },
-      lightColors: { ...DEFAULT_LIGHT_THEME },
-    };
-  }
-
+  if (typeof localStorage === 'undefined') return { ...DEFAULT_THEME_SETTINGS };
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw) {
     try {
-      const parsed = JSON.parse(raw);
-      let loadedBase = parsed.fontFamilyBase || parsed.fontFamily || APP_FONT_PRESETS[0].value;
-      let loadedMods = parsed.fontFamilyMods || MOD_FONT_PRESETS[0].value;
-
-      if (loadedBase === LEGACY_DEFAULT_BASE) {
-        loadedBase = APP_FONT_PRESETS[0].value;
-      }
-      if (loadedMods === LEGACY_DEFAULT_MODS) {
-        loadedMods = MOD_FONT_PRESETS[0].value;
-      }
-
-      const loadedMode = parsed.mode === 'light' ? 'light' : 'dark';
-      const darkAccent = parsed.darkColors?.accent || ACCENT_PRESETS[0].hex;
-      const lightAccent = parsed.lightColors?.accent || '#5A8F00';
-
-      return {
-        mode: loadedMode,
-        darkColors: generateThemeColors('dark', darkAccent),
-        lightColors: generateThemeColors('light', lightAccent),
-        fontFamilyBase: loadedBase,
-        fontFamilyMods: loadedMods,
-        fontFamily: loadedBase,
-        isCompact: true,
-      };
-    } catch {
-      // fallback
-    }
+      return { ...DEFAULT_THEME_SETTINGS, ...JSON.parse(raw) };
+    } catch {}
   }
-
-  return {
-    ...DEFAULT_THEME_SETTINGS,
-    darkColors: { ...DEFAULT_DARK_THEME },
-    lightColors: { ...DEFAULT_LIGHT_THEME },
-  };
+  return { ...DEFAULT_THEME_SETTINGS };
 }
 
 export function applyThemeSettings(settings: ThemeSettings) {
   if (typeof document === 'undefined') return;
 
-  const activeColors = settings.mode === 'light' ? settings.lightColors : settings.darkColors;
+  const activeColors = generateThemeColors(settings.mode, settings.atmosphere, settings.accentHex);
   const root = document.documentElement;
 
-  for (const meta of THEME_COLOR_META) {
-    root.style.setProperty(meta.cssVar, activeColors[meta.key as keyof AppThemeColors]);
-  }
+  root.style.setProperty('--theme-accent', activeColors.accent);
+  root.style.setProperty('--theme-accent-hover', activeColors.accentHover);
+  root.style.setProperty('--theme-accent-contrast', activeColors.accentContrast);
+  root.style.setProperty('--theme-bg', activeColors.bg);
+  root.style.setProperty('--theme-surface', activeColors.surface);
+  root.style.setProperty('--theme-card', activeColors.card);
+  root.style.setProperty('--theme-border', activeColors.border);
+  root.style.setProperty('--theme-text-primary', activeColors.textPrimary);
+  root.style.setProperty('--theme-text-muted', activeColors.textMuted);
 
-  const contrastColor = getContrastColor(activeColors.accent);
-  root.style.setProperty('--theme-accent-contrast', contrastColor);
-
-  const baseFont = settings.fontFamilyBase || settings.fontFamily || APP_FONT_PRESETS[0].value;
-  const modsFont = settings.fontFamilyMods || MOD_FONT_PRESETS[0].value;
-
-  root.style.setProperty('--theme-font-base', baseFont);
-  root.style.setProperty('--theme-font-mods', modsFont);
+  // Lock UI font to system default, only allow custom monospace
+  root.style.setProperty('--theme-font-base', "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif");
+  root.style.setProperty('--theme-font-mods', settings.fontFamilyMods || MOD_FONT_PRESETS[0].value);
   root.style.colorScheme = settings.mode;
 
   if (typeof localStorage !== 'undefined') {
@@ -237,34 +161,10 @@ export async function loadConfigFromDisk(): Promise<AppConfig> {
   try {
     const config = await invoke<AppConfig>('load_app_config');
     if (config && config.theme) {
-      if (!config.theme.fontFamilyBase && (config.theme as any).fontFamily) {
-        config.theme.fontFamilyBase = (config.theme as any).fontFamily;
-      }
-      if (!config.theme.fontFamilyMods) {
-        config.theme.fontFamilyMods = MOD_FONT_PRESETS[0].value;
-      }
-
-      if (config.theme.fontFamilyBase === LEGACY_DEFAULT_BASE) {
-        config.theme.fontFamilyBase = APP_FONT_PRESETS[0].value;
-      }
-      if (config.theme.fontFamilyMods === LEGACY_DEFAULT_MODS) {
-        config.theme.fontFamilyMods = MOD_FONT_PRESETS[0].value;
-      }
-
-      config.theme.fontFamily = config.theme.fontFamilyBase;
-
-      config.theme.darkColors = generateThemeColors('dark', config.theme.darkColors?.accent || ACCENT_PRESETS[0].hex);
-      config.theme.lightColors = generateThemeColors('light', config.theme.lightColors?.accent || '#5A8F00');
-
-      if (config.recentDaysThreshold === undefined) config.recentDaysThreshold = 30;
-      if (config.newModsHours === undefined) config.newModsHours = 6;
-      if (config.showNewMods === undefined) config.showNewMods = false;
-      if (config.customTextEditorPath === undefined) config.customTextEditorPath = '';
-      if (config.customPhotoPath === undefined) config.customPhotoPath = '';
-      if (config.enableOrganizerView === undefined) config.enableOrganizerView = false;
-      if (config.showCategoryLabelsInLoadOrder === undefined) config.showCategoryLabelsInLoadOrder = true;
-      if (config.organizerColumns === undefined) config.organizerColumns = 'auto';
-
+      config.theme.atmosphere = config.theme.atmosphere || 'graphite';
+      config.theme.accentHex = config.theme.accentHex || '#76B900';
+      config.theme.fontFamilyMods = config.theme.fontFamilyMods || MOD_FONT_PRESETS[0].value;
+      
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(config.theme));
       }
@@ -288,41 +188,4 @@ export async function saveConfigToDisk(config: AppConfig): Promise<void> {
   } catch (err) {
     console.error('Failed to save config to disk:', err);
   }
-}
-
-export async function applyAndPersistTheme(settings: ThemeSettings): Promise<void> {
-  applyThemeSettings(settings);
-  try {
-    settings.fontFamily = settings.fontFamilyBase;
-    let config = await invoke<AppConfig>('load_app_config').catch(() => null);
-    if (!config) {
-      config = { ...DEFAULT_APP_CONFIG };
-    }
-    config.theme = settings;
-    await invoke('save_app_config', { config });
-  } catch (err) {
-    console.error('Failed to persist theme to disk:', err);
-  }
-}
-
-export function loadSavedTheme(): { mode: any; customColors: AppThemeColors } {
-  const settings = loadThemeSettings();
-  return {
-    mode: settings.mode === 'light' ? 'custom' : 'default',
-    customColors: settings.mode === 'light' ? settings.lightColors : settings.darkColors,
-  };
-}
-
-export function applyTheme(mode: any, customColors?: AppThemeColors) {
-  const settings = loadThemeSettings();
-  if (customColors) {
-    if (mode === 'custom' || mode === 'light') {
-      settings.mode = 'dark';
-      settings.darkColors = { ...customColors };
-    } else {
-      settings.mode = 'dark';
-      settings.darkColors = { ...DEFAULT_DARK_THEME };
-    }
-  }
-  applyThemeSettings(settings);
 }

@@ -74,33 +74,36 @@
     role="presentation"
   >
     <div
-      class="w-full max-w-md rounded-xl border border-nvidia-border bg-nvidia-card shadow-2xl overflow-hidden flex flex-col"
+      class="w-full max-w-md rounded-xl border shadow-2xl overflow-hidden flex flex-col"
+      style="background-color: var(--theme-card); border-color: var(--theme-border);"
       onclick={(e) => e.stopPropagation()}
       role="dialog"
     >
-      <div class="px-5 py-3.5 border-b border-nvidia-border flex items-center justify-between bg-nvidia-surface/40">
+      <div class="px-5 py-3.5 border-b flex items-center justify-between" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
         <div class="flex items-center gap-2.5">
-          <FolderInput class="h-4 w-4 text-nvidia-accent" />
-          <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">Move to Folder</span>
+          <FolderInput class="h-4 w-4" style="color: var(--theme-accent);" />
+          <span class="text-xs font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">Move to Group</span>
         </div>
         <button
           type="button"
           onclick={() => { isOpen = false; onCancel(); }}
-          class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-text-primary hover:bg-nvidia-surface transition cursor-pointer"
+          class="p-1 rounded transition cursor-pointer hover:bg-[var(--theme-bg)]"
+          style="color: var(--theme-text-muted);"
         >
-          <X class="h-4 w-4" />
+          <X class="h-4 w-4 hover:text-[var(--theme-text-primary)]" />
         </button>
       </div>
 
-      <div class="p-3 border-b border-nvidia-border bg-nvidia-surface/20 relative">
-        <Search class="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-nvidia-text-muted" />
+      <div class="p-3 border-b relative" style="background-color: color-mix(in srgb, var(--theme-surface) 50%, transparent); border-color: var(--theme-border);">
+        <Search class="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4" style="color: var(--theme-text-muted);" />
         <input
           bind:this={inputEl}
           type="text"
           bind:value={searchQuery}
           oninput={() => selectedIndex = -2}
-          placeholder="Search folders..."
-          class="w-full pl-9 pr-3 py-2 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary focus:outline-none focus:border-nvidia-accent"
+          placeholder="Search groups..."
+          class="w-full pl-9 pr-3 py-2 border rounded text-xs focus:outline-none"
+          style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
         />
       </div>
 
@@ -108,29 +111,31 @@
         <button
           type="button"
           onclick={() => onConfirm(`[CREATE_NEW]:${searchQuery}`)}
-          class="w-full text-left px-3 py-2 rounded text-xs font-bold transition flex items-center gap-2 cursor-pointer text-nvidia-accent border {selectedIndex === -1 ? 'bg-nvidia-accent/15 border-nvidia-accent/30' : 'border-transparent hover:bg-nvidia-accent/10'}"
+          class="w-full text-left px-3 py-2 rounded text-xs font-bold transition flex items-center gap-2 cursor-pointer border"
+          style="color: var(--theme-accent); border-color: {selectedIndex === -1 ? 'var(--theme-accent)' : 'transparent'}; background-color: {selectedIndex === -1 ? 'color-mix(in srgb, var(--theme-accent) 15%, transparent)' : 'transparent'};"
         >
           <FolderPlus class="h-4 w-4" />
-          {searchQuery ? `+ Create "${searchQuery}" Folder...` : '+ Create New Folder...'}
+          {searchQuery ? `+ Create "${searchQuery}" Group...` : '+ Create New Group...'}
         </button>
 
         {#if filtered.length > 0}
-          <div class="h-px bg-nvidia-border/50 my-1.5 mx-1"></div>
+          <div class="h-px my-1.5 mx-1" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
         {/if}
 
         {#each filtered as cat, i}
           <button
             type="button"
             onclick={() => onConfirm(cat.file_name)}
-            class="w-full text-left px-3 py-2 rounded text-xs font-medium transition flex items-center gap-2 cursor-pointer text-nvidia-text-primary border {i === selectedIndex ? 'bg-nvidia-surface border-nvidia-border shadow-sm' : 'border-transparent hover:bg-nvidia-surface/60'}"
+            class="w-full text-left px-3 py-2 rounded text-xs font-medium transition flex items-center gap-2 cursor-pointer border"
+            style="color: var(--theme-text-primary); border-color: {i === selectedIndex ? 'var(--theme-border)' : 'transparent'}; background-color: {i === selectedIndex ? 'var(--theme-surface)' : 'transparent'};"
           >
-            <FolderInput class="h-3.5 w-3.5 text-nvidia-text-muted" />
+            <FolderInput class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
             {cat.name}
           </button>
         {/each}
         
         {#if filtered.length === 0}
-          <div class="p-4 text-center text-xs text-nvidia-text-muted">No existing folders match your search.</div>
+          <div class="p-4 text-center text-xs" style="color: var(--theme-text-muted);">No existing groups match your search.</div>
         {/if}
       </div>
     </div>

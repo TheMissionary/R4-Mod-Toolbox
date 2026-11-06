@@ -32,18 +32,16 @@
   import AboutView from '$lib/components/AboutView.svelte';
 
   import {
-    Archive,
-    Cpu,
-    Puzzle,
-    FileCode2,
-    Sliders,
+    Folder,
+    Clock,
+    Camera,
     HelpCircle,
     Settings,
     Info,
-    Coffee,
-    PanelLeftClose,
-    Clock,
-    Camera,
+    CheckCircle2,
+    AlertCircle,
+    AlertTriangle,
+    RefreshCw,
     Check,
     Power
   } from 'lucide-svelte';
@@ -51,20 +49,6 @@
   type TabType = 'archive' | 'cet' | 'red4ext' | 'redscript' | 'r6tweaks' | 'history' | 'settings' | 'help' | 'about';
 
   let currentTab = $state<TabType>('archive');
-  let isSidebarCollapsed = $state(false);
-  
-  // Responsive Auto-Collapse Logic
-  let innerWidth = $state(1200);
-  let wasBelowThreshold = $state(false);
-
-  $effect(() => {
-    const isBelow = innerWidth < 1100;
-    if (isBelow && !wasBelowThreshold) {
-      isSidebarCollapsed = true;
-    }
-    wasBelowThreshold = isBelow;
-  });
-
   let customPhotoPath = $state('');
   let enableOrganizerView = $state(false);
   let showCategoryLabelsInLoadOrder = $state(true);
@@ -98,6 +82,9 @@
   // History Timeframe State
   let newModsHours = $state(6);
   let targetHighlightMod = $state<string | null>(null);
+
+  // Global Selected Path for Status Bar (To be wired in Phase 3)
+  let globalSelectedPath = $state<string>('Ready');
 
   // Sidebar Context Menu State
   let sidebarContextMenu = $state<{
@@ -148,15 +135,6 @@
     setTab('history');
     targetHighlightMod = modName;
     setTimeout(() => { targetHighlightMod = null; }, 100);
-  }
-
-  async function openExternalLink(url: string) {
-    if (!url) return;
-    try {
-      await openUrl(url);
-    } catch (err) {
-      error(`Failed to open URL ${url}: ${err}`);
-    }
   }
 
   async function handleOpenPhotos() {
@@ -240,7 +218,6 @@
       }
       if (config.targetGamePath) {
         gamePath = config.targetGamePath;
-        // Force Archive tab on startup
         currentTab = 'archive';
       } else {
         currentTab = 'settings';
@@ -273,19 +250,43 @@
       unlisten.then(f => f());
     };
   });
+
+  let activeCount = $derived.by(() => {
+    if (!scanResult) return 0;
+    switch(currentTab) {
+      case 'archive': return scanResult.archive_active;
+      case 'cet': return scanResult.cet_active;
+      case 'red4ext': return scanResult.red4ext_active;
+      case 'redscript': return scanResult.redscript_active;
+      case 'r6tweaks': return scanResult.r6tweaks_active;
+      default: return 0;
+    }
+  });
+
+  let totalCount = $derived.by(() => {
+    if (!scanResult) return 0;
+    switch(currentTab) {
+      case 'archive': return scanResult.archive_total;
+      case 'cet': return scanResult.cet_total;
+      case 'red4ext': return scanResult.red4ext_total;
+      case 'redscript': return scanResult.redscript_total;
+      case 'r6tweaks': return scanResult.r6tweaks_total;
+      default: return 0;
+    }
+  });
 </script>
 
-<svelte:window bind:innerWidth onclick={closeSidebarContextMenu} oncontextmenu={(e) => e.preventDefault()} />
+<svelte:window onclick={closeSidebarContextMenu} oncontextmenu={(e) => e.preventDefault()} />
 
 {#if sidebarContextMenu.visible}
   <div
-    class="fixed z-50 w-40 rounded-md border border-nvidia-border bg-nvidia-card py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
-    style="left: {sidebarContextMenu.x}px; top: {sidebarContextMenu.y}px;"
+    class="fixed z-50 w-40 rounded-md border py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
+    style="left: {sidebarContextMenu.x}px; top: {sidebarContextMenu.y}px; background-color: var(--theme-card); border-color: var(--theme-border);"
     onclick={(e) => e.stopPropagation()}
     oncontextmenu={(e) => e.preventDefault()}
   >
-    <div class="px-3 py-1.5 border-b border-nvidia-border/60 bg-nvidia-surface/40 flex items-center gap-2">
-      <span class="font-mono text-[11px] font-bold text-nvidia-text-primary truncate">
+    <div class="px-3 py-1.5 border-b flex items-center gap-2" style="border-color: var(--theme-border); background-color: var(--theme-surface);">
+      <span class="font-mono text-[11px] font-bold truncate" style="color: var(--theme-text-primary);">
         {sidebarContextMenu.label}
       </span>
     </div>
@@ -293,303 +294,189 @@
       <button
         type="button"
         onclick={() => handleBulkToggle(true)}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+        style="color: var(--theme-text-primary);"
       >
-        <Check class="h-3.5 w-3.5 text-nvidia-accent" />
+        <Check class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
         <span>Enable All</span>
       </button>
       <button
         type="button"
         onclick={() => handleBulkToggle(false)}
-        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-primary transition text-left cursor-pointer group"
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+        style="color: var(--theme-text-primary);"
       >
-        <Power class="h-3.5 w-3.5 text-red-400" />
+        <Power class="h-3.5 w-3.5" style="color: var(--color-danger);" />
         <span>Disable All</span>
       </button>
     </div>
   </div>
 {/if}
 
-<div class="flex h-screen w-screen overflow-hidden bg-nvidia-bg text-nvidia-text-primary font-sans">
-  <!-- Left Navigation Sidebar -->
-  <aside class="border-r border-nvidia-border flex flex-col justify-between bg-nvidia-surface/40 select-none shrink-0 transition-all duration-300 {isSidebarCollapsed ? 'w-[72px]' : 'w-64'}">
+<div class="flex h-screen w-screen overflow-hidden font-sans" style="background-color: var(--theme-bg); color: var(--theme-text-primary);">
+  
+  <!-- Left Navigation Sidebar (Fixed Width Quick Access) -->
+  <aside class="w-64 border-r flex flex-col justify-between shrink-0 select-none" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
     <div class="flex flex-col h-full overflow-hidden">
       
-      <!-- Sidebar Header / Toggle -->
-      <div class="h-16 border-b border-nvidia-border flex items-center {isSidebarCollapsed ? 'justify-center' : 'px-5 gap-3'} shrink-0 transition-all duration-300">
-        {#if isSidebarCollapsed}
-          <button 
-            onclick={() => isSidebarCollapsed = false} 
-            class="h-9 w-9 rounded-xl bg-nvidia-accent flex items-center justify-center text-black font-black text-base shadow-md shrink-0 hover:brightness-110 hover:scale-105 transition-all cursor-pointer" 
-            title="Expand Sidebar"
-          >
-            R4
-          </button>
-        {:else}
-          <button 
-            onclick={() => isSidebarCollapsed = true} 
-            class="h-6 w-6 rounded bg-nvidia-accent flex items-center justify-center text-black font-black text-sm shadow-sm shrink-0 hover:brightness-110 hover:scale-105 transition-all cursor-pointer"
-            title="Collapse Sidebar"
-          >
-            R4
-          </button>
-          <div class="flex flex-col flex-1 min-w-0">
-            <h1 class="text-xs font-bold tracking-wider uppercase text-nvidia-text-primary truncate">R4 Mod Toolbox</h1>
-          </div>
-          <button onclick={() => isSidebarCollapsed = true} class="p-1.5 rounded hover:bg-nvidia-surface text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer shrink-0" title="Collapse Sidebar">
-            <PanelLeftClose class="h-4 w-4" />
-          </button>
-        {/if}
+      <!-- Branding Header -->
+      <div class="h-14 border-b flex items-center px-5 gap-3 shrink-0" style="border-color: var(--theme-border);">
+        <div class="h-7 w-7 rounded flex items-center justify-center font-black text-sm shadow-sm shrink-0" style="background-color: var(--theme-accent); color: var(--theme-accent-contrast);">
+          R4
+        </div>
+        <h1 class="text-xs font-bold tracking-wider uppercase truncate" style="color: var(--theme-text-primary);">R4 Mod Toolbox</h1>
       </div>
 
+      <!-- Quick Access Navigation -->
       <div class="flex-1 overflow-y-auto overflow-x-hidden">
         <nav class="p-3 space-y-1.5">
           <button
             type="button"
             onclick={() => setTab('archive')}
             oncontextmenu={(e) => openSidebarContextMenu(e, 'archive', 'Archive Mods')}
-            title={isSidebarCollapsed ? 'Archive Mods (Right-click for options)' : 'Right-click for options'}
-            class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'} py-2.5 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'archive' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
+            title="Right-click for options"
+            class="relative w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition cursor-pointer border"
+            style="{currentTab === 'archive' ? 'background-color: var(--theme-card); border-color: var(--theme-border); color: var(--theme-text-primary);' : 'border-color: transparent; color: var(--theme-text-muted);'}"
           >
             {#if currentTab === 'archive'}
-              <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md bg-nvidia-accent shadow-[0_0_8px_var(--theme-accent)]"></div>
+              <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md shadow-[0_0_8px_var(--theme-accent)]" style="background-color: var(--theme-accent);"></div>
             {/if}
             <div class="flex items-center gap-3">
-              <Archive class="h-4 w-4 {currentTab === 'archive' ? 'text-nvidia-accent' : ''}" />
-              {#if !isSidebarCollapsed}
-                <span>Archive</span>
-              {/if}
+              <Folder class="h-4 w-4" style="{currentTab === 'archive' ? 'color: var(--theme-accent);' : ''}" />
+              <span>Archive Mods</span>
             </div>
-            {#if !isSidebarCollapsed && scanResult}
-              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted border border-nvidia-border/50">
-                {scanResult.archive_active}/{scanResult.archive_total}
-              </span>
-            {/if}
           </button>
 
           <button
             type="button"
             onclick={() => setTab('cet')}
             oncontextmenu={(e) => openSidebarContextMenu(e, 'cet', 'CET Plugins')}
-            title={isSidebarCollapsed ? 'CET Plugins (Right-click for options)' : 'Right-click for options'}
-            class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'} py-2.5 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'cet' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
+            title="Right-click for options"
+            class="relative w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition cursor-pointer border"
+            style="{currentTab === 'cet' ? 'background-color: var(--theme-card); border-color: var(--theme-border); color: var(--theme-text-primary);' : 'border-color: transparent; color: var(--theme-text-muted);'}"
           >
             {#if currentTab === 'cet'}
-              <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md bg-nvidia-accent shadow-[0_0_8px_var(--theme-accent)]"></div>
+              <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md shadow-[0_0_8px_var(--theme-accent)]" style="background-color: var(--theme-accent);"></div>
             {/if}
             <div class="flex items-center gap-3">
-              <Cpu class="h-4 w-4 {currentTab === 'cet' ? 'text-nvidia-accent' : ''}" />
-              {#if !isSidebarCollapsed}
-                <span>CET</span>
-              {/if}
+              <Folder class="h-4 w-4" style="{currentTab === 'cet' ? 'color: var(--theme-accent);' : ''}" />
+              <span>CET Plugins</span>
             </div>
-            {#if !isSidebarCollapsed && scanResult}
-              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted border border-nvidia-border/50">
-                {scanResult.cet_active}/{scanResult.cet_total}
-              </span>
-            {/if}
           </button>
 
           <button
             type="button"
             onclick={() => setTab('red4ext')}
             oncontextmenu={(e) => openSidebarContextMenu(e, 'red4ext', 'RED4ext Plugins')}
-            title={isSidebarCollapsed ? 'RED4ext Plugins (Right-click for options)' : 'Right-click for options'}
-            class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'} py-2.5 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'red4ext' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
+            title="Right-click for options"
+            class="relative w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition cursor-pointer border"
+            style="{currentTab === 'red4ext' ? 'background-color: var(--theme-card); border-color: var(--theme-border); color: var(--theme-text-primary);' : 'border-color: transparent; color: var(--theme-text-muted);'}"
           >
             {#if currentTab === 'red4ext'}
-              <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md bg-nvidia-accent shadow-[0_0_8px_var(--theme-accent)]"></div>
+              <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md shadow-[0_0_8px_var(--theme-accent)]" style="background-color: var(--theme-accent);"></div>
             {/if}
             <div class="flex items-center gap-3">
-              <Puzzle class="h-4 w-4 {currentTab === 'red4ext' ? 'text-nvidia-accent' : ''}" />
-              {#if !isSidebarCollapsed}
-                <span>RED4ext</span>
-              {/if}
+              <Folder class="h-4 w-4" style="{currentTab === 'red4ext' ? 'color: var(--theme-accent);' : ''}" />
+              <span>RED4ext Plugins</span>
             </div>
-            {#if !isSidebarCollapsed && scanResult}
-              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted border border-nvidia-border/50">
-                {scanResult.red4ext_active}/{scanResult.red4ext_total}
-              </span>
-            {/if}
           </button>
 
           <button
             type="button"
             onclick={() => setTab('redscript')}
             oncontextmenu={(e) => openSidebarContextMenu(e, 'redscript', 'R6\\Scripts')}
-            title={isSidebarCollapsed ? 'R6\\Scripts (Right-click for options)' : 'Right-click for options'}
-            class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'} py-2.5 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'redscript' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
+            title="Right-click for options"
+            class="relative w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition cursor-pointer border"
+            style="{currentTab === 'redscript' ? 'background-color: var(--theme-card); border-color: var(--theme-border); color: var(--theme-text-primary);' : 'border-color: transparent; color: var(--theme-text-muted);'}"
           >
             {#if currentTab === 'redscript'}
-              <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md bg-nvidia-accent shadow-[0_0_8px_var(--theme-accent)]"></div>
+              <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md shadow-[0_0_8px_var(--theme-accent)]" style="background-color: var(--theme-accent);"></div>
             {/if}
             <div class="flex items-center gap-3">
-              <FileCode2 class="h-4 w-4 {currentTab === 'redscript' ? 'text-nvidia-accent' : ''}" />
-              {#if !isSidebarCollapsed}
-                <span>R6\Scripts</span>
-              {/if}
+              <Folder class="h-4 w-4" style="{currentTab === 'redscript' ? 'color: var(--theme-accent);' : ''}" />
+              <span>R6\Scripts</span>
             </div>
-            {#if !isSidebarCollapsed && scanResult}
-              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted border border-nvidia-border/50">
-                {scanResult.redscript_active}/{scanResult.redscript_total}
-              </span>
-            {/if}
           </button>
 
           <button
             type="button"
             onclick={() => setTab('r6tweaks')}
             oncontextmenu={(e) => openSidebarContextMenu(e, 'r6tweaks', 'R6\\Tweaks')}
-            title={isSidebarCollapsed ? 'R6\\Tweaks (Right-click for options)' : 'Right-click for options'}
-            class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'} py-2.5 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'r6tweaks' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
+            title="Right-click for options"
+            class="relative w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition cursor-pointer border"
+            style="{currentTab === 'r6tweaks' ? 'background-color: var(--theme-card); border-color: var(--theme-border); color: var(--theme-text-primary);' : 'border-color: transparent; color: var(--theme-text-muted);'}"
           >
             {#if currentTab === 'r6tweaks'}
-              <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md bg-nvidia-accent shadow-[0_0_8px_var(--theme-accent)]"></div>
+              <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md shadow-[0_0_8px_var(--theme-accent)]" style="background-color: var(--theme-accent);"></div>
             {/if}
             <div class="flex items-center gap-3">
-              <Sliders class="h-4 w-4 {currentTab === 'r6tweaks' ? 'text-nvidia-accent' : ''}" />
-              {#if !isSidebarCollapsed}
-                <span>R6\Tweaks</span>
-              {/if}
+              <Folder class="h-4 w-4" style="{currentTab === 'r6tweaks' ? 'color: var(--theme-accent);' : ''}" />
+              <span>R6\Tweaks</span>
             </div>
-            {#if !isSidebarCollapsed && scanResult}
-              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-nvidia-surface text-nvidia-text-muted border border-nvidia-border/50">
-                {scanResult.r6tweaks_active}/{scanResult.r6tweaks_total}
-              </span>
-            {/if}
           </button>
         </nav>
       </div>
 
-      <!-- Secondary Navigation Cluster -->
-      <div class="px-3 pb-3 space-y-1.5 bg-nvidia-surface/20 shrink-0 border-t border-nvidia-border/50 pt-3">
+      <!-- Bottom Utility Dock (Icon Only) -->
+      <div class="px-4 pb-4 pt-3 border-t flex items-center justify-between shrink-0" style="border-color: var(--theme-border); background-color: var(--theme-bg);">
         <button
           type="button"
           onclick={() => setTab('history')}
-          title={isSidebarCollapsed ? 'Mod History & Ledger' : ''}
-          class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'history' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
+          title="Mod History & Ledger"
+          class="p-2 rounded transition cursor-pointer hover:brightness-125"
+          style="{currentTab === 'history' ? 'color: var(--theme-accent); background-color: var(--theme-card);' : 'color: var(--theme-text-muted);'}"
         >
-          {#if currentTab === 'history'}
-            <div class="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-md bg-nvidia-accent shadow-[0_0_8px_var(--theme-accent)]"></div>
-          {/if}
-          <Clock class="h-4 w-4 {currentTab === 'history' ? 'text-nvidia-accent' : ''}" />
-          {#if !isSidebarCollapsed}
-            <span>History</span>
-          {/if}
+          <Clock class="h-4 w-4" />
         </button>
 
         {#if customPhotoPath}
           <button
             type="button"
             onclick={handleOpenPhotos}
-            title={isSidebarCollapsed ? 'Cyberpunk 2077 Photos' : ''}
-            class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2 rounded-lg text-xs font-medium transition cursor-pointer text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent"
+            title="Cyberpunk 2077 Photos"
+            class="p-2 rounded transition cursor-pointer hover:brightness-125"
+            style="color: var(--theme-text-muted);"
           >
             <Camera class="h-4 w-4" />
-            {#if !isSidebarCollapsed}
-              <span>Photos</span>
-            {/if}
           </button>
         {/if}
 
         <button
           type="button"
           onclick={() => setTab('help')}
-          title={isSidebarCollapsed ? 'Help & Documentation' : ''}
-          class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'help' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
+          title="Help & Documentation"
+          class="p-2 rounded transition cursor-pointer hover:brightness-125"
+          style="{currentTab === 'help' ? 'color: var(--theme-accent); background-color: var(--theme-card);' : 'color: var(--theme-text-muted);'}"
         >
-          {#if currentTab === 'help'}
-            <div class="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-md bg-nvidia-accent shadow-[0_0_8px_var(--theme-accent)]"></div>
-          {/if}
-          <HelpCircle class="h-4 w-4 {currentTab === 'help' ? 'text-nvidia-accent' : ''}" />
-          {#if !isSidebarCollapsed}
-            <span>Help</span>
-          {/if}
+          <HelpCircle class="h-4 w-4" />
         </button>
+
         <button
           type="button"
           onclick={() => setTab('settings')}
-          title={isSidebarCollapsed ? 'Settings' : ''}
-          class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'settings' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
+          title="Settings"
+          class="p-2 rounded transition cursor-pointer hover:brightness-125"
+          style="{currentTab === 'settings' ? 'color: var(--theme-accent); background-color: var(--theme-card);' : 'color: var(--theme-text-muted);'}"
         >
-          {#if currentTab === 'settings'}
-            <div class="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-md bg-nvidia-accent shadow-[0_0_8px_var(--theme-accent)]"></div>
-          {/if}
-          <Settings class="h-4 w-4 {currentTab === 'settings' ? 'text-nvidia-accent' : ''}" />
-          {#if !isSidebarCollapsed}
-            <span>Settings</span>
-          {/if}
+          <Settings class="h-4 w-4" />
         </button>
+
         <button
           type="button"
           onclick={() => setTab('about')}
-          title={isSidebarCollapsed ? 'About R4' : ''}
-          class="relative w-full flex items-center {isSidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2 rounded-lg text-xs font-medium transition cursor-pointer {currentTab === 'about' ? 'bg-nvidia-card text-nvidia-accent shadow-sm border border-nvidia-border' : 'text-nvidia-text-muted hover:bg-nvidia-surface hover:text-nvidia-text-primary border border-transparent'}"
+          title="About R4"
+          class="p-2 rounded transition cursor-pointer hover:brightness-125"
+          style="{currentTab === 'about' ? 'color: var(--theme-accent); background-color: var(--theme-card);' : 'color: var(--theme-text-muted);'}"
         >
-          {#if currentTab === 'about'}
-            <div class="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-md bg-nvidia-accent shadow-[0_0_8px_var(--theme-accent)]"></div>
-          {/if}
-          <Info class="h-4 w-4 {currentTab === 'about' ? 'text-nvidia-accent' : ''}" />
-          {#if !isSidebarCollapsed}
-            <span>About</span>
-          {/if}
+          <Info class="h-4 w-4" />
         </button>
       </div>
-    </div>
-
-    <!-- Developer Tile -->
-    <div class="p-3 border-t border-nvidia-border bg-nvidia-surface/30 shrink-0 flex justify-center">
-      {#if isSidebarCollapsed}
-        <button 
-          type="button" 
-          onclick={() => openExternalLink('https://www.nexusmods.com/profile/Mi55ionary')} 
-          class="h-8 w-8 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center hover:border-amber-500 transition cursor-pointer" 
-          title="Mi55ionary"
-        >
-          <svg viewBox="0 0 100 100" class="h-5 w-5 drop-shadow-sm" fill="none" stroke="#e08528" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M 48 34 C 44 20 22 10 13 26 C 3 44 18 68 49 92 C 80 68 97 44 87 22 C 77 0 54 8 48 34 Z" />
-          </svg>
-        </button>
-      {:else}
-        <div class="w-full rounded-lg border border-nvidia-border/70 bg-nvidia-surface/70 p-2 flex items-center justify-between gap-2 shadow-xs select-none">
-          <div class="flex items-center gap-2 min-w-0">
-            <div class="h-6 w-6 rounded bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
-              <svg viewBox="0 0 100 100" class="h-4 w-4 drop-shadow-sm" fill="none" stroke="#e08528" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M 48 34 C 44 20 22 10 13 26 C 3 44 18 68 49 92 C 80 68 97 44 87 22 C 77 0 54 8 48 34 Z" />
-              </svg>
-            </div>
-            <div class="min-w-0 flex flex-col">
-              <span class="text-[9px] text-nvidia-text-muted uppercase tracking-wider font-semibold leading-tight">Dev</span>
-              <button 
-                type="button" 
-                onclick={() => openExternalLink('https://www.nexusmods.com/profile/Mi55ionary')} 
-                class="text-[11px] font-mono font-bold text-nvidia-text-primary hover:text-nvidia-accent transition-colors truncate leading-tight text-left cursor-pointer" 
-                title="View Mi55ionary on Nexus Mods"
-              >
-                Mi55ionary
-              </button>
-            </div>
-          </div>
-
-          <div class="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              onclick={() => openExternalLink('https://ko-fi.com/themissionary')}
-              class="px-2 py-1 rounded bg-nvidia-card hover:bg-cyan-500/10 text-[10px] font-mono text-nvidia-text-muted hover:text-cyan-400 border border-nvidia-border hover:border-cyan-500/30 transition cursor-pointer flex items-center justify-center gap-1.5"
-              title="Support on Ko-fi"
-            >
-              <Coffee class="h-3 w-3" />
-              <span class="font-bold">Ko-fi</span>
-            </button>
-          </div>
-        </div>
-      {/if}
     </div>
   </aside>
 
   <!-- Workspace Canvas -->
-  <div class="flex-1 flex flex-col h-full overflow-hidden relative">
-    <HeaderBar {gamePath} {currentTab} onRefresh={refreshAll} {isLoading} {scanResult} {isSidebarCollapsed} />
+  <div class="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+    <HeaderBar {gamePath} {currentTab} />
 
     <main class="flex-1 overflow-y-auto {['settings', 'help', 'about', 'history'].includes(currentTab) ? 'p-0' : 'p-6'}">
       
@@ -696,5 +583,49 @@
         <AboutView />
       </div>
     </main>
+
+    <!-- Bottom Status Bar -->
+    <footer class="h-8 border-t flex items-center justify-between px-4 shrink-0 text-[11px] font-mono select-none" style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-muted);">
+      <!-- Left: Connection Status -->
+      <div class="flex items-center gap-2 w-48 shrink-0">
+        {#if !gamePath}
+          <AlertTriangle class="h-3.5 w-3.5" style="color: var(--color-warning);" />
+          <span class="font-bold uppercase tracking-wider" style="color: var(--color-warning);">Setup Required</span>
+        {:else if !scanResult?.is_valid_game_path}
+          <AlertCircle class="h-3.5 w-3.5" style="color: var(--color-danger);" />
+          <span class="font-bold uppercase tracking-wider" style="color: var(--color-danger);">Disconnected</span>
+        {:else}
+          <CheckCircle2 class="h-3.5 w-3.5" style="color: var(--color-success);" />
+          <span class="font-bold uppercase tracking-wider" style="color: var(--color-success);">Connected</span>
+        {/if}
+      </div>
+
+      <!-- Center: Selected Path (Wired in Phase 3) -->
+      <div class="flex-1 flex justify-center truncate px-4">
+        <span class="truncate opacity-70">{globalSelectedPath}</span>
+      </div>
+
+      <!-- Right: Sync & Counts -->
+      <div class="flex items-center justify-end gap-4 w-48 shrink-0">
+        <div class="flex items-center gap-1.5">
+          {#if isLoading}
+            <RefreshCw class="h-3 w-3 animate-spin" style="color: var(--theme-accent);" />
+            <span style="color: var(--theme-accent);">Syncing...</span>
+          {:else}
+            <button type="button" onclick={refreshAll} class="hover:brightness-125 transition cursor-pointer" title="Force Rescan">
+              <RefreshCw class="h-3 w-3" />
+            </button>
+          {/if}
+        </div>
+        
+        {#if ['archive', 'cet', 'red4ext', 'redscript', 'r6tweaks'].includes(currentTab)}
+          <div class="flex items-center gap-1">
+            <span>Active:</span>
+            <span class="font-bold" style="color: var(--theme-text-primary);">{activeCount}</span>
+            <span>of {totalCount}</span>
+          </div>
+        {/if}
+      </div>
+    </footer>
   </div>
 </div>

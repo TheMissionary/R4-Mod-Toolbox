@@ -6,7 +6,7 @@
     isOpen = $bindable(false),
     title = 'RED4 Mod Toolbox',
     message = '',
-    mode = 'prompt', // 'prompt' | 'confirm'
+    mode = 'prompt',
     initialValue = '',
     confirmText = 'Confirm',
     cancelText = 'Cancel',
@@ -72,39 +72,41 @@
     role="presentation"
   >
     <div
-      class="w-full max-w-md rounded-xl border border-nvidia-border bg-nvidia-card shadow-2xl overflow-hidden flex flex-col"
+      class="w-full max-w-md rounded-xl border shadow-2xl overflow-hidden flex flex-col"
+      style="background-color: var(--theme-card); border-color: var(--theme-border);"
       onclick={(e) => e.stopPropagation()}
       role="dialog"
       aria-modal="true"
       tabindex="-1"
     >
       <!-- Modal Header -->
-      <div class="px-5 py-3.5 border-b border-nvidia-border flex items-center justify-between bg-nvidia-surface/40 shrink-0">
+      <div class="px-5 py-3.5 border-b flex items-center justify-between shrink-0" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
         <div class="flex items-center gap-2.5">
           {#if isDanger}
-            <AlertTriangle class="h-4 w-4 text-red-400" />
+            <AlertTriangle class="h-4 w-4" style="color: var(--color-danger);" />
           {:else if mode === 'prompt' && title.includes('Rename')}
-            <Pencil class="h-4 w-4 text-nvidia-accent" />
+            <Pencil class="h-4 w-4" style="color: var(--theme-accent);" />
           {:else}
-            <FolderPlus class="h-4 w-4 text-nvidia-accent" />
+            <FolderPlus class="h-4 w-4" style="color: var(--theme-accent);" />
           {/if}
-          <span class="text-xs font-bold text-nvidia-text-primary uppercase tracking-wider">
+          <span class="text-xs font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">
             {title}
           </span>
         </div>
         <button
           type="button"
           onclick={handleClose}
-          class="p-1 rounded text-nvidia-text-muted hover:text-nvidia-text-primary hover:bg-nvidia-surface transition cursor-pointer"
+          class="p-1 rounded transition cursor-pointer hover:bg-[var(--theme-bg)]"
+          style="color: var(--theme-text-muted);"
         >
-          <X class="h-4 w-4" />
+          <X class="h-4 w-4 hover:text-[var(--theme-text-primary)]" />
         </button>
       </div>
 
       <!-- Modal Body -->
       <div class="p-5 space-y-3.5">
         {#if message}
-          <p class="text-xs text-nvidia-text-muted leading-relaxed">
+          <p class="text-xs leading-relaxed" style="color: var(--theme-text-muted);">
             {message}
           </p>
         {/if}
@@ -115,18 +117,20 @@
               bind:this={inputEl}
               type="text"
               bind:value={inputValue}
-              class="w-full px-3 py-2 bg-nvidia-surface border border-nvidia-border rounded text-xs text-nvidia-text-primary placeholder:text-nvidia-text-muted/60 focus:outline-none focus:border-nvidia-accent font-sans"
+              class="w-full px-3 py-2 border rounded text-xs focus:outline-none font-sans"
+              style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
             />
           </div>
         {/if}
       </div>
 
       <!-- Modal Footer -->
-      <div class="px-5 py-3 border-t border-nvidia-border bg-nvidia-surface/40 flex items-center justify-end gap-2.5 shrink-0">
+      <div class="px-5 py-3 border-t flex items-center justify-end gap-2.5 shrink-0" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
         <button
           type="button"
           onclick={handleClose}
-          class="px-3.5 py-1.5 rounded hover:bg-nvidia-surface text-xs text-nvidia-text-muted hover:text-nvidia-text-primary transition cursor-pointer"
+          class="px-3.5 py-1.5 rounded text-xs transition cursor-pointer hover:bg-[var(--theme-bg)]"
+          style="color: var(--theme-text-muted);"
         >
           {cancelText}
         </button>
@@ -134,7 +138,8 @@
         <button
           type="button"
           onclick={handleSubmit}
-          class="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold transition shadow-sm cursor-pointer {isDanger ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-nvidia-accent hover:brightness-105 text-black'}"
+          class="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold transition shadow-sm cursor-pointer hover:brightness-110"
+          style="{isDanger ? 'background-color: var(--color-danger); color: #ffffff;' : 'background-color: var(--theme-accent); color: var(--theme-accent-contrast);'}"
         >
           <Check class="h-3.5 w-3.5 stroke-[2.5]" />
           <span>{confirmText}</span>
