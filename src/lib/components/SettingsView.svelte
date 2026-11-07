@@ -14,7 +14,7 @@
     type ThemeSettings
   } from '$lib/theme';
   import {
-    RotateCcw, Check, Settings, Sun, Moon, Type, Sparkles, Palette, FolderSearch,
+    RotateCcw, Check, Settings, Sun, Moon, Sparkles, Palette, FolderSearch,
     ChevronDown, ChevronRight, Wrench, GripVertical, Folder, FileCode, LayoutGrid, FileText, Image as ImageIcon, X
   } from 'lucide-svelte';
 
@@ -94,7 +94,7 @@
 
   function handleModeToggle(newMode: 'dark' | 'light') {
     draft.mode = newMode;
-    draft.atmosphere = newMode === 'light' ? 'pearl' : 'graphite';
+    draft.atmosphere = newMode === 'light' ? 'cloud' : 'graphite';
     markDirty();
   }
 
@@ -176,9 +176,15 @@
     } catch (err) { console.error(err); } finally { isExporting = false; }
   }
 
+  // State-aware reset: preserves active mode and restores mode-specific atmosphere
   function handleResetDefault() {
-    draft.mode = 'dark';
-    draft.atmosphere = 'graphite';
+    if (draft.mode === 'light') {
+      draft.mode = 'light';
+      draft.atmosphere = 'cloud';
+    } else {
+      draft.mode = 'dark';
+      draft.atmosphere = 'graphite';
+    }
     draft.accentHex = '#76B900';
     currentAccentHex = '#76B900';
     draft.fontFamilyMods = MOD_FONT_PRESETS[0].value;
@@ -228,7 +234,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl">
       
       <!-- Left Column: Unified Theme Engine -->
-      <div class="rounded-xl border flex flex-col h-fit" style="background-color: var(--theme-card); border-color: var(--theme-border);">
+      <div class="rounded-xl border flex flex-col h-fit overflow-hidden" style="background-color: var(--theme-card); border-color: var(--theme-border);">
         <div class="px-4 py-3 border-b flex items-center gap-2.5" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
           <Palette class="h-4 w-4" style="color: var(--theme-accent);" />
           <h3 class="text-sm font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">Appearance & Theming</h3>
@@ -437,7 +443,7 @@
 
       <!-- Right Column: Directories & Integrations -->
       <div class="flex flex-col gap-4">
-        <div class="rounded-xl border flex flex-col h-fit" style="background-color: var(--theme-card); border-color: var(--theme-border);">
+        <div class="rounded-xl border flex flex-col h-fit overflow-hidden" style="background-color: var(--theme-card); border-color: var(--theme-border);">
           <div class="px-4 py-3 border-b flex items-center gap-2.5" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
             <FolderSearch class="h-4 w-4" style="color: var(--theme-accent);" />
             <h3 class="text-sm font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">Game Directory</h3>

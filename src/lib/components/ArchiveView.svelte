@@ -188,9 +188,18 @@
     }
   });
 
+  // Tab Exit Effect: Clears Search, Selections, and Highlights
   $effect(() => {
-    if (currentTab !== 'archive' && searchQuery !== '') {
-      untrack(() => { searchQuery = ''; });
+    if (currentTab !== 'archive') {
+      untrack(() => {
+        if (searchQuery !== '') searchQuery = '';
+        if (selectedMods.size > 0) {
+          selectedMods.clear();
+          selectedMods = new Set();
+          lastSelectedFileName = null;
+        }
+        if (highlightedModName !== null) highlightedModName = null;
+      });
     }
   });
 
@@ -784,7 +793,6 @@
     if (!searchQuery.trim()) return true;
     return item.file_name.toLowerCase().includes(searchQuery.toLowerCase());
   }));
-  let actualMods = $derived(archives.filter(a => !a.is_delimiter));
 </script>
 
 <svelte:window
@@ -997,6 +1005,7 @@
 
 <div class="flex flex-col h-full select-none" oncontextmenu={(e) => e.preventDefault()}>
   
+  <!-- Toolbar Header -->
   <div class="flex items-center justify-between gap-4 shrink-0 mb-3">
     <div class="flex items-center gap-3 flex-1 max-w-md">
       <div class="relative flex-1">
@@ -1005,7 +1014,7 @@
           type="text"
           bind:value={searchQuery}
           placeholder="Filter mods or groups..."
-          class="w-full pl-9 pr-8 py-1.5 rounded text-xs focus:outline-none border"
+          class="w-full pl-9 pr-8 py-1.5 rounded text-xs focus:outline-none border font-sans"
           style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
         />
         {#if searchQuery !== ''}
@@ -1024,24 +1033,24 @@
 
     <div class="flex items-center gap-2.5">
       {#if enableOrganizerView}
-        <div class="flex items-center p-0.5 rounded border" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
+        <div class="flex items-center h-8 p-0.5 rounded border" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
           <button
             type="button"
             onclick={() => { activeViewMode = 'load_order'; searchQuery = ''; }}
-            class="p-1 rounded transition cursor-pointer"
+            class="h-full px-2.5 rounded-sm flex items-center justify-center transition cursor-pointer"
             style="{activeViewMode === 'load_order' ? 'background-color: var(--theme-card); color: var(--theme-accent);' : 'color: var(--theme-text-muted);'}"
             title="Load Order View"
           >
-            <ListTree class="h-3.5 w-3.5" />
+            <ListTree class="h-4 w-4" />
           </button>
           <button
             type="button"
             onclick={() => { activeViewMode = 'organizer'; searchQuery = ''; }}
-            class="p-1 rounded transition cursor-pointer"
+            class="h-full px-2.5 rounded-sm flex items-center justify-center transition cursor-pointer"
             style="{activeViewMode === 'organizer' ? 'background-color: var(--theme-card); color: var(--color-info);' : 'color: var(--theme-text-muted);'}"
             title="Organizer View"
           >
-            <LayoutGrid class="h-3.5 w-3.5" />
+            <LayoutGrid class="h-4 w-4" />
           </button>
         </div>
       {/if}
@@ -1049,17 +1058,17 @@
       {#if activeViewMode === 'load_order'}
         <button
           onclick={toggleSummaryDrawer}
-          class="p-1.5 rounded border transition cursor-pointer hover:brightness-125"
+          class="h-8 px-2.5 rounded border transition cursor-pointer flex items-center justify-center hover:brightness-125"
           style="{showConflictSummary ? 'background-color: color-mix(in srgb, var(--theme-accent) 15%, transparent); border-color: var(--theme-accent); color: var(--theme-accent);' : 'background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-muted);'}"
           title="Toggle Conflict Summary"
         >
-          <AlertTriangle class="h-3.5 w-3.5" />
+          <AlertTriangle class="h-4 w-4" />
         </button>
 
         <button
           onclick={toggleAllFolders}
           disabled={totalFolders === 0}
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-125"
+          class="h-8 flex items-center gap-1.5 px-3 rounded border text-xs font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-125"
           style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
         >
           {#if isAllCollapsed}
@@ -1073,7 +1082,7 @@
 
         <button
           onclick={addFolder}
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition cursor-pointer hover:brightness-125"
+          class="h-8 flex items-center gap-1.5 px-3 rounded border text-xs font-medium transition cursor-pointer hover:brightness-125"
           style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
         >
           <FolderPlus class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
@@ -1082,7 +1091,7 @@
       {:else}
         <button
           onclick={() => showUncategorizedDrawer = !showUncategorizedDrawer}
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition cursor-pointer hover:brightness-125"
+          class="h-8 flex items-center gap-1.5 px-3 rounded border text-xs font-medium transition cursor-pointer hover:brightness-125"
           style="{showUncategorizedDrawer ? 'background-color: color-mix(in srgb, var(--color-warning) 15%, transparent); border-color: var(--color-warning); color: var(--color-warning);' : 'background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-muted);'}"
           title="Toggle The Stash Drawer"
         >
@@ -1133,12 +1142,7 @@
             {@const showLineBefore = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'before' && !isSource}
             {@const showLineAfter = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'after' && !isSource}
 
-            <div class="relative flex flex-col {inCategory ? 'ml-3' : ''}">
-              {#if inCategory}
-                <div class="absolute -left-2 -top-1 bottom-0 w-[1px] z-0" style="background-color: color-mix(in srgb, var(--theme-border) 45%, transparent);"></div>
-                <div class="absolute -left-2 top-1/2 w-2 h-[1px] z-0" style="background-color: color-mix(in srgb, var(--theme-border) 45%, transparent);"></div>
-              {/if}
-
+            <div class="relative flex flex-col">
               {#if showLineBefore}
                 <div class="absolute {originalIndex === 0 ? '-top-1.5' : '-top-1'} left-0 right-0 h-[2.5px] z-30 flex items-center shadow-[0_0_12px_var(--theme-accent)]" style="background-color: var(--theme-accent);">
                   <div class="h-2.5 w-2.5 rounded-full -ml-1.5 shadow-[0_0_8px_var(--theme-accent)]" style="background-color: var(--theme-accent);"></div>
@@ -1177,14 +1181,18 @@
                   onclick={(e) => handleModClick(e, archive)}
                   onpointermove={(e) => onRowPointerMove(e, originalIndex)}
                   onpointerenter={() => globalSelectedPath = archive.path}
-                  onpointerleave={() => globalSelectedPath = 'Ready'}
+                  onpointerleave={() => globalSelectedPath = ''}
                   oncontextmenu={(e) => openContextMenu(e, archive, 'archive')}
-                  class="group transition-all duration-200 z-10 border-b {isHighlighted ? 'ring-1' : ''} {archive.enabled ? 'opacity-100' : 'opacity-40'} {isSource ? 'opacity-20 border-dashed' : ''}"
-                  style="border-color: var(--theme-border); {isHighlighted ? 'background-color: color-mix(in srgb, var(--theme-accent) 15%, transparent); border-color: var(--theme-accent); box-shadow: 0 0 15px color-mix(in srgb, var(--theme-accent) 35%, transparent);' : (isSelected ? 'background-color: color-mix(in srgb, var(--theme-accent) 10%, transparent); border-color: color-mix(in srgb, var(--theme-accent) 60%, transparent);' : 'hover:background-color: var(--theme-surface);')}"
+                  class="group transition-all duration-200 z-10 border-b density-row cursor-context-menu
+                    {isHighlighted ? 'ring-1 bg-[color-mix(in_srgb,var(--theme-accent)_15%,transparent)] border-[var(--theme-accent)] shadow-[0_0_15px_color-mix(in_srgb,var(--theme-accent)_35%,transparent)]' : 
+                    (isSelected ? 'bg-[color-mix(in_srgb,var(--theme-accent)_10%,transparent)] border-[color-mix(in_srgb,var(--theme-accent)_60%,transparent)]' : 
+                    'bg-transparent border-[var(--theme-border)] hover:bg-[color-mix(in_srgb,var(--theme-accent)_12%,transparent)]')}
+                    {archive.enabled ? 'opacity-100' : 'opacity-40'} 
+                    {isSource ? 'opacity-20 border-dashed' : ''}"
                 >
-                  <!-- Seamless Row Container (24px) -->
-                  <div class="flex items-center justify-between px-2 gap-2 density-row">
-                    <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div class="flex items-center justify-between px-2 gap-2 density-row relative">
+                    
+                    <div class="flex items-center gap-2.5 min-w-0 flex-1 pl-1">
                       <div
                         role="button"
                         tabindex="0"
@@ -1198,18 +1206,24 @@
                         <GripVertical class="h-3.5 w-3.5" />
                       </div>
 
-                      <!-- Minimal Checkbox -->
                       <button
                         type="button"
                         onclick={(e) => { e.stopPropagation(); toggleMod(archive); }}
                         aria-label={archive.enabled ? "Disable mod " + archive.file_name : "Enable mod " + archive.file_name}
                         class="w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors shrink-0 cursor-pointer"
-                        style="border-color: {archive.enabled ? 'var(--theme-accent)' : 'var(--theme-text-muted)'}; background-color: {archive.enabled ? 'var(--theme-accent)' : 'transparent'};"
+                        style="border-color: {archive.enabled ? 'var(--theme-accent)' : 'var(--theme-border)'}; background-color: {archive.enabled ? 'var(--theme-accent)' : 'transparent'};"
                       >
                         {#if archive.enabled}
-                          <Check class="h-3 w-3" style="color: var(--theme-accent-contrast);" strokeWidth={3} />
+                          <Check class="h-2.5 w-2.5" style="color: var(--theme-accent-contrast);" strokeWidth={3} />
                         {/if}
                       </button>
+
+                      {#if inCategory}
+                        <div class="flex items-center shrink-0 w-4 h-full relative">
+                          <div class="absolute left-1 top-0 bottom-0 w-[1px] pointer-events-none" style="background-color: color-mix(in srgb, var(--theme-border) 70%, transparent);"></div>
+                          <div class="absolute left-1 top-1/2 w-2.5 h-[1px] pointer-events-none" style="background-color: color-mix(in srgb, var(--theme-border) 70%, transparent);"></div>
+                        </div>
+                      {/if}
 
                       <span class="text-[10px] font-mono px-1 py-0.2 min-w-[34px] text-center rounded border shrink-0" style="background-color: var(--theme-card); color: var(--theme-text-muted); border-color: var(--theme-border);">
                         #{archiveRank}
@@ -1240,10 +1254,8 @@
                       </div>
                     </div>
 
-                    <!-- Right Column -->
                     <div class="flex items-center gap-2 shrink-0">
                       
-                      <!-- Virtual Category Pill -->
                       <div class="w-28 flex justify-end pr-2">
                         {#if showCategoryLabelsInLoadOrder && assignedCat && !assignedCat.stashed}
                           <span 
@@ -1256,7 +1268,6 @@
                         {/if}
                       </div>
 
-                      <!-- Notes Icon -->
                       <div class="w-4 flex items-center justify-center shrink-0">
                         {#if notesConfig[archive.file_name]}
                           <button 
@@ -1269,7 +1280,6 @@
                         {/if}
                       </div>
 
-                      <!-- Conflict Dot (No Text) -->
                       <div class="w-3 flex items-center justify-center shrink-0">
                         {#if !archive.enabled}
                           <div class="h-2 w-2 rounded-full opacity-50" style="background-color: var(--theme-text-muted);" title="Disabled"></div>
@@ -1300,7 +1310,6 @@
                         {/if}
                       </div>
 
-                      <!-- Hover Context Menu Button -->
                       <div class="flex items-center justify-end shrink-0 w-6">
                         <button
                           type="button"
@@ -1356,7 +1365,7 @@
           {/each}
         {/if}
 
-        <!-- Dedicated Bottom Section: Unassociated .xl Files -->
+        <!-- Unassociated .xl Files Section -->
         {#if unassociatedXlFiles.length > 0}
           <div class="mt-6 pt-4 border-t space-y-2" style="border-color: color-mix(in srgb, var(--theme-border) 60%, transparent);">
             <div 
@@ -1420,8 +1429,7 @@
                 {#each unassociatedXlFiles as xl (xl.file_name + '_' + xl.enabled)}
                   <div
                     oncontextmenu={(e) => openContextMenu(e, xl, 'unassociated_xl')}
-                    class="border-b px-2 flex items-center justify-between density-row cursor-context-menu hover:bg-[var(--theme-surface)]"
-                    style="border-color: var(--theme-border);"
+                    class="border-b px-2 flex items-center justify-between density-row cursor-context-menu bg-transparent border-[var(--theme-border)] hover:bg-[color-mix(in_srgb,var(--theme-accent)_12%,transparent)]"
                   >
                     <div class="flex items-center gap-2.5 min-w-0">
                       <FileCode class="h-3.5 w-3.5 shrink-0" style="color: var(--color-info);" />

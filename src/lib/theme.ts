@@ -24,6 +24,7 @@ export const DARK_ATMOSPHERES: Record<string, Omit<AppThemeColors, 'accent' | 'a
 export const LIGHT_ATMOSPHERES: Record<string, Omit<AppThemeColors, 'accent' | 'accentHover' | 'accentContrast'>> = {
   pearl: { bg: '#ffffff', surface: '#f8fafc', card: '#f1f5f9', border: '#e2e8f0', textPrimary: '#0f172a', textMuted: '#64748b' },
   cloud: { bg: '#f3f4f6', surface: '#e5e7eb', card: '#d1d5db', border: '#9ca3af', textPrimary: '#111827', textMuted: '#6b7280' },
+  frost: { bg: '#f1f5f9', surface: '#e2e8f0', card: '#cbd5e1', border: '#94a3b8', textPrimary: '#0f172a', textMuted: '#475569' },
   parchment: { bg: '#fdfbf7', surface: '#f4f1ea', card: '#e8e3d9', border: '#d6cebf', textPrimary: '#292524', textMuted: '#78716c' }
 };
 
@@ -72,7 +73,7 @@ export function generateThemeColors(mode: 'dark' | 'light', atmosphere: string, 
   const contrast = getContrastColor(normHex);
   
   const base = mode === 'light' 
-    ? (LIGHT_ATMOSPHERES[atmosphere] || LIGHT_ATMOSPHERES.pearl)
+    ? (LIGHT_ATMOSPHERES[atmosphere] || LIGHT_ATMOSPHERES.cloud)
     : (DARK_ATMOSPHERES[atmosphere] || DARK_ATMOSPHERES.graphite);
 
   return {
@@ -147,7 +148,6 @@ export function applyThemeSettings(settings: ThemeSettings) {
   root.style.setProperty('--theme-text-primary', activeColors.textPrimary);
   root.style.setProperty('--theme-text-muted', activeColors.textMuted);
 
-  // Lock UI font to system default, only allow custom monospace
   root.style.setProperty('--theme-font-base', "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif");
   root.style.setProperty('--theme-font-mods', settings.fontFamilyMods || MOD_FONT_PRESETS[0].value);
   root.style.colorScheme = settings.mode;

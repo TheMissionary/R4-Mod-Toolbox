@@ -2,7 +2,7 @@
 
 **Advanced Mod Manager and Conflict Resolver for Cyberpunk 2077**
 
-![RC1 Release](https://img.shields.io/badge/Release-v0.42.3_(RC1)-orange.svg)
+![Release](https://img.shields.io/badge/Release-v0.43.0-blue.svg)
 ![Platform](https://img.shields.io/badge/Platform-Windows_10_%7C_11-blue.svg)
 ![R4 Mod Toolbox Header](https://raw.githubusercontent.com/TheMissionary/R4-Mod-Toolbox/main/assets/headertemplate4.png)
 
@@ -12,8 +12,8 @@ It does not hijack your downloads or obfuscate your files inside virtual file sy
 
 ---
 
-## ✅ Release Candidate 1 (v0.42.3-rc1)
-R4 Mod Toolbox has officially reached Release Candidate 1. The core engine is stable, and the feature set is hardened. We are currently gathering community feedback and edge-case reports from users managing massive or highly complex modlists to ensure absolute stability before the 1.0 launch. Please report any bugs or UX friction in the [Issues tab](https://github.com/TheMissionary/R4-Mod-Toolbox/issues). 
+## ✅ Latest Release (v0.43.0)
+R4 Mod Toolbox has officially reached v0.43.0. The core engine is stable, and the feature set is hardened. We are currently gathering community feedback and edge-case reports from users managing massive or highly complex modlists to ensure absolute stability before the 1.0 launch. Please report any bugs or UX friction in the [Issues tab](https://github.com/TheMissionary/R4-Mod-Toolbox/issues). 
 
 ---
 

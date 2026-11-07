@@ -1,8 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { invoke } from '@tauri-apps/api/core';
+  import { invoke, convertFileSrc } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
-  import { openUrl } from '@tauri-apps/plugin-opener';
   import { info, error, warn } from '@tauri-apps/plugin-log';
   import {
     loadThemeSettings,
@@ -53,6 +52,17 @@
   let enableOrganizerView = $state(false);
   let showCategoryLabelsInLoadOrder = $state(true);
 
+  let heroBannerUrl = $state<string | null>(null);
+
+  function updateHeroBanner() {
+    const settings = loadThemeSettings();
+    if (settings.heroBannerPath) {
+      heroBannerUrl = convertFileSrc(settings.heroBannerPath);
+    } else {
+      heroBannerUrl = null;
+    }
+  }
+
   async function setTab(tab: TabType) {
     currentTab = tab;
     info(`Navigated to tab: ${tab}`);
@@ -79,14 +89,11 @@
   let redscriptPackages = $state<RedScriptItem[]>([]);
   let r6tweaks = $state<R6TweaksItem[]>([]);
 
-  // History Timeframe State
   let newModsHours = $state(6);
   let targetHighlightMod = $state<string | null>(null);
 
-  // Global Selected Path for Status Bar (To be wired in Phase 3)
-  let globalSelectedPath = $state<string>('Ready');
+  let globalSelectedPath = $state<string>('');
 
-  // Sidebar Context Menu State
   let sidebarContextMenu = $state<{
     visible: boolean;
     x: number;
@@ -198,6 +205,9 @@
   onMount(() => {
     const localSettings = loadThemeSettings();
     applyThemeSettings(localSettings);
+    updateHeroBanner();
+
+    window.addEventListener('theme-updated', updateHeroBanner);
 
     const splashStartTime = Date.now();
     const dismissSplash = () => {
@@ -247,6 +257,7 @@
     });
 
     return () => {
+      window.removeEventListener('theme-updated', updateHeroBanner);
       unlisten.then(f => f());
     };
   });
@@ -315,8 +326,8 @@
 
 <div class="flex h-screen w-screen overflow-hidden font-sans" style="background-color: var(--theme-bg); color: var(--theme-text-primary);">
   
-  <!-- Left Navigation Sidebar (Fixed Width Quick Access) -->
-  <aside class="w-64 border-r flex flex-col justify-between shrink-0 select-none" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
+  <!-- Left Navigation Sidebar -->
+  <aside class="w-64 border-r flex flex-col justify-between shrink-0 select-none z-20" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
     <div class="flex flex-col h-full overflow-hidden">
       
       <!-- Branding Header -->
@@ -417,7 +428,7 @@
         </nav>
       </div>
 
-      <!-- Bottom Utility Dock (Icon Only) -->
+      <!-- Bottom Utility Dock -->
       <div class="px-4 pb-4 pt-3 border-t flex items-center justify-between shrink-0" style="border-color: var(--theme-border); background-color: var(--theme-bg);">
         <button
           type="button"
@@ -476,9 +487,27 @@
 
   <!-- Workspace Canvas -->
   <div class="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+    
+    <!-- Full-Canvas Hero Background Layer (Enhanced Vibrancy Wash) -->
+    {#if heroBannerUrl}
+      <div class="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+        <img 
+          src={heroBannerUrl} 
+          alt="" 
+          onerror={(e) => (e.currentTarget as HTMLImageElement).style.display = 'none'}
+          class="absolute inset-0 w-full h-full object-cover object-[center_top] opacity-55 saturate-[1.15]" 
+        />
+        <!-- Multi-stop Gradient Protective Wash: Enhanced clarity at top transitioning to protective dark surface at bottom -->
+        <div 
+          class="absolute inset-0" 
+          style="background: linear-gradient(to bottom, color-mix(in srgb, var(--theme-bg) 20%, transparent) 0%, color-mix(in srgb, var(--theme-bg) 65%, transparent) 40%, var(--theme-bg) 95%);"
+        ></div>
+      </div>
+    {/if}
+
     <HeaderBar {gamePath} {currentTab} />
 
-    <main class="flex-1 overflow-y-auto {['settings', 'help', 'about', 'history'].includes(currentTab) ? 'p-0' : 'p-6'}">
+    <main class="flex-1 overflow-y-auto relative z-10 {['settings', 'help', 'about', 'history'].includes(currentTab) ? 'p-0' : 'p-6'}">
       
       <!-- Persistent Tab Views -->
       <div class={currentTab === 'archive' ? 'h-full' : 'hidden'}>
@@ -503,6 +532,7 @@
             }
           }}
           {currentTab}
+          bind:globalSelectedPath
         />
       </div>
 
@@ -514,6 +544,7 @@
           {targetHighlightMod}
           onRouteToHistory={handleNavigateToHistory}
           {currentTab}
+          bind:globalSelectedPath
         />
       </div>
 
@@ -525,6 +556,7 @@
           {targetHighlightMod}
           onRouteToHistory={handleNavigateToHistory}
           {currentTab}
+          bind:globalSelectedPath
         />
       </div>
 
@@ -536,6 +568,7 @@
           {targetHighlightMod}
           onRouteToHistory={handleNavigateToHistory}
           {currentTab}
+          bind:globalSelectedPath
         />
       </div>
 
@@ -547,6 +580,7 @@
           {targetHighlightMod}
           onRouteToHistory={handleNavigateToHistory}
           {currentTab}
+          bind:globalSelectedPath
         />
       </div>
 
@@ -584,29 +618,21 @@
       </div>
     </main>
 
-    <!-- Bottom Status Bar -->
-    <footer class="h-8 border-t flex items-center justify-between px-4 shrink-0 text-[11px] font-mono select-none" style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-muted);">
-      <!-- Left: Connection Status -->
-      <div class="flex items-center gap-2 w-48 shrink-0">
-        {#if !gamePath}
-          <AlertTriangle class="h-3.5 w-3.5" style="color: var(--color-warning);" />
-          <span class="font-bold uppercase tracking-wider" style="color: var(--color-warning);">Setup Required</span>
-        {:else if !scanResult?.is_valid_game_path}
-          <AlertCircle class="h-3.5 w-3.5" style="color: var(--color-danger);" />
-          <span class="font-bold uppercase tracking-wider" style="color: var(--color-danger);">Disconnected</span>
-        {:else}
-          <CheckCircle2 class="h-3.5 w-3.5" style="color: var(--color-success);" />
-          <span class="font-bold uppercase tracking-wider" style="color: var(--color-success);">Connected</span>
+    <!-- Bottom Status Bar (Restructured Telemetry Cluster - Point 6) -->
+    <footer class="h-8 border-t flex items-center justify-between px-4 shrink-0 text-[11px] font-mono select-none relative z-10" style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-muted);">
+      
+      <!-- Left: Active Cursor Hover Path (Empty when idle) -->
+      <div class="flex-1 min-w-0 pr-4 truncate">
+        {#if globalSelectedPath && globalSelectedPath !== 'Ready'}
+          <span class="truncate opacity-80" style="color: var(--theme-text-muted);" title={globalSelectedPath}>
+            {globalSelectedPath}
+          </span>
         {/if}
       </div>
 
-      <!-- Center: Selected Path (Wired in Phase 3) -->
-      <div class="flex-1 flex justify-center truncate px-4">
-        <span class="truncate opacity-70">{globalSelectedPath}</span>
-      </div>
-
-      <!-- Right: Sync & Counts -->
-      <div class="flex items-center justify-end gap-4 w-48 shrink-0">
+      <!-- Right: Unified Telemetry Cluster (Right-Justified with Dividers) -->
+      <div class="flex items-center gap-3 shrink-0">
+        <!-- Sync / Rescan Button -->
         <div class="flex items-center gap-1.5">
           {#if isLoading}
             <RefreshCw class="h-3 w-3 animate-spin" style="color: var(--theme-accent);" />
@@ -617,14 +643,35 @@
             </button>
           {/if}
         </div>
-        
+
+        <!-- Vertical Divider -->
+        <div class="h-3 w-px" style="background-color: var(--theme-border);"></div>
+
+        <!-- Active Mod Metrics -->
         {#if ['archive', 'cet', 'red4ext', 'redscript', 'r6tweaks'].includes(currentTab)}
           <div class="flex items-center gap-1">
             <span>Active:</span>
             <span class="font-bold" style="color: var(--theme-text-primary);">{activeCount}</span>
             <span>of {totalCount}</span>
           </div>
+
+          <!-- Vertical Divider -->
+          <div class="h-3 w-px" style="background-color: var(--theme-border);"></div>
         {/if}
+
+        <!-- Connection Integrity (Right-Justified) -->
+        <div class="flex items-center gap-1.5">
+          {#if !gamePath}
+            <AlertTriangle class="h-3.5 w-3.5" style="color: var(--color-warning);" />
+            <span class="font-bold uppercase tracking-wider" style="color: var(--color-warning);">Setup Required</span>
+          {:else if !scanResult?.is_valid_game_path}
+            <AlertCircle class="h-3.5 w-3.5" style="color: var(--color-danger);" />
+            <span class="font-bold uppercase tracking-wider" style="color: var(--color-danger);">Disconnected</span>
+          {:else}
+            <CheckCircle2 class="h-3.5 w-3.5" style="color: var(--color-success);" />
+            <span class="font-bold uppercase tracking-wider" style="color: var(--color-success);">Connected</span>
+          {/if}
+        </div>
       </div>
     </footer>
   </div>

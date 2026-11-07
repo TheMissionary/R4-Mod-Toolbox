@@ -12,6 +12,23 @@
 
   const changelog = [
     {
+      version: "0.43.0",
+      date: "October 2026",
+      changes: [
+        "IDE & File-Explorer Paradigm: Transitioned to an uncluttered workspace layout featuring a 240px Quick Access left rail, breadcrumb navigation header, and unified telemetry status bar.",
+        "Restructured Telemetry Status Bar: Replaced legacy center text with live cursor hover path streaming on the left and right-justified system indicators ([Rescan] | [Active: X of Y] | [● Connected]) separated by clean vertical dividers.",
+        "Full-Canvas Atmospheric Hero Wash: Extended custom background images across the entire workspace stage, layered with a protective multi-stop gradient wash to maintain strict WCAG AA (4.5:1) text contrast over data rows.",
+        "Laser-Straight Vertical Symmetry: Locked grip handles and checkboxes to dedicated, fixed-width columns across all mod and group rows.",
+        "IDE Tree Guide Wires: Nested child mods display continuous vertical guide lines and horizontal branches (├─), providing clear structural indentation under virtual groups without horizontal checkbox drift.",
+        "Elevated Group Banners: Group separators feature subtle surface banding with an accent line marker and dedicated mod count pills (X mods).",
+        "Clean Action Ergonomics: Moved Group Rename and Delete actions to the far-right edge, revealing cleanly on row hover only.",
+        "High-Contrast Checkbox Fill: Solid accent fills with luminosity-adaptive contrast checkmarks across all framework tabs.",
+        "New Base Atmospheres: Added 'Frost' (an icy Nordic slate neutral) and established 'Graphite' and 'Cloud' as the hardcoded defaults for Dark and Light modes respectively.",
+        "Hover Ergonomics: Implemented a distinct 12% accent-tinted highlight when mousing over any mod row, clearing seamlessly on mouse exit.",
+        "Tab-Exit Selection Clearing: Active multi-select highlights are now strictly cleared the moment a user navigates away from the active framework tab."
+      ]
+    },
+    {
       version: "0.42.3 (RC1)",
       date: "October 2026",
       changes: [
@@ -19,16 +36,7 @@
         "Personal Mod Notes: Added the ability to attach personal notes to any mod via the right-click context menu, complete with a dedicated UI modal and visual indicators.",
         "Organizer View Enhancements: Introduced a responsive Grid Layout (Span-Full) for categories, a Column Control dropdown (Auto, 1, 2, or 3 columns), and dynamic hover illumination for drag-and-drop targeting.",
         "Strict Search Decoupling: Search queries are now strictly isolated and automatically cleared when navigating between Load Order, Organizer, and framework tabs.",
-        "Mod List Export: Added a new utility in the Settings tab to export the entire load order and framework mod lists to a formatted .txt file.",
-        "UI/UX Refinements: Redesigned the About page for better symmetry, updated visual switch backgrounds (tinted green/red), and implemented gray conflict dots for disabled mods."
-      ]
-    },
-    {
-      version: "0.42.2 (RC1 Hotfix)",
-      date: "October 2026",
-      changes: [
-        "Framework Tab Rendering Crash: Resolved a fatal UI rendering halt (empty lists) in the CET, RED4ext, R6\\Scripts, and R6\\Tweaks tabs caused by duplicate mod folders.",
-        "Universal Synchronization: Implemented a new automated local build workflow that synchronizes versioning across all core configuration files and the public README.md."
+        "Mod List Export: Added a new utility in the Settings tab to export the entire load order and framework mod lists to a formatted .txt file."
       ]
     },
     {
@@ -41,8 +49,7 @@
         "Full-Spectrum Color Picker: Integrated a native color wheel directly into category creation and editing dialogs, eliminating the need for external hex tools.",
         "Real-Time Organizer Search: Wired the search bar directly into the Organizer View, auto-expanding categories with matches, highlighting matching mods, and dimming non-matches.",
         "Universal History Routing: Added 'Show in History' across all framework tabs, automatically routing users to the mod ledger with all-time context.",
-        "Antivirus Compliance & Verifiable Cloud Builds: Excised all background process commands, implemented clean OS-native handlers, and integrated GitHub Actions CI/CD for public build provenance (0/62 clean MSI scan).",
-        "Special Acknowledgement: Dedicated card in About R4 honoring community collaborator rapsodyas for their essential feedback and design insights throughout the Organizer View's development."
+        "Antivirus Compliance & Verifiable Cloud Builds: Excised all background process commands, implemented clean OS-native handlers, and integrated GitHub Actions CI/CD for public build provenance (0/62 clean MSI scan)."
       ]
     }
   ];
@@ -103,7 +110,7 @@
             </div>
             <div>
               <div class="text-lg font-bold" style="color: var(--theme-text-primary);">R4 Mod Toolbox</div>
-              <div class="text-xs font-mono mt-0.5" style="color: var(--theme-text-muted);">Version 0.42.3-rc1</div>
+              <div class="text-xs font-mono mt-0.5" style="color: var(--theme-text-muted);">Version 0.43.0</div>
             </div>
           </div>
         </div>
