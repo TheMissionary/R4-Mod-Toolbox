@@ -5,7 +5,7 @@
   import { 
     Plus, Pencil, Trash2, GripVertical, FileArchive, LayoutGrid, Tag, ListTree, 
     FolderSearch, FolderInput, X, ChevronDown, ChevronRight, Folder, FolderOpen,
-    Archive, RotateCcw, Package, Search, MessageSquare, Columns
+    Archive, RotateCcw, Package, Search, MessageSquare, Columns, MoreVertical
   } from 'lucide-svelte';
   import CategoryModal from './CategoryModal.svelte';
   import DialogModal from './DialogModal.svelte';
@@ -230,10 +230,19 @@
       labelsConfig.categories = [...labelsConfig.categories, { ...data, id: newId, stashed: false }];
       if (selectedMods.size > 0) {
         const newAssignments = { ...labelsConfig.assignments };
-        for (const mod of selectedMods) {
+        const newOrders = { ...(labelsConfig.orders || {}) };
+        
+        // Explicitly sort alphabetically on initial creation
+        const sortedSelected = Array.from(selectedMods).sort((a, b) => a.localeCompare(b));
+        
+        for (const mod of sortedSelected) {
           newAssignments[mod] = newId;
         }
+        newOrders[newId] = sortedSelected;
+        
         labelsConfig.assignments = newAssignments;
+        labelsConfig.orders = newOrders;
+        
         selectedMods.clear();
         selectedMods = new Set();
         lastSelectedMod = null;
@@ -348,10 +357,22 @@
       return;
     }
     const newAssignments = { ...labelsConfig.assignments };
-    for (const mod of selectedMods) {
+    const newOrders = { ...(labelsConfig.orders || {}) };
+    const targetOrder = newOrders[actionOrId] || [];
+    
+    // Explicitly sort alphabetically on initial move
+    const sortedSelected = Array.from(selectedMods).sort((a, b) => a.localeCompare(b));
+    
+    for (const mod of sortedSelected) {
       newAssignments[mod] = actionOrId;
+      if (!targetOrder.includes(mod)) {
+        targetOrder.push(mod);
+      }
     }
+    newOrders[actionOrId] = targetOrder;
+    
     labelsConfig.assignments = newAssignments;
+    labelsConfig.orders = newOrders;
     saveConfig();
     isMoveCatModalOpen = false;
   }
@@ -450,40 +471,69 @@
           categoryDropTargetId = 'stash';
           categoryDropPlacement = null;
         } else {
-          const catElements = Array.from(document.querySelectorAll('.organizer-category-header'));
-          let closestCat: Element | null = null;
-          let minDistance = Infinity;
-          for (const el of catElements) {
-            const rect = el.getBoundingClientRect();
-            const midY = rect.top + rect.height / 2;
-            const dist = Math.abs(e.clientY - midY);
-            if (dist < minDistance) {
-              minDistance = dist;
-              closestCat = el;
-            }
-          }
+          // 2D Pointer Hit Detection for Categories (Absolute Insertion Index Normalization)
+          const el = document.elementFromPoint(e.clientX, e.clientY);
+          const closestCat = el?.closest('.organizer-category-header');
           if (closestCat) {
             const targetId = closestCat.getAttribute('data-category-id');
-            if (targetId && targetId !== activeCategoryDragId) {
-              categoryDropTargetId = targetId;
+            if (targetId) {
               const rect = closestCat.getBoundingClientRect();
-              categoryDropPlacement = e.clientY < (rect.top + rect.height / 2) ? 'before' : 'after';
-            } else {
-              categoryDropTargetId = null;
-              categoryDropPlacement = null;
+              const isTopHalf = e.clientY < (rect.top + rect.height / 2);
+              
+              const targetIdx = activeCategories.findIndex(c => c.id === targetId);
+              if (targetIdx !== -1) {
+                let insertIdx = isTopHalf ? targetIdx : targetIdx + 1;
+                const dragIdx = activeCategories.findIndex(c => c.id === activeCategoryDragId);
+                
+                // Prevent dropping on itself
+                if (insertIdx === dragIdx || insertIdx === dragIdx + 1) {
+                  categoryDropTargetId = null;
+                  categoryDropPlacement = null;
+                } else {
+                  // Normalize to always use 'before' unless it's the very end of the list
+                  if (insertIdx < activeCategories.length) {
+                    categoryDropTargetId = activeCategories[insertIdx].id;
+                    categoryDropPlacement = 'before';
+                  } else {
+                    categoryDropTargetId = activeCategories[activeCategories.length - 1].id;
+                    categoryDropPlacement = 'after';
+                  }
+                }
+              }
             }
+          } else {
+            categoryDropTargetId = null;
+            categoryDropPlacement = null;
           }
         }
       } else {
         const el = document.elementFromPoint(e.clientX, e.clientY);
         const targetContainer = el?.closest('[data-category-id]');
         activeDropTarget = targetContainer ? targetContainer.getAttribute('data-category-id') : null;
+        
+        // 2D Pointer Hit Detection for Mods (Absolute Insertion Index Normalization)
         const modEl = el?.closest('[data-mod-name]');
         if (modEl && activeDropTarget) {
           const rect = modEl.getBoundingClientRect();
-          const mid = rect.top + rect.height / 2;
-          dropPlacement = e.clientY < mid ? 'before' : 'after';
-          dropTargetMod = modEl.getAttribute('data-mod-name');
+          const isTopHalf = e.clientY < (rect.top + rect.height / 2);
+          const hoveredMod = modEl.getAttribute('data-mod-name');
+          
+          let currentVisualOrder = activeDropTarget === 'uncategorized' 
+            ? sortedUncategorizedMods.map(m => m.file_name)
+            : (sortedCategorizedMods.get(activeDropTarget) || []).map(m => m.file_name);
+            
+          const targetIdx = currentVisualOrder.indexOf(hoveredMod || '');
+          if (targetIdx !== -1) {
+            let insertIdx = isTopHalf ? targetIdx : targetIdx + 1;
+            
+            if (insertIdx < currentVisualOrder.length) {
+              dropTargetMod = currentVisualOrder[insertIdx];
+              dropPlacement = 'before';
+            } else {
+              dropTargetMod = currentVisualOrder[currentVisualOrder.length - 1];
+              dropPlacement = 'after';
+            }
+          }
         } else {
           dropTargetMod = null;
           dropPlacement = null;
@@ -585,10 +635,10 @@
   <div
     id="dnd-ghost"
     class="fixed pointer-events-none z-50 px-3 py-1.5 rounded-lg border shadow-2xl shadow-black/60 flex items-center gap-2.5 backdrop-blur-md -translate-x-4 -translate-y-6"
-    style="left: {currentX}px; top: {currentY}px; background-color: var(--theme-card); border-color: var(--color-info);"
+    style="left: {currentX}px; top: {currentY}px; background-color: var(--theme-card); border-color: var(--theme-accent);"
   >
-    <GripVertical class="h-3.5 w-3.5" style="color: var(--color-info);" />
-    <FileArchive class="h-3.5 w-3.5" style="color: var(--color-info);" />
+    <GripVertical class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
+    <FileArchive class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
     <span class="text-xs font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">
       {#if selectedMods.size > 1}
         {selectedMods.size} Mods Selected
@@ -738,8 +788,10 @@
 
 <div class="flex h-full gap-4 overflow-hidden select-none" onpointerdown={clearSelection}>
   
-  <!-- Left: Grid Active Category Layout -->
+  <!-- Left: Split View (Category Tray & Active Canvas) -->
   <div class="flex-1 flex flex-col min-w-0 overflow-hidden" onpointerdown={clearSelection}>
+    
+    <!-- Header Controls -->
     <div class="flex items-center justify-between mb-4 shrink-0">
       <div class="flex items-center gap-2">
         <LayoutGrid class="h-4 w-4" style="color: var(--color-info);" />
@@ -808,38 +860,37 @@
       </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto pr-2 pb-4" onpointerdown={clearSelection}>
-      {#if activeCategories.length === 0}
-        <div class="h-full flex flex-col items-center justify-center border-2 border-dashed rounded-xl" style="color: var(--theme-text-muted); border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-surface) 20%, transparent);">
-          <LayoutGrid class="h-8 w-8 mb-3 opacity-30" />
-          <p class="text-xs font-medium">No active virtual categories.</p>
-          <p class="text-[10px] mt-1 opacity-70">Click "Add Category" or restore shelved categories from The Stash.</p>
-        </div>
-      {:else}
-        <!-- Grid Layout Implementation -->
-        {@const gridColsClass = organizerColumns === '1' ? 'grid-cols-1' : 
-                                organizerColumns === '2' ? 'grid-cols-2' : 
-                                organizerColumns === '3' ? 'grid-cols-3' : 
-                                'grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3'}
-        <div class="grid {gridColsClass} gap-3" onpointerdown={clearSelection}>
+    {#if activeCategories.length === 0}
+      <div class="flex-1 flex flex-col items-center justify-center border-2 border-dashed rounded-xl" style="color: var(--theme-text-muted); border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-surface) 20%, transparent);">
+        <LayoutGrid class="h-8 w-8 mb-3 opacity-30" />
+        <p class="text-xs font-medium">No active virtual categories.</p>
+        <p class="text-[10px] mt-1 opacity-70">Click "Add Category" or restore shelved categories from The Stash.</p>
+      </div>
+    {:else}
+      <!-- Category Tray (Top Section) -->
+      {@const columnsClass = organizerColumns === '1' ? 'columns-1' : 
+                             organizerColumns === '2' ? 'columns-2' : 
+                             organizerColumns === '3' ? 'columns-3' : 
+                             'columns-1 lg:columns-2 2xl:columns-3'}
+      
+      <div class="shrink-0 max-h-[40%] overflow-y-auto pr-2 pb-4 pt-2 border-b mb-4" style="border-color: color-mix(in srgb, var(--theme-border) 50%, transparent);" onpointerdown={clearSelection}>
+        <div class="{columnsClass} gap-3">
           {#each activeCategories as cat (cat.id)}
             {@const mods = sortedCategorizedMods.get(cat.id) || []}
             {@const matchesSearch = doesCategoryMatch(cat, mods)}
             {@const isHovered = isDragging && !activeCategoryDragId && activeDropTarget === cat.id}
+            {@const isExpanded = !collapsedCategories[cat.id]}
             
-            <!-- Span-Full Logic -->
-            <div class="relative flex flex-col transition-opacity duration-200 {isSearching && !matchesSearch ? 'opacity-25' : 'opacity-100'} {!collapsedCategories[cat.id] ? 'col-span-full' : ''}">
+            <div class="break-inside-avoid mb-3 relative flex flex-col transition-opacity duration-200 {isSearching && !matchesSearch ? 'opacity-25' : 'opacity-100'}">
               
-              <!-- Drop Indicator Before Category -->
               {#if isDragging && activeCategoryDragId && categoryDropTargetId === cat.id && categoryDropPlacement === 'before'}
-                <div class="absolute -top-1 left-0 right-0 h-[2.5px] z-30" style="background-color: var(--color-info); box-shadow: 0 0 12px color-mix(in srgb, var(--color-info) 80%, transparent);"></div>
+                <div class="absolute top-0 left-0 right-0 h-[2.5px] z-30 pointer-events-none" style="background-color: var(--theme-accent); box-shadow: 0 0 12px color-mix(in srgb, var(--theme-accent) 80%, transparent);"></div>
               {/if}
 
-              <!-- Category Header -->
               <div
-                class="organizer-category-header group rounded-lg border transition-all duration-300 {activeCategoryDragId === cat.id ? 'opacity-30 border-dashed' : ''} {isHovered ? 'ring-1' : ''}"
+                class="organizer-category-header group rounded-lg border transition-all duration-300 {activeCategoryDragId === cat.id ? 'opacity-30 border-dashed' : ''} {isHovered ? 'ring-1' : ''} {isExpanded ? 'ring-1 shadow-md' : ''}"
                 data-category-id={cat.id}
-                style="background-color: color-mix(in srgb, {cat.color} {isHovered ? '25%' : '15%'}, transparent); border-color: {isHovered ? cat.color : 'var(--theme-border)'}; {isHovered ? `box-shadow: 0 0 15px color-mix(in srgb, ${cat.color} 40%, transparent);` : ''}"
+                style="background-color: color-mix(in srgb, {cat.color} {isHovered || isExpanded ? '25%' : '15%'}, transparent); border-color: {isHovered || isExpanded ? cat.color : 'var(--theme-border)'}; {isHovered || isExpanded ? `box-shadow: 0 0 15px color-mix(in srgb, ${cat.color} 40%, transparent);` : ''}"
                 oncontextmenu={(e) => openCategoryContextMenu(e, cat)}
               >
                 <div class="flex items-center justify-between px-3 gap-2 density-row relative overflow-hidden">
@@ -865,115 +916,108 @@
                     >
                       {#if collapsedCategories[cat.id]}
                         <ChevronRight class="h-4 w-4 shrink-0" style="color: var(--theme-text-muted);" />
-                        <Folder class="h-4 w-4 shrink-0" style="color: var(--theme-text-muted);" />
                       {:else}
                         <ChevronDown class="h-4 w-4 shrink-0" style="color: var(--theme-text-muted);" />
-                        <FolderOpen class="h-4 w-4 shrink-0" style="color: var(--theme-text-muted);" />
                       {/if}
                       <span class="font-bold uppercase tracking-wider truncate">{cat.name}</span>
                     </button>
-
-                    <span class="text-[10px] font-mono shrink-0 opacity-80" style="color: var(--theme-text-muted);">
-                      ({mods.length} {mods.length === 1 ? 'mod' : 'mods'})
-                    </span>
                   </div>
 
                   <div class="flex items-center gap-1.5 shrink-0">
-                    {#if !collapsedCategories[cat.id]}
-                      <button 
-                        type="button"
-                        onclick={() => toggleStashCategory(cat)} 
-                        class="p-1 rounded transition cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-warning)_10%,transparent)]" 
-                        style="color: var(--theme-text-muted);"
-                        title="Move Category to Stash (Also suppresses label in load order)"
-                      >
-                        <Archive class="h-3.5 w-3.5 hover:text-[var(--color-warning)]" />
-                      </button>
-                      <button 
-                        type="button"
-                        onclick={() => openEditModal(cat)} 
-                        class="p-1 rounded transition cursor-pointer hover:bg-[var(--theme-surface)]" 
-                        style="color: var(--theme-text-muted);"
-                        title="Edit Category"
-                      >
-                        <Pencil class="h-3.5 w-3.5 hover:text-[var(--color-info)]" />
-                      </button>
-                      <button 
-                        type="button"
-                        onclick={() => confirmDelete(cat)} 
-                        class="p-1 rounded transition cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-danger)_10%,transparent)]" 
-                        style="color: var(--theme-text-muted);"
-                        title="Delete Category"
-                      >
-                        <Trash2 class="h-3.5 w-3.5 hover:text-[var(--color-danger)]" />
-                      </button>
-                    {/if}
+                    <span class="text-[10px] font-mono shrink-0 opacity-80" style="color: var(--theme-text-muted);">
+                      ({mods.length})
+                    </span>
+                    
+                    <button 
+                      type="button"
+                      onclick={(e) => openCategoryContextMenu(e, cat)} 
+                      class="p-1 rounded transition cursor-pointer opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-surface)]" 
+                      style="color: var(--theme-text-muted);"
+                      title="More options"
+                    >
+                      <MoreVertical class="h-3.5 w-3.5 hover:text-[var(--theme-text-primary)]" />
+                    </button>
                   </div>
                 </div>
               </div>
 
-              <!-- Drop Indicator After Category -->
               {#if isDragging && activeCategoryDragId && categoryDropTargetId === cat.id && categoryDropPlacement === 'after'}
-                <div class="absolute -bottom-1 left-0 right-0 h-[2.5px] z-30" style="background-color: var(--color-info); box-shadow: 0 0 12px color-mix(in srgb, var(--color-info) 80%, transparent);"></div>
-              {/if}
-
-              <!-- Category Body (Mods) -->
-              {#if !collapsedCategories[cat.id]}
-                <div class="flex flex-col space-y-1 mt-1 mb-2" data-category-id={cat.id} onpointerdown={clearSelection}>
-                  {#if mods.length === 0}
-                    <div class="ml-3 pl-4 py-2 text-[10px] font-mono italic pointer-events-none border-l" style="color: color-mix(in srgb, var(--theme-text-muted) 50%, transparent); border-color: color-mix(in srgb, var(--theme-border) 45%, transparent);">
-                      Drag mods here
-                    </div>
-                  {:else}
-                    <!-- Multi-column grid for mods inside the expanded category -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-2 ml-3 pl-2 border-l pt-1" style="border-color: color-mix(in srgb, var(--theme-border) 45%, transparent);">
-                      {#each mods as mod}
-                        {@const isTargetMatch = doesModMatch(mod.file_name)}
-                        <div class="relative flex flex-col">
-                          
-                          {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'before' && !selectedMods.has(mod.file_name)}
-                            <div class="absolute -top-1 left-0 right-0 h-[2.5px] z-30" style="background-color: var(--color-info); box-shadow: 0 0 12px color-mix(in srgb, var(--color-info) 80%, transparent);"></div>
-                          {/if}
-
-                          <div
-                            onpointerdown={(e) => handlePointerDown(e, mod.file_name)}
-                            oncontextmenu={(e) => openContextMenu(e, mod.file_name)}
-                            ondblclick={() => onShowInLoadOrder && onShowInLoadOrder(mod.file_name)}
-                            class="flex items-center justify-between px-2 py-1.5 rounded border transition density-row cursor-pointer z-10 
-                              {selectedMods.has(mod.file_name) ? 'opacity-50' : (isTargetMatch ? 'ring-1' : 'hover:brightness-125')}"
-                            style="{selectedMods.has(mod.file_name) ? 'background-color: color-mix(in srgb, var(--color-info) 15%, transparent); border-color: color-mix(in srgb, var(--color-info) 60%, transparent);' : (isTargetMatch ? 'background-color: color-mix(in srgb, var(--color-info) 20%, transparent); border-color: var(--color-info); box-shadow: 0 0 0 1px var(--color-info);' : 'background-color: var(--theme-surface); border-color: color-mix(in srgb, var(--theme-border) 50%, transparent);')}"
-                            data-mod-name={mod.file_name}
-                            title="Double-click to locate in Load Order"
-                          >
-                            <div class="flex items-center gap-2 min-w-0">
-                              <GripVertical class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
-                              <FileArchive class="h-3.5 w-3.5 shrink-0" style="color: {isTargetMatch ? 'var(--color-info)' : 'var(--theme-text-muted)'};" />
-                              <span class="text-[11px] font-mono truncate {isTargetMatch ? 'font-bold' : (mod.enabled ? '' : 'opacity-50 line-through')}" style="color: {isTargetMatch ? 'var(--color-info)' : 'var(--theme-text-primary)'};">
-                                {mod.file_name}
-                              </span>
-                            </div>
-                            
-                            {#if notesConfig[mod.file_name]}
-                              <div class="shrink-0 ml-2" title={notesConfig[mod.file_name]}>
-                                <MessageSquare class="h-3.5 w-3.5" style="color: var(--color-warning);" />
-                              </div>
-                            {/if}
-                          </div>
-
-                          {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'after' && !selectedMods.has(mod.file_name)}
-                            <div class="absolute -bottom-1 left-0 right-0 h-[2.5px] z-30" style="background-color: var(--color-info); box-shadow: 0 0 12px color-mix(in srgb, var(--color-info) 80%, transparent);"></div>
-                          {/if}
-                        </div>
-                      {/each}
-                    </div>
-                  {/if}
-                </div>
+                <div class="absolute bottom-0 left-0 right-0 h-[2.5px] z-30 pointer-events-none" style="background-color: var(--theme-accent); box-shadow: 0 0 12px color-mix(in srgb, var(--theme-accent) 80%, transparent);"></div>
               {/if}
             </div>
           {/each}
         </div>
-      {/if}
-    </div>
+      </div>
+
+      <!-- Active Canvas (Bottom Section) -->
+      <div class="flex-1 overflow-y-auto pr-2 pb-4 pt-2" onpointerdown={clearSelection}>
+        {#each activeCategories.filter(c => !collapsedCategories[c.id]) as cat (cat.id)}
+          {@const mods = sortedCategorizedMods.get(cat.id) || []}
+          <div class="mb-6" data-category-id={cat.id}>
+            
+            <!-- Canvas Section Header -->
+            <div class="flex items-center gap-2 mb-3 px-1">
+              <div class="h-3 w-3 rounded-full shadow-sm" style="background-color: {cat.color};"></div>
+              <h4 class="text-sm font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">{cat.name}</h4>
+            </div>
+
+            {#if mods.length === 0}
+              <div class="ml-3 pl-4 py-2 text-[10px] font-mono italic pointer-events-none border-l" style="color: color-mix(in srgb, var(--theme-text-muted) 50%, transparent); border-color: color-mix(in srgb, var(--theme-border) 45%, transparent);">
+                Drag mods here
+              </div>
+            {:else}
+              <!-- CSS Columns for Vertical Flow -->
+              <div class="{columnsClass} gap-3">
+                {#each mods as mod}
+                  {@const isTargetMatch = doesModMatch(mod.file_name)}
+                  {@const isSelected = selectedMods.has(mod.file_name)}
+                  <div class="break-inside-avoid mb-3 relative flex flex-col">
+                    
+                    {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'before' && !isSelected}
+                      <div class="absolute top-0 left-0 right-0 h-[2.5px] z-30 pointer-events-none" style="background-color: var(--theme-accent); box-shadow: 0 0 12px color-mix(in srgb, var(--theme-accent) 80%, transparent);"></div>
+                    {/if}
+
+                    <div
+                      onpointerdown={(e) => handlePointerDown(e, mod.file_name)}
+                      oncontextmenu={(e) => openContextMenu(e, mod.file_name)}
+                      ondblclick={() => onShowInLoadOrder && onShowInLoadOrder(mod.file_name)}
+                      class="flex items-center justify-between px-2 py-1.5 rounded border transition density-row cursor-pointer z-10 
+                        {isSelected ? 'ring-1 z-10 relative' : (isTargetMatch ? 'ring-1' : 'hover:brightness-125')}"
+                      style="{isSelected ? 'background-color: color-mix(in srgb, var(--theme-accent) 15%, transparent); border-color: var(--theme-accent); box-shadow: 0 0 15px color-mix(in srgb, var(--theme-accent) 35%, transparent);' : (isTargetMatch ? 'background-color: color-mix(in srgb, var(--color-info) 20%, transparent); border-color: var(--color-info); box-shadow: 0 0 0 1px var(--color-info);' : 'background-color: var(--theme-surface); border-color: color-mix(in srgb, var(--theme-border) 50%, transparent);')}"
+                      data-mod-name={mod.file_name}
+                      title="Double-click to locate in Load Order"
+                    >
+                      <div class="flex items-center gap-2 min-w-0">
+                        <GripVertical class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
+                        <FileArchive class="h-3.5 w-3.5 shrink-0" style="color: {isTargetMatch ? 'var(--color-info)' : 'var(--theme-text-muted)'};" />
+                        <span class="text-[11px] font-mono truncate {isTargetMatch ? 'font-bold' : (mod.enabled ? '' : 'opacity-50 line-through')}" style="color: {isTargetMatch ? 'var(--color-info)' : 'var(--theme-text-primary)'};">
+                          {mod.file_name}
+                        </span>
+                      </div>
+                      
+                      {#if notesConfig[mod.file_name]}
+                        <button 
+                          type="button"
+                          onclick={(e) => { e.stopPropagation(); targetNoteModName = mod.file_name; isNoteModalOpen = true; }}
+                          class="shrink-0 ml-2 hover:scale-110 transition-transform cursor-pointer" 
+                          title={notesConfig[mod.file_name]}
+                        >
+                          <MessageSquare class="h-3.5 w-3.5" style="color: var(--color-warning);" />
+                        </button>
+                      {/if}
+                    </div>
+
+                    {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'after' && !isSelected}
+                      <div class="absolute bottom-0 left-0 right-0 h-[2.5px] z-30 pointer-events-none" style="background-color: var(--theme-accent); box-shadow: 0 0 12px color-mix(in srgb, var(--theme-accent) 80%, transparent);"></div>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    {/if}
   </div>
 
   <!-- Right: The Stash Drawer -->
@@ -1025,7 +1069,7 @@
                     </div>
                     <span class="text-xs font-bold truncate" style="color: var(--theme-text-primary);">{cat.name}</span>
                     <span class="text-[10px] font-mono shrink-0" style="color: var(--theme-text-muted);">
-                      ({catMods.length} {catMods.length === 1 ? 'mod' : 'mods'})
+                      ({catMods.length})
                     </span>
                   </div>
 
@@ -1062,9 +1106,10 @@
             <div class="space-y-1">
               {#each sortedUncategorizedMods as mod (mod.file_name)}
                 {@const isTargetMatch = doesModMatch(mod.file_name)}
+                {@const isSelected = selectedMods.has(mod.file_name)}
                 <div class="relative flex flex-col">
-                  {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'before' && !selectedMods.has(mod.file_name)}
-                    <div class="absolute -top-1 left-0 right-0 h-[2.5px] z-30" style="background-color: var(--color-info); box-shadow: 0 0 12px color-mix(in srgb, var(--color-info) 80%, transparent);"></div>
+                  {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'before' && !isSelected}
+                    <div class="absolute top-0 left-0 right-0 h-[2.5px] z-30 pointer-events-none" style="background-color: var(--theme-accent); box-shadow: 0 0 12px color-mix(in srgb, var(--theme-accent) 80%, transparent);"></div>
                   {/if}
 
                   <div
@@ -1072,8 +1117,8 @@
                     oncontextmenu={(e) => openContextMenu(e, mod.file_name)}
                     ondblclick={() => onShowInLoadOrder && onShowInLoadOrder(mod.file_name)}
                     class="flex items-center justify-between px-2 py-1.5 rounded border transition density-row cursor-pointer 
-                      {selectedMods.has(mod.file_name) ? 'opacity-50' : (isTargetMatch ? 'ring-1' : 'hover:brightness-125')}"
-                    style="{selectedMods.has(mod.file_name) ? 'background-color: color-mix(in srgb, var(--color-info) 15%, transparent); border-color: color-mix(in srgb, var(--color-info) 60%, transparent);' : (isTargetMatch ? 'background-color: color-mix(in srgb, var(--color-info) 20%, transparent); border-color: var(--color-info); box-shadow: 0 0 0 1px var(--color-info);' : 'background-color: var(--theme-surface); border-color: color-mix(in srgb, var(--theme-border) 50%, transparent);')}"
+                      {isSelected ? 'ring-1 z-10 relative' : (isTargetMatch ? 'ring-1' : 'hover:brightness-125')}"
+                    style="{isSelected ? 'background-color: color-mix(in srgb, var(--theme-accent) 15%, transparent); border-color: var(--theme-accent); box-shadow: 0 0 15px color-mix(in srgb, var(--theme-accent) 35%, transparent);' : (isTargetMatch ? 'background-color: color-mix(in srgb, var(--color-info) 20%, transparent); border-color: var(--color-info); box-shadow: 0 0 0 1px var(--color-info);' : 'background-color: var(--theme-surface); border-color: color-mix(in srgb, var(--theme-border) 50%, transparent);')}"
                     data-mod-name={mod.file_name}
                     title="Double-click to locate in Load Order"
                   >
@@ -1086,14 +1131,19 @@
                     </div>
 
                     {#if notesConfig[mod.file_name]}
-                      <div class="shrink-0 ml-2" title={notesConfig[mod.file_name]}>
+                      <button 
+                        type="button"
+                        onclick={(e) => { e.stopPropagation(); targetNoteModName = mod.file_name; isNoteModalOpen = true; }}
+                        class="shrink-0 ml-2 hover:scale-110 transition-transform cursor-pointer" 
+                        title={notesConfig[mod.file_name]}
+                      >
                         <MessageSquare class="h-3.5 w-3.5" style="color: var(--color-warning);" />
-                      </div>
+                      </button>
                     {/if}
                   </div>
 
-                  {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'after' && !selectedMods.has(mod.file_name)}
-                    <div class="absolute -bottom-1 left-0 right-0 h-[2.5px] z-30" style="background-color: var(--color-info); box-shadow: 0 0 12px color-mix(in srgb, var(--color-info) 80%, transparent);"></div>
+                  {#if isDragging && !activeCategoryDragId && dropTargetMod === mod.file_name && dropPlacement === 'after' && !isSelected}
+                    <div class="absolute bottom-0 left-0 right-0 h-[2.5px] z-30 pointer-events-none" style="background-color: var(--theme-accent); box-shadow: 0 0 12px color-mix(in srgb, var(--theme-accent) 80%, transparent);"></div>
                   {/if}
                 </div>
               {/each}
