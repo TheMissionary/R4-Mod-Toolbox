@@ -12,6 +12,19 @@
 
   const changelog = [
     {
+      version: "0.44.0",
+      date: "October 2026",
+      changes: [
+        "Split-View Organizer: Completely redesigned the Organizer View into a dual-pane architecture featuring a dedicated Category Tray at the top and an Active Canvas below, eliminating vertical fragmentation.",
+        "Vertical Shift-Select: Converted the underlying grid architecture to CSS Columns, enforcing a strict top-to-bottom flow that makes multi-selecting (Shift-Click) highly intuitive.",
+        "WYSIWYG Drag & Drop: Rewrote the drag-and-drop hit detection engine to use 2D pointer targeting. Drop lines now render with pixel-perfect accuracy across multiple columns and at the absolute top/bottom of lists.",
+        "Selection Ergonomics: Replaced the legacy \"dimming\" selection effect with a high-visibility neon accent outline and 15% background tint, preserving conflict color-coding while clearly indicating selected mods.",
+        "Global Bulk Actions: Injected \"Enable All\" and \"Disable All\" action buttons into the top toolbar of all framework tabs, protected by a nuclear-option safety confirmation dialog.",
+        "Note Tooltips: Standardized the Note icon across all views to display your custom text on hover, while remaining fully clickable for quick edits.",
+        "Default State Refinement: The Organizer View now defaults to a fully collapsed state upon initial load to prevent UI overwhelm on massive load orders."
+      ]
+    },
+    {
       version: "0.43.0",
       date: "October 2026",
       changes: [
@@ -110,7 +123,7 @@
             </div>
             <div>
               <div class="text-lg font-bold" style="color: var(--theme-text-primary);">R4 Mod Toolbox</div>
-              <div class="text-xs font-mono mt-0.5" style="color: var(--theme-text-muted);">Version 0.43.0</div>
+              <div class="text-xs font-mono mt-0.5" style="color: var(--theme-text-muted);">Version 0.44.0</div>
             </div>
           </div>
         </div>

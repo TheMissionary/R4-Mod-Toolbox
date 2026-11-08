@@ -51,14 +51,16 @@
 
   let organizerColumns = $state<'auto' | '1' | '2' | '3'>('auto');
 
-  let collapsedCategories = $state<Record<string, boolean>>({});
+  // Inverted state: Categories are collapsed by default. 
+  // If their ID is in this object as true, they are expanded.
+  let expandedCategories = $state<Record<string, boolean>>({});
   
   let activeCategories = $derived(labelsConfig.categories.filter(c => !c.stashed));
   let stashedCategories = $derived(labelsConfig.categories.filter(c => c.stashed));
 
   let totalActiveCategories = $derived(activeCategories.length);
-  let collapsedCount = $derived(activeCategories.filter(c => collapsedCategories[c.id]).length);
-  let isAllCollapsed = $derived(totalActiveCategories > 0 && collapsedCount === totalActiveCategories);
+  let expandedCount = $derived(activeCategories.filter(c => expandedCategories[c.id]).length);
+  let isAllExpanded = $derived(totalActiveCategories > 0 && expandedCount === totalActiveCategories);
 
   $effect(() => {
     if (gamePath) {
@@ -81,19 +83,19 @@
   }
 
   function toggleAllCategories() {
-    if (isAllCollapsed) {
-      collapsedCategories = {};
+    if (isAllExpanded) {
+      expandedCategories = {};
     } else {
       const newState: Record<string, boolean> = {};
       for (const cat of activeCategories) {
         newState[cat.id] = true;
       }
-      collapsedCategories = newState;
+      expandedCategories = newState;
     }
   }
 
-  function toggleCategoryCollapse(catId: string) {
-    collapsedCategories[catId] = !collapsedCategories[catId];
+  function toggleCategoryExpansion(catId: string) {
+    expandedCategories[catId] = !expandedCategories[catId];
   }
 
   let isSearching = $derived(searchQuery.trim().length > 0);
@@ -112,14 +114,14 @@
 
   $effect(() => {
     if (isSearching) {
-      const newCollapsed = { ...collapsedCategories };
+      const newExpanded = { ...expandedCategories };
       for (const cat of activeCategories) {
         const mods = sortedCategorizedMods.get(cat.id) || [];
         if (doesCategoryMatch(cat, mods)) {
-          newCollapsed[cat.id] = false;
+          newExpanded[cat.id] = true;
         }
       }
-      collapsedCategories = newCollapsed;
+      expandedCategories = newExpanded;
     }
   });
 
@@ -839,12 +841,12 @@
           class="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-125"
           style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
         >
-          {#if isAllCollapsed}
-            <FolderOpen class="h-3.5 w-3.5" style="color: var(--color-info);" />
-            <span>Expand All</span>
-          {:else}
+          {#if isAllExpanded}
             <Folder class="h-3.5 w-3.5" style="color: var(--color-info);" />
             <span>Collapse All</span>
+          {:else}
+            <FolderOpen class="h-3.5 w-3.5" style="color: var(--color-info);" />
+            <span>Expand All</span>
           {/if}
         </button>
 
@@ -879,7 +881,7 @@
             {@const mods = sortedCategorizedMods.get(cat.id) || []}
             {@const matchesSearch = doesCategoryMatch(cat, mods)}
             {@const isHovered = isDragging && !activeCategoryDragId && activeDropTarget === cat.id}
-            {@const isExpanded = !collapsedCategories[cat.id]}
+            {@const isExpanded = !!expandedCategories[cat.id]}
             
             <div class="break-inside-avoid mb-3 relative flex flex-col transition-opacity duration-200 {isSearching && !matchesSearch ? 'opacity-25' : 'opacity-100'}">
               
@@ -910,14 +912,14 @@
 
                     <button
                       type="button"
-                      onclick={() => toggleCategoryCollapse(cat.id)}
+                      onclick={() => toggleCategoryExpansion(cat.id)}
                       class="flex items-center gap-1.5 transition cursor-pointer min-w-0 hover:brightness-125"
                       style="color: var(--theme-text-primary);"
                     >
-                      {#if collapsedCategories[cat.id]}
-                        <ChevronRight class="h-4 w-4 shrink-0" style="color: var(--theme-text-muted);" />
-                      {:else}
+                      {#if isExpanded}
                         <ChevronDown class="h-4 w-4 shrink-0" style="color: var(--theme-text-muted);" />
+                      {:else}
+                        <ChevronRight class="h-4 w-4 shrink-0" style="color: var(--theme-text-muted);" />
                       {/if}
                       <span class="font-bold uppercase tracking-wider truncate">{cat.name}</span>
                     </button>
@@ -951,7 +953,7 @@
 
       <!-- Active Canvas (Bottom Section) -->
       <div class="flex-1 overflow-y-auto pr-2 pb-4 pt-2" onpointerdown={clearSelection}>
-        {#each activeCategories.filter(c => !collapsedCategories[c.id]) as cat (cat.id)}
+        {#each activeCategories.filter(c => expandedCategories[c.id]) as cat (cat.id)}
           {@const mods = sortedCategorizedMods.get(cat.id) || []}
           <div class="mb-6" data-category-id={cat.id}>
             

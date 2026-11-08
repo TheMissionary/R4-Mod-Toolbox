@@ -7,6 +7,7 @@
   import { tick } from 'svelte';
   import { loadConfigFromDisk } from '$lib/theme';
   import NoteModal from '$lib/components/NoteModal.svelte';
+  import DialogModal from '$lib/components/DialogModal.svelte';
 
   let {
     plugins = $bindable([]),
@@ -42,6 +43,19 @@
   let notesConfig = $state<Record<string, string>>({});
   let isNoteModalOpen = $state(false);
   let targetNoteModName = $state('');
+
+  let dialogState = $state<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    mode: 'prompt' | 'confirm';
+    initialValue: string;
+    confirmText: string;
+    isDanger: boolean;
+    onConfirm: (val: string) => void;
+  }>({
+    isOpen: false, title: '', message: '', mode: 'prompt', initialValue: '', confirmText: 'Confirm', isDanger: false, onConfirm: () => {}
+  });
 
   let contextMenu = $state<{
     visible: boolean;
@@ -193,6 +207,30 @@
         plugins = [...plugins];
       }
     })();
+  }
+
+  function confirmBulkAction(enable: boolean) {
+    dialogState = {
+      isOpen: true,
+      title: enable ? 'Enable All RED4ext Plugins' : 'Disable All RED4ext Plugins',
+      message: enable 
+        ? 'Are you sure you want to enable all RED4ext plugins? This will activate every mod in this list.' 
+        : 'Are you sure you want to disable all RED4ext plugins? This is a nuclear option that will deactivate every mod in this list.',
+      mode: 'confirm',
+      initialValue: '',
+      confirmText: enable ? 'Enable All' : 'Disable All',
+      isDanger: !enable,
+      onConfirm: async () => {
+        dialogState.isOpen = false;
+        try {
+          await invoke('bulk_toggle_mod_type', { gamePath, modType: 'red4ext', enable });
+          plugins = await invoke<Red4extPluginItem[]>('get_red4ext_details', { gamePath });
+          if (onStateChanged) onStateChanged();
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    };
   }
 
   async function toggleFolder(path: string) {
@@ -569,6 +607,28 @@
           <span>Expand All</span>
         {/if}
       </button>
+
+      <div class="w-px h-5 mx-1" style="background-color: var(--theme-border);"></div>
+
+      <button
+        onclick={() => confirmBulkAction(true)}
+        class="h-8 flex items-center gap-1.5 px-3 rounded border text-xs font-medium transition cursor-pointer hover:brightness-125"
+        style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
+        title="Enable All RED4ext Plugins"
+      >
+        <Check class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
+        <span class="hidden xl:inline">Enable All</span>
+      </button>
+
+      <button
+        onclick={() => confirmBulkAction(false)}
+        class="h-8 flex items-center gap-1.5 px-3 rounded border text-xs font-medium transition cursor-pointer hover:brightness-125"
+        style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--color-danger);"
+        title="Disable All RED4ext Plugins"
+      >
+        <Power class="h-3.5 w-3.5" style="color: var(--color-danger);" />
+        <span class="hidden xl:inline">Disable All</span>
+      </button>
     </div>
   </div>
 
@@ -647,6 +707,7 @@
                     type="button"
                     onclick={(e) => { e.stopPropagation(); targetNoteModName = plugin.name; isNoteModalOpen = true; }}
                     class="hover:scale-110 transition-transform cursor-pointer"
+                    title={notesConfig[plugin.name]}
                   >
                     <MessageSquare class="h-3.5 w-3.5" style="color: var(--color-warning);" />
                   </button>
@@ -690,4 +751,16 @@
   initialNote={notesConfig[targetNoteModName] || ''}
   onConfirm={handleNoteConfirm}
   onCancel={() => isNoteModalOpen = false}
+/>
+
+<DialogModal
+  bind:isOpen={dialogState.isOpen}
+  title={dialogState.title}
+  message={dialogState.message}
+  mode={dialogState.mode}
+  initialValue={dialogState.initialValue}
+  confirmText={dialogState.confirmText}
+  isDanger={dialogState.isDanger}
+  onConfirm={dialogState.onConfirm}
+  onCancel={() => dialogState.isOpen = false}
 />

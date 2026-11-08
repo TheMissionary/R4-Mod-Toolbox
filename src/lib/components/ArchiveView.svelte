@@ -316,6 +316,29 @@
     };
   }
 
+  function confirmBulkAction(enable: boolean) {
+    dialogState = {
+      isOpen: true,
+      title: enable ? 'Enable All Archive Mods' : 'Disable All Archive Mods',
+      message: enable 
+        ? 'Are you sure you want to enable all archive mods? This will activate every mod in this list.' 
+        : 'Are you sure you want to disable all archive mods? This is a nuclear option that will deactivate every mod in this list.',
+      mode: 'confirm',
+      initialValue: '',
+      confirmText: enable ? 'Enable All' : 'Disable All',
+      isDanger: !enable,
+      onConfirm: async () => {
+        dialogState.isOpen = false;
+        try {
+          await invoke('bulk_toggle_mod_type', { gamePath, modType: 'archive', enable });
+          if (onScanRequested) onScanRequested();
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    };
+  }
+
   let toggleDebounceTimer: number | null = null;
 
   async function toggleMod(archive: ArchiveItem) {
@@ -1088,6 +1111,28 @@
           <FolderPlus class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
           <span>Add Group</span>
         </button>
+
+        <div class="w-px h-5 mx-1" style="background-color: var(--theme-border);"></div>
+
+        <button
+          onclick={() => confirmBulkAction(true)}
+          class="h-8 flex items-center gap-1.5 px-3 rounded border text-xs font-medium transition cursor-pointer hover:brightness-125"
+          style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
+          title="Enable All Archive Mods"
+        >
+          <Check class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
+          <span class="hidden xl:inline">Enable All</span>
+        </button>
+
+        <button
+          onclick={() => confirmBulkAction(false)}
+          class="h-8 flex items-center gap-1.5 px-3 rounded border text-xs font-medium transition cursor-pointer hover:brightness-125"
+          style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--color-danger);"
+          title="Disable All Archive Mods"
+        >
+          <Power class="h-3.5 w-3.5" style="color: var(--color-danger);" />
+          <span class="hidden xl:inline">Disable All</span>
+        </button>
       {:else}
         <button
           onclick={() => showUncategorizedDrawer = !showUncategorizedDrawer}
@@ -1183,7 +1228,7 @@
                   onpointerenter={() => globalSelectedPath = archive.path}
                   onpointerleave={() => globalSelectedPath = ''}
                   oncontextmenu={(e) => openContextMenu(e, archive, 'archive')}
-                  class="group transition-all duration-200 z-10 border-b density-row cursor-context-menu
+                  class="group transition-all duration-200 z-10 border-b cursor-context-menu
                     {isHighlighted ? 'ring-1 bg-[color-mix(in_srgb,var(--theme-accent)_15%,transparent)] border-[var(--theme-accent)] shadow-[0_0_15px_color-mix(in_srgb,var(--theme-accent)_35%,transparent)]' : 
                     (isSelected ? 'bg-[color-mix(in_srgb,var(--theme-accent)_10%,transparent)] border-[color-mix(in_srgb,var(--theme-accent)_60%,transparent)]' : 
                     'bg-transparent border-[var(--theme-border)] hover:bg-[color-mix(in_srgb,var(--theme-accent)_12%,transparent)]')}
@@ -1274,6 +1319,7 @@
                             type="button"
                             onclick={(e) => { e.stopPropagation(); targetNoteModName = archive.file_name; isNoteModalOpen = true; }}
                             class="hover:scale-110 transition-transform cursor-pointer"
+                            title={notesConfig[archive.file_name]}
                           >
                             <MessageSquare class="h-3.5 w-3.5" style="color: var(--color-warning);" />
                           </button>
