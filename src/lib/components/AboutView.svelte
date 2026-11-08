@@ -12,6 +12,15 @@
 
   const changelog = [
     {
+      version: "0.44.1",
+      date: "November 2026",
+      changes: [
+        "Build De-optimization for AV Compliance: Because R4 Mod Toolbox is a compiled Rust application that bundles web assets, highly optimized builds can sometimes trigger heuristic false positives (flagged as \"packed\" or \"high entropy\") by obscure AV engines on VirusTotal.",
+        "Commitment to Safety: To ensure absolute transparency and maintain a flawless 0/70 VirusTotal safety score, we have intentionally de-optimized our compilation pipeline. We disabled Link Time Optimization (LTO), retained debug symbols, and reduced binary compression.",
+        "The Result: The standalone executable is slightly larger, but it guarantees a clean, verifiable signature that meets the highest safety and integrity standards for the modding community."
+      ]
+    },
+    {
       version: "0.44.0",
       date: "October 2026",
       changes: [
@@ -123,7 +132,7 @@
             </div>
             <div>
               <div class="text-lg font-bold" style="color: var(--theme-text-primary);">R4 Mod Toolbox</div>
-              <div class="text-xs font-mono mt-0.5" style="color: var(--theme-text-muted);">Version 0.44.0</div>
+              <div class="text-xs font-mono mt-0.5" style="color: var(--theme-text-muted);">Version 0.44.1</div>
             </div>
           </div>
         </div>
