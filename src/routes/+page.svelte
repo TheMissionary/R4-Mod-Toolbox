@@ -202,6 +202,12 @@
     }
   }
 
+  $effect(() => {
+    if (gamePath) {
+      invoke('start_directory_watcher', { gamePath }).catch(err => warn(`Watcher error: ${err}`));
+    }
+  });
+
   onMount(() => {
     const localSettings = loadThemeSettings();
     applyThemeSettings(localSettings);
@@ -250,7 +256,6 @@
       }
     });
 
-    invoke('start_directory_watcher', { gamePath }).catch(() => {});
     const unlisten = listen('directory-changed', () => {
       info('Directory change detected, triggering refresh.');
       refreshAll();

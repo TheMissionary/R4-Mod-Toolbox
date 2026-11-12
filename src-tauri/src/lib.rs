@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::Manager;
+use tauri::{Manager, Emitter};
+
+struct WatcherState(std::sync::Mutex<Option<notify::RecommendedWatcher>>);
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -557,7 +559,71 @@ fn unlink_xl_from_archive(game_path: String, xl_name: String) -> Result<archive:
 }
 
 #[tauri::command]
-fn start_directory_watcher(_game_path: String) -> Result<(), String> {
+fn start_directory_watcher(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, WatcherState>,
+    game_path: String,
+) -> Result<(), String> {
+    use notify::{Watcher, RecursiveMode};
+    use std::sync::mpsc::channel;
+    use std::time::Duration;
+
+    let root = PathBuf::from(&game_path);
+    
+    let dirs_to_watch = vec![
+        root.join("archive").join("pc").join("mod"),
+        root.join("bin").join("x64").join("plugins").join("cyber_engine_tweaks").join("mods"),
+        root.join("red4ext").join("plugins"),
+        root.join("r6").join("scripts"),
+        root.join("r6").join("tweaks"),
+        root.join("Disabled_Mods"),
+    ];
+
+    let (tx, rx) = channel();
+    let mut watcher = notify::recommended_watcher(move |res| {
+        let _ = tx.send(res);
+    }).map_err(|e| e.to_string())?;
+
+    let mut watching_any = false;
+    for dir in dirs_to_watch {
+        if dir.exists() {
+            if let Err(e) = watcher.watch(&dir, RecursiveMode::Recursive) {
+                warn!("Failed to watch directory {:?}: {}", dir, e);
+            } else {
+                watching_any = true;
+            }
+        }
+    }
+
+    if !watching_any {
+        return Ok(());
+    }
+
+    *state.0.lock().unwrap() = Some(watcher);
+
+    std::thread::spawn(move || {
+        let debounce_duration = Duration::from_millis(500);
+        loop {
+            match rx.recv() {
+                Ok(_) => {
+                    // Drain subsequent events within the debounce window
+                    loop {
+                        match rx.recv_timeout(debounce_duration) {
+                            Ok(_) => continue,
+                            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                                info!("Directory change debounced, emitting event to frontend.");
+                                let _ = app.emit("directory-changed", ());
+                                break;
+                            }
+                            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return,
+                        }
+                    }
+                }
+                Err(_) => return, // Channel disconnected (watcher dropped)
+            }
+        }
+    });
+
     Ok(())
 }
 
@@ -1042,6 +1108,7 @@ pub fn run() {
         )
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            app.manage(WatcherState(std::sync::Mutex::new(None)));
             prune_logs(app);
             if let Some(window) = app.get_webview_window("main") {
                 let config = load_app_config().unwrap_or_default();
