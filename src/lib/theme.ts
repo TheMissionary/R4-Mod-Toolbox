@@ -102,23 +102,6 @@ export const DEFAULT_THEME_SETTINGS: ThemeSettings = {
   isCompact: true,
 };
 
-export const DEFAULT_APP_CONFIG: AppConfig = {
-  targetGamePath: '',
-  activeTab: 'archive',
-  showConflictSummary: true,
-  windowWidth: 1600,
-  windowHeight: 1000,
-  recentDaysThreshold: 30,
-  newModsHours: 6,
-  showNewMods: false,
-  customTextEditorPath: '',
-  customPhotoPath: '',
-  enableOrganizerView: false,
-  showCategoryLabelsInLoadOrder: true,
-  organizerColumns: 'auto',
-  theme: { ...DEFAULT_THEME_SETTINGS },
-};
-
 const STORAGE_KEY = 'cp2077_theme_settings_v3';
 
 export function loadThemeSettings(): ThemeSettings {
@@ -138,6 +121,7 @@ export function applyThemeSettings(settings: ThemeSettings) {
   const activeColors = generateThemeColors(settings.mode, settings.atmosphere, settings.accentHex);
   const root = document.documentElement;
 
+  // 1. Base Colors
   root.style.setProperty('--theme-accent', activeColors.accent);
   root.style.setProperty('--theme-accent-hover', activeColors.accentHover);
   root.style.setProperty('--theme-accent-contrast', activeColors.accentContrast);
@@ -148,9 +132,37 @@ export function applyThemeSettings(settings: ThemeSettings) {
   root.style.setProperty('--theme-text-primary', activeColors.textPrimary);
   root.style.setProperty('--theme-text-muted', activeColors.textMuted);
 
+  // 2. Typography
   root.style.setProperty('--theme-font-base', "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif");
   root.style.setProperty('--theme-font-mods', settings.fontFamilyMods || MOD_FONT_PRESETS[0].value);
   root.style.colorScheme = settings.mode;
+
+  // 3. Advanced Theme Properties (The Sandbox)
+  
+  // Opacity Clamp (40% to 100%)
+  const rawOpacity = settings.surfaceOpacity ?? 100;
+  const safeOpacity = Math.max(40, Math.min(100, rawOpacity));
+  root.style.setProperty('--theme-surface-opacity', `${safeOpacity}%`);
+
+  // Backdrop Blur (Static Elements Only)
+  const blurMap: Record<string, string> = { none: '0px', sm: '4px', md: '8px', lg: '16px' };
+  root.style.setProperty('--theme-backdrop-blur', blurMap[settings.backdropBlur || 'none'] || '0px');
+
+  // UI Rounding (Safe Geometry)
+  const roundingMap: Record<string, string> = { sharp: '0px', standard: '0.375rem', soft: '0.75rem' };
+  root.style.setProperty('--theme-ui-rounding', roundingMap[settings.uiRounding || 'standard'] || '0.375rem');
+
+  // Border Thickness (Macro Elements Only)
+  const borderMap: Record<string, string> = { thin: '1px', standard: '1px', thick: '2px' };
+  root.style.setProperty('--theme-border-macro', borderMap[settings.borderThickness || 'standard'] || '1px');
+
+  // Neon Intensity (Stacked Box Shadow Spread)
+  const neonMap: Record<string, string> = { 
+    none: 'none', 
+    low: '0 0 4px var(--theme-accent), 0 0 8px color-mix(in srgb, var(--theme-accent) 40%, transparent)', 
+    high: '0 0 8px var(--theme-accent), 0 0 16px var(--theme-accent), 0 0 30px color-mix(in srgb, var(--theme-accent) 60%, transparent)' 
+  };
+  root.style.setProperty('--theme-neon-shadow', neonMap[settings.neonIntensity || 'none'] || 'none');
 
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));

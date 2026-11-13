@@ -23,6 +23,18 @@ pub struct ThemeConfig {
     pub is_compact: bool,
     #[serde(default)]
     pub hero_banner_path: Option<String>,
+    #[serde(default)]
+    pub sidebar_image: Option<String>,
+    #[serde(default)]
+    pub surface_opacity: Option<u8>,
+    #[serde(default)]
+    pub backdrop_blur: Option<String>,
+    #[serde(default)]
+    pub ui_rounding: Option<String>,
+    #[serde(default)]
+    pub border_thickness: Option<String>,
+    #[serde(default)]
+    pub neon_intensity: Option<String>,
 }
 
 fn default_atmosphere() -> String { "graphite".to_string() }
@@ -38,6 +50,12 @@ impl Default for ThemeConfig {
             font_family_mods: default_font_mods(),
             is_compact: true,
             hero_banner_path: None,
+            sidebar_image: None,
+            surface_opacity: None,
+            backdrop_blur: None,
+            ui_rounding: None,
+            border_thickness: None,
+            neon_intensity: None,
         }
     }
 }
@@ -1092,6 +1110,56 @@ fn export_mod_list(game_path: String, export_path: String) -> Result<(), String>
     Ok(())
 }
 
+#[tauri::command]
+fn import_theme_pack(app: tauri::AppHandle, file_path: String) -> Result<ThemeConfig, String> {
+    use std::io::Read;
+    
+    let file = fs::File::open(&file_path).map_err(|e| e.to_string())?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+
+    let theme_dir = app.path().app_data_dir().map_err(|e| e.to_string())?.join("themes");
+    fs::create_dir_all(&theme_dir).map_err(|e| e.to_string())?;
+
+    let mut theme_config: Option<ThemeConfig> = None;
+
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+        let outpath = match file.enclosed_name() {
+            Some(path) => path.to_owned(),
+            None => continue,
+        };
+
+        let file_name = outpath.file_name().unwrap_or_default().to_string_lossy().to_string();
+        
+        if file_name == "theme.json" {
+            let mut contents = String::new();
+            file.read_to_string(&mut contents).map_err(|e| e.to_string())?;
+            theme_config = Some(serde_json::from_str(&contents).map_err(|e| e.to_string())?);
+        } else if file.is_file() {
+            let target_path = theme_dir.join(&file_name);
+            let mut outfile = fs::File::create(&target_path).map_err(|e| e.to_string())?;
+            std::io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
+        }
+    }
+
+    let mut config = theme_config.ok_or("theme.json not found in pack")?;
+
+    if let Some(banner_name) = config.hero_banner_path.as_ref() {
+        if !Path::new(banner_name).is_absolute() {
+            let banner_path = theme_dir.join(banner_name);
+            config.hero_banner_path = Some(banner_path.to_string_lossy().to_string());
+        }
+    }
+    if let Some(sidebar_name) = config.sidebar_image.as_ref() {
+        if !Path::new(sidebar_name).is_absolute() {
+            let sidebar_path = theme_dir.join(sidebar_name);
+            config.sidebar_image = Some(sidebar_path.to_string_lossy().to_string());
+        }
+    }
+
+    Ok(config)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1179,7 +1247,8 @@ pub fn run() {
             clear_user_log,
             launch_game,
             open_custom_folder,
-            export_mod_list
+            export_mod_list,
+            import_theme_pack
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

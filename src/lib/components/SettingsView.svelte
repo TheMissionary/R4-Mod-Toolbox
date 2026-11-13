@@ -15,7 +15,7 @@
   } from '$lib/theme';
   import {
     RotateCcw, Check, Settings, Sun, Moon, Sparkles, Palette, FolderSearch,
-    ChevronDown, ChevronRight, Wrench, GripVertical, Folder, FileCode, LayoutGrid, FileText, Image as ImageIcon, X
+    ChevronDown, ChevronRight, Wrench, GripVertical, Folder, FileCode, LayoutGrid, FileText, Image as ImageIcon, X, Download
   } from 'lucide-svelte';
 
   let { 
@@ -176,6 +176,35 @@
     } catch (err) { console.error(err); } finally { isExporting = false; }
   }
 
+  async function handleImportThemePack() {
+    try {
+      const selected = await open({
+        multiple: false,
+        directory: false,
+        filters: [{ name: 'R4 Theme Pack', extensions: ['r4theme', 'zip'] }],
+        title: 'Import Theme Pack'
+      });
+      if (typeof selected === 'string') {
+        const importedTheme = await invoke<ThemeSettings>('import_theme_pack', { filePath: selected });
+        draft = { ...draft, ...importedTheme };
+        currentAccentHex = draft.accentHex.toUpperCase();
+        
+        const matchedMods = MOD_FONT_PRESETS.find(p => p.value === draft.fontFamilyMods);
+        if (matchedMods) {
+          selectedModsPreset = matchedMods.value;
+          customModsInput = '';
+        } else {
+          selectedModsPreset = 'custom';
+          customModsInput = draft.fontFamilyMods.replace(/^"|"$/g, '').replace(/, monospace$/, '');
+        }
+        
+        markDirty();
+      }
+    } catch (err) {
+      console.error('Failed to import theme pack:', err);
+    }
+  }
+
   // State-aware reset: preserves active mode and restores mode-specific atmosphere
   function handleResetDefault() {
     if (draft.mode === 'light') {
@@ -189,6 +218,12 @@
     currentAccentHex = '#76B900';
     draft.fontFamilyMods = MOD_FONT_PRESETS[0].value;
     draft.heroBannerPath = undefined;
+    draft.sidebarImage = undefined;
+    draft.surfaceOpacity = undefined;
+    draft.backdropBlur = undefined;
+    draft.uiRounding = undefined;
+    draft.borderThickness = undefined;
+    draft.neonIntensity = undefined;
     selectedModsPreset = MOD_FONT_PRESETS[0].value;
     customModsInput = '';
     customEditorPath = '';
@@ -235,9 +270,20 @@
       
       <!-- Left Column: Unified Theme Engine -->
       <div class="rounded-xl border flex flex-col h-fit overflow-hidden" style="background-color: var(--theme-card); border-color: var(--theme-border);">
-        <div class="px-4 py-3 border-b flex items-center gap-2.5" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
-          <Palette class="h-4 w-4" style="color: var(--theme-accent);" />
-          <h3 class="text-sm font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">Appearance & Theming</h3>
+        <div class="px-4 py-3 border-b flex items-center justify-between gap-2.5" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
+          <div class="flex items-center gap-2.5">
+            <Palette class="h-4 w-4" style="color: var(--theme-accent);" />
+            <h3 class="text-sm font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">Appearance & Theming</h3>
+          </div>
+          <button
+            type="button"
+            onclick={handleImportThemePack}
+            class="flex items-center gap-1.5 px-3 py-1 rounded border text-[10px] font-bold uppercase tracking-wider transition cursor-pointer hover:brightness-125"
+            style="background-color: color-mix(in srgb, var(--theme-accent) 15%, transparent); border-color: color-mix(in srgb, var(--theme-accent) 40%, transparent); color: var(--theme-accent);"
+          >
+            <Download class="h-3.5 w-3.5" />
+            <span>Import .r4theme</span>
+          </button>
         </div>
 
         <div class="p-5 space-y-6">

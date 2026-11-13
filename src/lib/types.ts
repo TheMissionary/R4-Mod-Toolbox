@@ -128,12 +128,17 @@ export interface AppThemeColors {
 
 export interface ThemeSettings {
   mode: 'dark' | 'light';
-  darkColors: AppThemeColors;
-  lightColors: AppThemeColors;
-  fontFamilyBase: string;
+  atmosphere: string;
+  accentHex: string;
   fontFamilyMods: string;
-  fontFamily?: string;
   isCompact?: boolean;
+  heroBannerPath?: string;
+  sidebarImage?: string;
+  surfaceOpacity?: number;
+  backdropBlur?: 'none' | 'sm' | 'md' | 'lg';
+  uiRounding?: 'sharp' | 'standard' | 'soft';
+  borderThickness?: 'thin' | 'standard' | 'thick';
+  neonIntensity?: 'none' | 'low' | 'high';
 }
 
 export interface CategoryLabel {
