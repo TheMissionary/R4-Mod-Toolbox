@@ -2,7 +2,7 @@
 
 **Advanced Mod Manager and Conflict Resolver for Cyberpunk 2077**
 
-![Release](https://img.shields.io/badge/Release-v0.44.1-blue.svg)
+![Release](https://img.shields.io/badge/Release-v0.45.0-blue.svg)
 ![Platform](https://img.shields.io/badge/Platform-Windows_10_%7C_11-blue.svg)
 ![R4 Mod Toolbox Header](https://raw.githubusercontent.com/TheMissionary/R4-Mod-Toolbox/main/assets/headertemplate4.png)
 
@@ -12,8 +12,8 @@ It does not hijack your downloads or obfuscate your files inside virtual file sy
 
 ---
 
-## ✅ Latest Release (v0.44.1)
-R4 Mod Toolbox has officially reached v0.44.1. The core engine is stable, and the feature set is hardened. We are currently gathering community feedback and edge-case reports from users managing massive or highly complex modlists to ensure absolute stability before the 1.0 launch. Please report any bugs or UX friction in the [Issues tab](https://github.com/TheMissionary/R4-Mod-Toolbox/issues). 
+## ✅ Latest Release (v0.45.0)
+R4 Mod Toolbox has officially reached v0.45.0. This release introduces the Advanced Theme Engine, allowing users to import custom `.r4theme` packs with full support for glassmorphism, custom hero banners, and curated typography. We are currently gathering community feedback and edge-case reports from users managing massive or highly complex modlists to ensure absolute stability before the 1.0 launch. Please report any bugs or UX friction in the [Issues tab](https://github.com/TheMissionary/R4-Mod-Toolbox/issues). 
 
 ---
 
@@ -26,7 +26,7 @@ R4 Mod Toolbox has officially reached v0.44.1. The core engine is stable, and th
 * **Universal Framework Support:** Complete visibility with Windows Explorer-style file trees and safe toggle control over **Archive**, **CET**, **RED4ext**, **R6\Scripts**, and **R6\Tweaks**.
 * **Mod History & Ledger:** Track every mod by its "First Seen" date. Use the universal search or the "Show in History" context menu to instantly locate any file across your entire modding history.
 * **Smart XL Linking:** ArchiveXL requires `.xl` files to load custom entities. R4 automatically pairs these sidecar files with their parent `.archive`, allowing you to toggle both with a single click.
-* **Customizable Workspace:** Personalize your experience with dynamic accent colors, dual typography engines (featuring Geist and GeistMono), and light/dark modes.
+* **Advanced Theme Engine:** Personalize your experience with dynamic accent colors, curated typography engines, and full support for custom `.r4theme` zip packs featuring glassmorphism and custom hero banners.
 
 ---
 

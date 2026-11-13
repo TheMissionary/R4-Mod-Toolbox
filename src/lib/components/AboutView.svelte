@@ -12,6 +12,18 @@
 
   const changelog = [
     {
+      version: "0.45.0",
+      date: "November 2026",
+      changes: [
+        "Advanced Theme Engine: Implemented a robust, dynamic theming system supporting custom .r4theme zip packs. The engine now parses and injects advanced CSS variables for surfaceOpacity, backdropBlur, uiRounding, borderThickness, and neonIntensity.",
+        "Theme Pack Importer: Added a native Rust-based zip extraction pipeline. Users can now import .r4theme files directly from the Settings tab, which automatically routes hero banners and sidebar images to the local %APPDATA% directory and applies the JSON payload.",
+        "Settings UI Overhaul: Completely redesigned the Appearance & Theming tab. Replaced the legacy custom font input with 7 curated, highly legible typography presets to ensure deterministic rendering. Upgraded the Dark/Light mode toggle with perfect-nesting geometry that adapts to the active UI rounding theme.",
+        "Glassmorphism Compositing: Restructured the DOM layering of the Left Navigation Rail and the Conflict Summary Drawer. These elements now feature true glassmorphism, properly blurring the underlying workspace canvas and hero images without compromising text legibility.",
+        "R6\\Tweaks Bulk Actions: Brought the R6\\Tweaks framework tab up to parity by injecting \"Enable All\" and \"Disable All\" global action buttons into the top toolbar, protected by the standard safety confirmation dialog.",
+        "Repository Optimization: Executed a surgical cleanup of the open-source repository, purging orphaned components, duplicate type definitions, and redundant boilerplate assets to ensure a pristine, professional codebase."
+      ]
+    },
+    {
       version: "0.44.1",
       date: "November 2026",
       changes: [
@@ -132,7 +144,7 @@
             </div>
             <div>
               <div class="text-lg font-bold" style="color: var(--theme-text-primary);">R4 Mod Toolbox</div>
-              <div class="text-xs font-mono mt-0.5" style="color: var(--theme-text-muted);">Version 0.44.1</div>
+              <div class="text-xs font-mono mt-0.5" style="color: var(--theme-text-muted);">Version 0.45.0</div>
             </div>
           </div>
         </div>
