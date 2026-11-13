@@ -1505,8 +1505,11 @@
 
       <!-- Conflict Summary Drawer -->
       {#if showConflictSummary}
-        <aside class="w-80 rounded-lg border flex flex-col overflow-hidden shrink-0 shadow-xl transition-all duration-200" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
-          <div class="p-3 border-b flex items-center justify-between" style="background-color: color-mix(in srgb, var(--theme-card) 50%, transparent); border-color: var(--theme-border);">
+        <aside class="w-80 rounded-lg border flex flex-col overflow-hidden shrink-0 shadow-xl transition-all duration-200 relative" style="border-color: var(--theme-border);">
+          <!-- Glass Background -->
+          <div class="absolute inset-0 z-0 pointer-events-none" style="background-color: color-mix(in srgb, var(--theme-surface) var(--theme-surface-opacity, 100%), transparent); backdrop-filter: blur(var(--theme-backdrop-blur, 0px)); -webkit-backdrop-filter: blur(var(--theme-backdrop-blur, 0px));"></div>
+
+          <div class="relative z-10 p-3 border-b flex items-center justify-between" style="background-color: color-mix(in srgb, var(--theme-card) 50%, transparent); border-color: var(--theme-border);">
             <div class="flex items-center gap-2">
               <AlertTriangle class="h-4 w-4" style="color: var(--color-danger);" />
               <span class="text-xs font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">Conflict Summary</span>
@@ -1516,7 +1519,7 @@
             </span>
           </div>
 
-          <div class="p-2 space-y-1 overflow-y-auto flex-1 max-h-[calc(100vh-170px)]">
+          <div class="relative z-10 p-2 space-y-1 overflow-y-auto flex-1 max-h-[calc(100vh-170px)]">
             {#if conflictingArchives.length === 0}
               <div class="p-6 text-center text-xs" style="color: var(--theme-text-muted);">
                 No load order conflicts detected.
@@ -1560,7 +1563,7 @@
             {/if}
           </div>
 
-          <div class="p-2.5 border-t text-[10px] flex items-center justify-center" style="border-color: var(--theme-border); background-color: color-mix(in srgb, var(--theme-card) 30%, transparent); color: var(--theme-text-muted);">
+          <div class="relative z-10 p-2.5 border-t text-[10px] flex items-center justify-center" style="border-color: var(--theme-border); background-color: color-mix(in srgb, var(--theme-card) 30%, transparent); color: var(--theme-text-muted);">
             <span>Click any mod to locate in main load order</span>
           </div>
         </aside>

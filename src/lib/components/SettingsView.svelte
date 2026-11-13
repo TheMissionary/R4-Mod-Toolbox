@@ -31,7 +31,6 @@
   let draft = $state<ThemeSettings>(loadThemeSettings());
   let currentAccentHex = $state('#76B900');
   let selectedModsPreset = $state<string>(MOD_FONT_PRESETS[0].value);
-  let customModsInput = $state('');
   let customEditorPath = $state('');
   let customPhotoPath = $state('');
   let enableOrganizerView = $state(false);
@@ -53,13 +52,7 @@
 
     const currentMods = draft.fontFamilyMods || MOD_FONT_PRESETS[0].value;
     const matchedMods = MOD_FONT_PRESETS.find(p => p.value === currentMods);
-    if (matchedMods) {
-      selectedModsPreset = matchedMods.value;
-      customModsInput = '';
-    } else {
-      selectedModsPreset = 'custom';
-      customModsInput = currentMods.replace(/^"|"$/g, '').replace(/, monospace$/, '');
-    }
+    selectedModsPreset = matchedMods ? matchedMods.value : MOD_FONT_PRESETS[0].value;
 
     loadConfigFromDisk().then(config => {
       customEditorPath = config.customTextEditorPath || '';
@@ -118,15 +111,7 @@
   function handleModsPresetChange(e: Event) {
     const val = (e.target as HTMLSelectElement).value;
     selectedModsPreset = val;
-    if (val !== 'custom') { draft.fontFamilyMods = val; } 
-    else { draft.fontFamilyMods = customModsInput ? `"${customModsInput}", monospace` : MOD_FONT_PRESETS[0].value; }
-    markDirty();
-  }
-
-  function handleCustomModsInput(e: Event) {
-    const raw = (e.target as HTMLInputElement).value.trim();
-    customModsInput = raw;
-    draft.fontFamilyMods = raw ? `"${raw}", monospace` : MOD_FONT_PRESETS[0].value;
+    draft.fontFamilyMods = val;
     markDirty();
   }
 
@@ -190,13 +175,7 @@
         currentAccentHex = draft.accentHex.toUpperCase();
         
         const matchedMods = MOD_FONT_PRESETS.find(p => p.value === draft.fontFamilyMods);
-        if (matchedMods) {
-          selectedModsPreset = matchedMods.value;
-          customModsInput = '';
-        } else {
-          selectedModsPreset = 'custom';
-          customModsInput = draft.fontFamilyMods.replace(/^"|"$/g, '').replace(/, monospace$/, '');
-        }
+        selectedModsPreset = matchedMods ? matchedMods.value : MOD_FONT_PRESETS[0].value;
         
         markDirty();
       }
@@ -225,7 +204,6 @@
     draft.borderThickness = undefined;
     draft.neonIntensity = undefined;
     selectedModsPreset = MOD_FONT_PRESETS[0].value;
-    customModsInput = '';
     customEditorPath = '';
     customPhotoPath = '';
     enableOrganizerView = false;
@@ -233,9 +211,6 @@
   }
 
   async function handleApply() {
-    if (selectedModsPreset === 'custom' && customModsInput.trim()) {
-      draft.fontFamilyMods = `"${customModsInput.trim()}", monospace`;
-    }
     const plainPayload: ThemeSettings = JSON.parse(JSON.stringify(draft));
     applyThemeSettings(plainPayload);
     
@@ -300,8 +275,8 @@
                 <button
                   type="button"
                   onclick={() => handleModeToggle('dark')}
-                  class="flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider transition cursor-pointer border"
-                  style="{draft.mode === 'dark' ? 'background-color: var(--theme-card); color: var(--theme-text-primary); border-color: var(--theme-border);' : 'border-color: transparent; color: var(--theme-text-muted);'}"
+                  class="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition cursor-pointer border"
+                  style="border-radius: calc(var(--theme-ui-rounding, 0.375rem) - 2px); {draft.mode === 'dark' ? 'background-color: var(--theme-card); color: var(--theme-text-primary); border-color: var(--theme-border);' : 'border-color: transparent; color: var(--theme-text-muted);'}"
                 >
                   <Moon class="h-3.5 w-3.5" style="{draft.mode === 'dark' ? 'color: var(--theme-accent);' : ''}" />
                   <span>Dark</span>
@@ -309,8 +284,8 @@
                 <button
                   type="button"
                   onclick={() => handleModeToggle('light')}
-                  class="flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider transition cursor-pointer border"
-                  style="{draft.mode === 'light' ? 'background-color: var(--theme-card); color: var(--theme-text-primary); border-color: var(--theme-border);' : 'border-color: transparent; color: var(--theme-text-muted);'}"
+                  class="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition cursor-pointer border"
+                  style="border-radius: calc(var(--theme-ui-rounding, 0.375rem) - 2px); {draft.mode === 'light' ? 'background-color: var(--theme-card); color: var(--theme-text-primary); border-color: var(--theme-border);' : 'border-color: transparent; color: var(--theme-text-muted);'}"
                 >
                   <Sun class="h-3.5 w-3.5" style="{draft.mode === 'light' ? 'color: var(--theme-accent);' : ''}" />
                   <span>Light</span>
@@ -388,20 +363,7 @@
                     {preset.label}
                   </option>
                 {/each}
-                <option value="custom" selected={selectedModsPreset === 'custom'} style="background-color: var(--theme-surface); color: var(--color-info); font-weight: bold;">
-                  + Custom Font...
-                </option>
               </select>
-              {#if selectedModsPreset === 'custom'}
-                <input
-                  type="text"
-                  bind:value={customModsInput}
-                  oninput={handleCustomModsInput}
-                  placeholder="Font name..."
-                  class="w-full px-2 py-1.5 border rounded text-xs focus:outline-none"
-                  style="background-color: var(--theme-surface); border-color: color-mix(in srgb, var(--color-info) 60%, transparent); color: var(--theme-text-primary);"
-                />
-              {/if}
             </div>
 
             <div class="space-y-2">
