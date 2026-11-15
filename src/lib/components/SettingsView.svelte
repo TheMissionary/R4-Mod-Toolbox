@@ -17,6 +17,7 @@
     RotateCcw, Check, Settings, Sun, Moon, Sparkles, Palette, FolderSearch,
     ChevronDown, ChevronRight, Wrench, GripVertical, Folder, FileCode, LayoutGrid, FileText, Image as ImageIcon, X, Download
   } from 'lucide-svelte';
+  import DialogModal from './DialogModal.svelte';
 
   let { 
     gamePath = $bindable(''),
@@ -33,12 +34,26 @@
   let selectedModsPreset = $state<string>(MOD_FONT_PRESETS[0].value);
   let customEditorPath = $state('');
   let customPhotoPath = $state('');
+  let customLaunchPath = $state('');
   let enableOrganizerView = $state(false);
   let isDirty = $state(false);
   
   let showAdvancedIntegrations = $state(false);
   let isExporting = $state(false);
   let exportSuccess = $state(false);
+
+  let dialogState = $state<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    mode: 'prompt' | 'confirm';
+    confirmText: string;
+    cancelText: string;
+    isDanger: boolean;
+    onConfirm: (val: string) => void;
+  }>({
+    isOpen: false, title: '', message: '', mode: 'confirm', confirmText: 'OK', cancelText: 'Cancel', isDanger: false, onConfirm: () => {}
+  });
 
   let activeColors = $derived(generateThemeColors(draft.mode, draft.atmosphere, currentAccentHex));
   let availableAtmospheres = $derived(draft.mode === 'light' ? Object.keys(LIGHT_ATMOSPHERES) : Object.keys(DARK_ATMOSPHERES));
@@ -57,6 +72,7 @@
     loadConfigFromDisk().then(config => {
       customEditorPath = config.customTextEditorPath || '';
       customPhotoPath = config.customPhotoPath || '';
+      customLaunchPath = config.customLaunchPath || '';
       enableOrganizerView = config.enableOrganizerView || false;
     });
   });
@@ -74,6 +90,17 @@
             await saveConfigToDisk(config);
           } catch (e) { console.error(e); }
           if (onRefresh) onRefresh();
+        } else {
+          dialogState = {
+            isOpen: true,
+            title: 'Invalid Game Directory',
+            message: 'Could not locate bin\\x64\\Cyberpunk2077.exe. Please select the root Cyberpunk 2077 installation folder.',
+            mode: 'confirm',
+            confirmText: 'OK',
+            cancelText: 'Close',
+            isDanger: true,
+            onConfirm: () => { dialogState.isOpen = false; }
+          };
         }
       }
     } catch (err) { console.error(err); }
@@ -148,6 +175,18 @@
     } catch (err) { console.error(err); }
   }
 
+  async function handleBrowseLauncher() {
+    try {
+      const selected = await open({ 
+        multiple: false, 
+        directory: false, 
+        filters: [{ name: 'Executables & Shortcuts', extensions: ['exe', 'lnk'] }], 
+        title: 'Select Custom Game Launcher' 
+      });
+      if (typeof selected === 'string') { customLaunchPath = selected; markDirty(); }
+    } catch (err) { console.error(err); }
+  }
+
   async function handleExportModList() {
     if (!gamePath) return;
     try {
@@ -206,6 +245,7 @@
     selectedModsPreset = MOD_FONT_PRESETS[0].value;
     customEditorPath = '';
     customPhotoPath = '';
+    customLaunchPath = '';
     enableOrganizerView = false;
     markDirty();
   }
@@ -219,6 +259,7 @@
       config.theme = plainPayload;
       config.customTextEditorPath = customEditorPath.trim();
       config.customPhotoPath = customPhotoPath.trim();
+      config.customLaunchPath = customLaunchPath.trim();
       config.enableOrganizerView = enableOrganizerView;
       await saveConfigToDisk(config);
       isDirty = false;
@@ -522,6 +563,34 @@
 
               <div class="h-px" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
 
+              <!-- Custom Game Launcher -->
+              <div class="space-y-2">
+                <span class="text-xs font-semibold" style="color: var(--theme-text-primary);">Custom Game Launcher</span>
+                <p class="text-[11px] leading-tight" style="color: var(--theme-text-muted);">
+                  Select a custom executable or shortcut (.exe, .lnk) to launch the game. Leave blank to use the default.
+                </p>
+                <div class="flex items-center gap-2">
+                  <input
+                    type="text"
+                    bind:value={customLaunchPath}
+                    oninput={markDirty}
+                    placeholder="Leave blank for default (bin\x64\Cyberpunk2077.exe)"
+                    class="flex-1 px-3 py-1.5 border rounded text-xs focus:outline-none font-mono"
+                    style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
+                  />
+                  <button
+                    type="button"
+                    onclick={handleBrowseLauncher}
+                    class="px-3 py-1.5 rounded border text-xs transition cursor-pointer shrink-0 hover:brightness-125"
+                    style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
+                  >
+                    Browse...
+                  </button>
+                </div>
+              </div>
+
+              <div class="h-px" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
+
               <!-- Custom Text Editor -->
               <div class="space-y-2">
                 <span class="text-xs font-semibold" style="color: var(--theme-text-primary);">Custom Text Editor</span>
@@ -634,3 +703,15 @@
     </button>
   </div>
 </div>
+
+<DialogModal
+  bind:isOpen={dialogState.isOpen}
+  title={dialogState.title}
+  message={dialogState.message}
+  mode={dialogState.mode}
+  confirmText={dialogState.confirmText}
+  cancelText={dialogState.cancelText}
+  isDanger={dialogState.isDanger}
+  onConfirm={dialogState.onConfirm}
+  onCancel={() => dialogState.isOpen = false}
+/>

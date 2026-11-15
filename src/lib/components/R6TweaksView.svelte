@@ -662,7 +662,7 @@
         No R6 Tweaks detected.
       </div>
     {:else}
-      {#each filteredTweaks as tweak (tweak.name + '_' + tweak.enabled)}
+      {#each filteredTweaks as tweak (tweak.name)}
         {@const isHighlighted = highlightedModName === tweak.name}
         {@const isSelected = selectedMod === tweak.name}
         <div class="flex flex-col">
@@ -741,6 +741,7 @@
                     type="button"
                     onclick={(e) => { e.stopPropagation(); targetNoteModName = tweak.name; isNoteModalOpen = true; }}
                     class="hover:scale-110 transition-transform cursor-pointer"
+                    title={notesConfig[tweak.name]}
                   >
                     <MessageSquare class="h-3.5 w-3.5" style="color: var(--color-warning);" />
                   </button>

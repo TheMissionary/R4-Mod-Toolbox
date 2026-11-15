@@ -6,9 +6,11 @@
   let { 
     gamePath = '', 
     currentTab = 'archive',
+    customLaunchPath = ''
   }: { 
     gamePath: string; 
     currentTab?: string;
+    customLaunchPath?: string;
   } = $props();
 
   let isValid = $derived(gamePath.length > 0);
@@ -19,7 +21,7 @@
     isLaunching = true;
     info('Initiating game launch sequence...');
     try {
-      await invoke('launch_game', { gamePath });
+      await invoke('launch_game', { gamePath, customLaunchPath });
       setTimeout(() => {
         isLaunching = false;
         info('Launch command sent successfully.');
@@ -68,7 +70,7 @@
       disabled={!isValid || isLaunching}
       class="flex items-center justify-center gap-2 px-5 h-8 rounded font-bold text-xs transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer hover:brightness-110"
       style="background-color: var(--theme-accent); color: var(--theme-accent-contrast);"
-      title={!isValid ? 'Configure a valid game directory to enable launch' : 'Launch Cyberpunk 2077'}
+      title={!isValid ? 'Configure a valid game directory to enable launch' : (customLaunchPath ? `Launch via ${customLaunchPath.split('\\').pop()}` : 'Launch Cyberpunk 2077')}
     >
       <Play class="h-3.5 w-3.5" style="fill: var(--theme-accent-contrast); color: var(--theme-accent-contrast);" />
       <span>{isLaunching ? 'Starting...' : 'Launch Game'}</span>

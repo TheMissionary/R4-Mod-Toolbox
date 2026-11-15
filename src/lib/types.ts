@@ -167,6 +167,7 @@ export interface AppConfig {
   showNewMods?: boolean;
   customTextEditorPath?: string;
   customPhotoPath?: string;
+  customLaunchPath?: string;
   enableOrganizerView?: boolean;
   showCategoryLabelsInLoadOrder?: boolean;
   organizerColumns?: 'auto' | '1' | '2' | '3';

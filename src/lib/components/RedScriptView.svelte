@@ -638,7 +638,7 @@
         No Redscript packages detected.
       </div>
     {:else}
-      {#each filteredPackages as pkg (pkg.name + '_' + pkg.enabled)}
+      {#each filteredPackages as pkg (pkg.name)}
         {@const isHighlighted = highlightedModName === pkg.name}
         {@const isSelected = selectedMod === pkg.name}
         <div class="flex flex-col">

@@ -12,6 +12,18 @@
 
   const changelog = [
     {
+      version: "0.45.1",
+      date: "November 2026",
+      changes: [
+        "Transparency Note: The \"Ghost Sync\" & UI Lockup Bug - I want to apologize for the UI lockups, \"App not responding\" dialogs, and sluggishness some of you experienced in v0.45.0 when leaving the app open during gameplay.",
+        "The Root Cause: I left the Rust directory watcher unfiltered. When Cyberpunk 2077 launches, frameworks like CET and RED4ext constantly write to their .log and .json files. R4 was detecting every single one of these micro-writes as a \"mod change\" and attempting to rescan the entire load order multiple times a second, effectively DDOS'ing its own frontend and locking up the UI thread.",
+        "The Fix: I have rewritten the backend watcher to use a Strict Allowlist. R4 is now completely deaf to runtime noise (.log, .json, .ini) and will only trigger a sync when actual mod files (.archive, .xl, .lua, etc.) are physically added, removed, or renamed. The app should now remain whisper-quiet and perfectly responsive, even if left running on a second monitor during heavy gameplay.",
+        "Custom Game Launcher: Added a new option under Settings > Advanced Integrations. You can now select a custom executable or shortcut (.exe, .lnk) to be executed when clicking the green \"Launch Game\" button. If left blank, it safely defaults to the standard bin\\x64\\Cyberpunk2077.exe.",
+        "Directory Selection UX Fix: Fixed a silent failure where selecting an invalid game directory in the Settings tab would simply do nothing. The app now presents a clear error dialog if it cannot locate the game executable in the chosen folder.",
+        "Frontend Concurrency Lock: Implemented a strict mutex-style lock on the frontend refresh cycle. Rapidly toggling multiple mods will no longer queue overlapping IPC payloads, resulting in a much snappier UI response."
+      ]
+    },
+    {
       version: "0.45.0",
       date: "November 2026",
       changes: [
@@ -144,7 +156,7 @@
             </div>
             <div>
               <div class="text-lg font-bold" style="color: var(--theme-text-primary);">R4 Mod Toolbox</div>
-              <div class="text-xs font-mono mt-0.5" style="color: var(--theme-text-muted);">Version 0.45.0</div>
+              <div class="text-xs font-mono mt-0.5" style="color: var(--theme-text-muted);">Version 0.45.1</div>
             </div>
           </div>
         </div>

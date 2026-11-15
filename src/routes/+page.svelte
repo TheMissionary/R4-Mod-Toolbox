@@ -49,6 +49,7 @@
 
   let currentTab = $state<TabType>('archive');
   let customPhotoPath = $state('');
+  let customLaunchPath = $state('');
   let enableOrganizerView = $state(false);
   let showCategoryLabelsInLoadOrder = $state(true);
 
@@ -76,6 +77,7 @@
       const config = await loadConfigFromDisk();
       config.activeTab = tab;
       customPhotoPath = config.customPhotoPath || '';
+      customLaunchPath = config.customLaunchPath || '';
       enableOrganizerView = config.enableOrganizerView || false;
       showCategoryLabelsInLoadOrder = config.showCategoryLabelsInLoadOrder ?? true;
       await saveConfigToDisk(config);
@@ -86,6 +88,8 @@
 
   let gamePath = $state('');
   let isLoading = $state(false);
+  let isRefreshing = $state(false);
+  let refreshQueued = $state(false);
 
   let scanResult = $state<ScanResult | null>(null);
   let archiveReport = $state<ArchiveScanReport | null>(null);
@@ -182,6 +186,11 @@
 
   async function refreshAll() {
     if (!gamePath) return;
+    if (isRefreshing) {
+      refreshQueued = true;
+      return;
+    }
+    isRefreshing = true;
     isLoading = true;
     info('Initiating full workspace refresh...');
     try {
@@ -196,6 +205,11 @@
       error(`Failed to scan game environment: ${err}`);
     } finally {
       isLoading = false;
+      isRefreshing = false;
+      if (refreshQueued) {
+        refreshQueued = false;
+        refreshAll();
+      }
     }
   }
 
@@ -243,6 +257,9 @@
       }
       if (config.customPhotoPath) {
         customPhotoPath = config.customPhotoPath;
+      }
+      if (config.customLaunchPath) {
+        customLaunchPath = config.customLaunchPath;
       }
       enableOrganizerView = config.enableOrganizerView || false;
       showCategoryLabelsInLoadOrder = config.showCategoryLabelsInLoadOrder ?? true;
@@ -535,7 +552,7 @@
       </div>
     {/if}
 
-    <HeaderBar {gamePath} {currentTab} />
+    <HeaderBar {gamePath} {currentTab} {customLaunchPath} />
 
     <main class="flex-1 overflow-y-auto relative z-10 {['settings', 'help', 'about', 'history'].includes(currentTab) ? 'p-0' : 'p-6'}">
       
@@ -633,6 +650,7 @@
           onSettingsSaved={async () => {
             const config = await loadConfigFromDisk();
             customPhotoPath = config.customPhotoPath || '';
+            customLaunchPath = config.customLaunchPath || '';
             enableOrganizerView = config.enableOrganizerView || false;
             showCategoryLabelsInLoadOrder = config.showCategoryLabelsInLoadOrder ?? true;
           }}
@@ -652,7 +670,7 @@
     <footer class="h-8 border-t flex items-center justify-between px-4 shrink-0 text-[11px] font-mono select-none relative z-10 overflow-hidden" style="border-color: var(--theme-border); border-top-width: var(--theme-border-macro, 1px); color: var(--theme-text-muted);">
       
       <!-- Glass Background -->
-      <div class="absolute inset-0 z-0 pointer-events-none" style="background-color: color-mix(in srgb, var(--theme-surface) var(--theme-surface-opacity, 100%), transparent); backdrop-filter: blur(var(--theme-backdrop-blur, 0px));"></div>
+      <div class="absolute inset-0 z-0 pointer-events-none" style="background-color: color-mix(in srgb, var(--theme-surface) var(--theme-surface-opacity, 100%), transparent); backdrop-filter: blur(var(--theme-backdrop-blur, 0px)); -webkit-backdrop-filter: blur(var(--theme-backdrop-blur, 0px));"></div>
 
       <!-- Left: Active Cursor Hover Path (Empty when idle) -->
       <div class="relative z-10 flex-1 min-w-0 pr-4 truncate flex items-center h-full">

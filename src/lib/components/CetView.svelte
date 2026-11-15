@@ -638,7 +638,7 @@
         No CET plugins detected.
       </div>
     {:else}
-      {#each filteredPlugins as plugin (plugin.name + '_' + plugin.enabled)}
+      {#each filteredPlugins as plugin (plugin.name)}
         {@const isHighlighted = highlightedModName === plugin.name}
         {@const isSelected = selectedMod === plugin.name}
         <div class="flex flex-col">

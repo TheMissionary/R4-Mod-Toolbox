@@ -207,7 +207,32 @@
     const archiveNames = localArchives.map(a => a.file_name);
     try {
       const report = await invoke<ArchiveScanReport>('save_load_order', { gamePath, loadOrder: archiveNames });
-      if (report && Array.isArray(report.archives)) { archives = report.archives; }
+      if (report && Array.isArray(report.archives)) {
+        // Smart Merge: Update conflict data without overwriting optimistic UI state (enabled)
+        const payloadMap = new Map(report.archives.map(a => [a.file_name, a]));
+        const updatedLocal = localArchives.map(local => {
+          const remote = payloadMap.get(local.file_name);
+          if (remote) {
+            return {
+              ...local,
+              has_conflicts: remote.has_conflicts,
+              conflicts_with: remote.conflicts_with,
+              wins: remote.wins,
+              loses: remote.loses,
+              associated_xls: remote.associated_xls
+            };
+          }
+          return local;
+        });
+        
+        localArchives = updatedLocal;
+        untrack(() => {
+          archives = [...updatedLocal];
+          if (scanReport) {
+            scanReport = report;
+          }
+        });
+      }
     } catch (err) { console.error(err); }
   }
 
@@ -1182,7 +1207,7 @@
             No matches found.
           </div>
         {:else}
-          {#each visibleItems as { archive, originalIndex, archiveRank, inCategory } (archive.file_name + '_' + archive.enabled)}
+          {#each visibleItems as { archive, originalIndex, archiveRank, inCategory } (archive.file_name)}
             {@const isSource = activeDragIndex !== null && originalIndex >= activeDragIndex && originalIndex < activeDragIndex + dragBlockSize}
             {@const showLineBefore = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'before' && !isSource}
             {@const showLineAfter = activeDragIndex !== null && dropTargetIndex === originalIndex && dropPlacement === 'after' && !isSource}
@@ -1472,7 +1497,7 @@
 
             {#if showUnassociatedXl}
               <div class="space-y-0">
-                {#each unassociatedXlFiles as xl (xl.file_name + '_' + xl.enabled)}
+                {#each unassociatedXlFiles as xl (xl.file_name)}
                   <div
                     oncontextmenu={(e) => openContextMenu(e, xl, 'unassociated_xl')}
                     class="border-b px-2 flex items-center justify-between density-row cursor-context-menu bg-transparent border-[var(--theme-border)] hover:bg-[color-mix(in_srgb,var(--theme-accent)_12%,transparent)]"
@@ -1525,7 +1550,7 @@
                 No load order conflicts detected.
               </div>
             {:else}
-              {#each conflictingArchives as archive (archive.file_name + '_' + archive.enabled)}
+              {#each conflictingArchives as archive (archive.file_name)}
                 {@const isLosing = archive.loses.length > 0}
                 {@const isDragged = draggedEntry?.file_name === archive.file_name}
                 <button

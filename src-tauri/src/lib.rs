@@ -4,10 +4,20 @@ use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{Manager, Emitter};
 
-struct WatcherState(std::sync::Mutex<Option<notify::RecommendedWatcher>>);
+struct WatcherState {
+    watcher: std::sync::Mutex<Option<notify::RecommendedWatcher>>,
+    mute_until: Arc<AtomicU64>,
+}
+
+fn mute_watcher(state: &tauri::State<'_, WatcherState>) {
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
+    state.mute_until.store(now + 1500, Ordering::SeqCst);
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -85,6 +95,8 @@ pub struct AppConfig {
     #[serde(default)]
     pub custom_photo_path: Option<String>,
     #[serde(default)]
+    pub custom_launch_path: Option<String>,
+    #[serde(default)]
     pub enable_organizer_view: Option<bool>,
     #[serde(default)]
     pub show_category_labels_in_load_order: Option<bool>,
@@ -108,6 +120,7 @@ impl Default for AppConfig {
             show_new_mods: Some(false),
             custom_text_editor_path: None,
             custom_photo_path: None,
+            custom_launch_path: None,
             enable_organizer_view: Some(false),
             show_category_labels_in_load_order: Some(true),
             organizer_columns: Some("auto".to_string()),
@@ -522,12 +535,14 @@ fn get_archive_details(game_path: String) -> Result<archive::ArchiveScanReport, 
 }
 
 #[tauri::command]
-fn toggle_mod_state(game_path: String, mod_name: String, enable: bool) -> Result<(), String> {
+fn toggle_mod_state(state: tauri::State<'_, WatcherState>, game_path: String, mod_name: String, enable: bool) -> Result<(), String> {
+    mute_watcher(&state);
     archive::toggle_mod(&game_path, &mod_name, enable)
 }
 
 #[tauri::command]
-fn save_load_order(game_path: String, load_order: Vec<String>) -> Result<archive::ArchiveScanReport, String> {
+fn save_load_order(state: tauri::State<'_, WatcherState>, game_path: String, load_order: Vec<String>) -> Result<archive::ArchiveScanReport, String> {
+    mute_watcher(&state);
     archive::save_modlist(&game_path, load_order)
 }
 
@@ -552,17 +567,20 @@ fn save_labels_config(game_path: String, config: archive::LabelsConfig) -> Resul
 }
 
 #[tauri::command]
-fn create_physical_folder(game_path: String, folder_name: String) -> Result<archive::ArchiveScanReport, String> {
+fn create_physical_folder(state: tauri::State<'_, WatcherState>, game_path: String, folder_name: String) -> Result<archive::ArchiveScanReport, String> {
+    mute_watcher(&state);
     archive::create_physical_folder(&game_path, &folder_name)
 }
 
 #[tauri::command]
-fn delete_physical_folder(game_path: String, folder_file_name: String) -> Result<archive::ArchiveScanReport, String> {
+fn delete_physical_folder(state: tauri::State<'_, WatcherState>, game_path: String, folder_file_name: String) -> Result<archive::ArchiveScanReport, String> {
+    mute_watcher(&state);
     archive::delete_physical_folder(&game_path, &folder_file_name)
 }
 
 #[tauri::command]
-fn rename_physical_folder(game_path: String, old_file_name: String, new_folder_name: String) -> Result<archive::ArchiveScanReport, String> {
+fn rename_physical_folder(state: tauri::State<'_, WatcherState>, game_path: String, old_file_name: String, new_folder_name: String) -> Result<archive::ArchiveScanReport, String> {
+    mute_watcher(&state);
     archive::rename_physical_folder(&game_path, &old_file_name, &new_folder_name)
 }
 
@@ -574,6 +592,50 @@ fn link_xl_to_archive(game_path: String, xl_name: String, archive_name: String) 
 #[tauri::command]
 fn unlink_xl_from_archive(game_path: String, xl_name: String) -> Result<archive::ArchiveScanReport, String> {
     archive::unlink_xl_from_archive(&game_path, &xl_name)
+}
+
+fn is_valid_mod_event(event: &notify::Event) -> bool {
+    use notify::EventKind;
+    use notify::event::ModifyKind;
+
+    // Ignore access events completely
+    if matches!(event.kind, EventKind::Access(_)) {
+        return false;
+    }
+
+    for path in &event.paths {
+        if let Some(ext_os) = path.extension() {
+            let ext = ext_os.to_string_lossy().to_lowercase();
+            let valid_exts = [
+                "archive", "disabled", "xl", "tweak", "yaml", 
+                "lua", "reds", "dll", "txt"
+            ];
+            
+            if valid_exts.contains(&ext.as_str()) {
+                // Exclude R4 state files explicitly
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    let ignored_names = [
+                        "r4_loadorder.txt", "modlist.txt", "r4_labels.json", 
+                        "modcategories.json", "modxl_associations.json", 
+                        "mod_history.json", "r4_notes.json", "config.json"
+                    ];
+                    if ignored_names.contains(&name) {
+                        continue;
+                    }
+                }
+                return true;
+            }
+        } else {
+            // No extension. Likely a directory.
+            // We only care about Create, Remove, or Rename (Name change) for directories.
+            match event.kind {
+                EventKind::Create(_) | EventKind::Remove(_) => return true,
+                EventKind::Modify(ModifyKind::Name(_)) => return true,
+                _ => {} // Ignore metadata/data changes on extension-less paths (the mtime trap)
+            }
+        }
+    }
+    false
 }
 
 #[tauri::command]
@@ -617,18 +679,46 @@ fn start_directory_watcher(
         return Ok(());
     }
 
-    *state.0.lock().unwrap() = Some(watcher);
+    *state.watcher.lock().unwrap() = Some(watcher);
+    let mute_until = state.mute_until.clone();
 
     std::thread::spawn(move || {
         let debounce_duration = Duration::from_millis(500);
+        
         loop {
             match rx.recv() {
-                Ok(_) => {
-                    // Drain subsequent events within the debounce window
+                Ok(event_res) => {
+                    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
+                    if now < mute_until.load(Ordering::SeqCst) {
+                        continue;
+                    }
+
+                    if let Ok(event) = event_res {
+                        if !is_valid_mod_event(&event) {
+                            continue;
+                        }
+                    }
+
+                    // We got a valid event. Now debounce.
                     loop {
                         match rx.recv_timeout(debounce_duration) {
-                            Ok(_) => continue,
+                            Ok(sub_event_res) => {
+                                let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
+                                if now < mute_until.load(Ordering::SeqCst) {
+                                    continue;
+                                }
+                                if let Ok(sub_event) = sub_event_res {
+                                    if is_valid_mod_event(&sub_event) {
+                                        // Another valid event resets the timer.
+                                        continue;
+                                    }
+                                }
+                            },
                             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                                let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
+                                if now < mute_until.load(Ordering::SeqCst) {
+                                    break; // Muted during debounce, abort emit
+                                }
                                 info!("Directory change debounced, emitting event to frontend.");
                                 let _ = app.emit("directory-changed", ());
                                 break;
@@ -637,7 +727,7 @@ fn start_directory_watcher(
                         }
                     }
                 }
-                Err(_) => return, // Channel disconnected (watcher dropped)
+                Err(_) => return,
             }
         }
     });
@@ -883,16 +973,15 @@ fn save_ledger_data(ledger: &Vec<LedgerEntry>) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
-fn toggle_plugin_state(
-    game_path: String,
-    mod_type: String,
-    mod_name: String,
+fn toggle_plugin_logic(
+    game_path: &str,
+    mod_type: &str,
+    mod_name: &str,
     enable: bool,
 ) -> Result<(), String> {
-    let root = PathBuf::from(&game_path);
+    let root = PathBuf::from(game_path);
 
-    let (active_base, disabled_base) = match mod_type.as_str() {
+    let (active_base, disabled_base) = match mod_type {
         "cet" => (
             root.join("bin").join("x64").join("plugins").join("cyber_engine_tweaks").join("mods"),
             root.join("Disabled_Mods").join("cet"),
@@ -913,9 +1002,9 @@ fn toggle_plugin_state(
     };
 
     let (source, target) = if enable {
-        (disabled_base.join(&mod_name), active_base.join(&mod_name))
+        (disabled_base.join(mod_name), active_base.join(mod_name))
     } else {
-        (active_base.join(&mod_name), disabled_base.join(&mod_name))
+        (active_base.join(mod_name), disabled_base.join(mod_name))
     };
 
     if !source.exists() {
@@ -931,7 +1020,20 @@ fn toggle_plugin_state(
 }
 
 #[tauri::command]
-fn bulk_toggle_mod_type(game_path: String, mod_type: String, enable: bool) -> Result<(), String> {
+fn toggle_plugin_state(
+    state: tauri::State<'_, WatcherState>,
+    game_path: String,
+    mod_type: String,
+    mod_name: String,
+    enable: bool,
+) -> Result<(), String> {
+    mute_watcher(&state);
+    toggle_plugin_logic(&game_path, &mod_type, &mod_name, enable)
+}
+
+#[tauri::command]
+fn bulk_toggle_mod_type(state: tauri::State<'_, WatcherState>, game_path: String, mod_type: String, enable: bool) -> Result<(), String> {
+    mute_watcher(&state);
     info!("Bulk toggling {} to {}", mod_type, enable);
     if mod_type == "archive" {
         if let Ok(report) = archive::scan_archives(&game_path) {
@@ -951,7 +1053,7 @@ fn bulk_toggle_mod_type(game_path: String, mod_type: String, enable: bool) -> Re
         };
         for (name, is_enabled) in items {
             if is_enabled != enable {
-                let _ = toggle_plugin_state(game_path.clone(), mod_type.clone(), name, enable);
+                let _ = toggle_plugin_logic(&game_path, &mod_type, &name, enable);
             }
         }
     }
@@ -1026,8 +1128,13 @@ fn clear_user_log(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn launch_game(game_path: String) -> Result<(), String> {
-    let target = PathBuf::from(&game_path).join("bin").join("x64").join("Cyberpunk2077.exe");
+fn launch_game(game_path: String, custom_launch_path: Option<String>) -> Result<(), String> {
+    let target = if let Some(custom) = custom_launch_path.filter(|s| !s.trim().is_empty()) {
+        PathBuf::from(custom)
+    } else {
+        PathBuf::from(&game_path).join("bin").join("x64").join("Cyberpunk2077.exe")
+    };
+    
     tauri_plugin_opener::open_path(&target, None::<&str>).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -1176,7 +1283,10 @@ pub fn run() {
         )
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            app.manage(WatcherState(std::sync::Mutex::new(None)));
+            app.manage(WatcherState {
+                watcher: std::sync::Mutex::new(None),
+                mute_until: Arc::new(AtomicU64::new(0)),
+            });
             prune_logs(app);
             if let Some(window) = app.get_webview_window("main") {
                 let config = load_app_config().unwrap_or_default();
