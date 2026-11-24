@@ -504,29 +504,43 @@
         style="padding-left: {4.5 + (depth - 1) * 1.375}rem; border-color: var(--theme-border);"
       >
         <div class="flex items-center gap-1 min-w-0 flex-1">
-          {#if node.is_dir}
-            <button
-              type="button"
-              onclick={(e) => { e.stopPropagation(); toggleFolder(node.path); }}
-              class="flex items-center gap-1.5 transition cursor-pointer min-w-0 hover:brightness-125"
-              style="color: var(--theme-text-primary);"
-            >
+          <!-- Slot 1: Chevron (w-6) -->
+          <div class="w-6 flex justify-center shrink-0">
+            {#if node.is_dir}
+              <button
+                type="button"
+                onclick={(e) => { e.stopPropagation(); toggleFolder(node.path); }}
+                class="p-0.5 rounded transition cursor-pointer hover:bg-[var(--theme-card)]"
+                style="color: var(--theme-text-muted);"
+              >
+                {#if expandedFolders[node.path]}
+                  <ChevronDown class="h-3.5 w-3.5" />
+                {:else}
+                  <ChevronRight class="h-3.5 w-3.5" />
+                {/if}
+              </button>
+            {/if}
+          </div>
+
+          <!-- Slot 2: Type Icon (w-6) -->
+          <div class="w-6 flex justify-center shrink-0">
+            {#if node.is_dir}
               {#if expandedFolders[node.path]}
-                <ChevronDown class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
-                <FolderOpen class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
+                <FolderOpen class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
               {:else}
-                <ChevronRight class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
-                <Folder class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
+                <Folder class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
               {/if}
-              <span class="font-bold truncate text-[11px]">{node.name}</span>
-            </button>
-          {:else}
-            <div class="flex items-center gap-1.5 min-w-0">
-              <div class="w-4 shrink-0"></div>
-              <FileCode class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
-              <span class="font-mono truncate text-[11px]" style="color: var(--theme-text-primary);">{node.name}</span>
-            </div>
-          {/if}
+            {:else}
+              <FileCode class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
+            {/if}
+          </div>
+
+          <!-- Slot 3: File Name -->
+          <div class="flex items-center min-w-0">
+            <span class="font-mono truncate text-[11px]" style="color: var(--theme-text-primary);">
+              {node.name}
+            </span>
+          </div>
         </div>
         
         <!-- STRICT SLOT ARCHITECTURE: RIGHT ZONE (Folder Tree) -->
@@ -668,7 +682,7 @@
                 </button>
               </div>
 
-              <!-- Slot 2: Folder Toggle / File Icon (w-6) -->
+              <!-- Slot 2: Chevron (w-6) -->
               <div class="w-6 flex justify-center shrink-0">
                 {#if tweak.is_dir}
                   <button
@@ -683,21 +697,25 @@
                       <ChevronRight class="h-3.5 w-3.5" />
                     {/if}
                   </button>
+                {/if}
+              </div>
+
+              <!-- Slot 3: Type Icon (w-6) -->
+              <div class="w-6 flex justify-center shrink-0">
+                {#if tweak.is_dir}
+                  {#if expandedFolders[tweak.path]}
+                    <FolderOpen class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
+                  {:else}
+                    <Folder class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
+                  {/if}
                 {:else}
                   <FileCode class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
                 {/if}
               </div>
 
-              <!-- Slot 3: Mod File Name -->
-              <div class="flex items-center gap-1.5 min-w-0">
-                {#if tweak.is_dir}
-                  {#if expandedFolders[tweak.path]}
-                    <FolderOpen class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
-                  {:else}
-                    <Folder class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
-                  {/if}
-                {/if}
-                <span class="font-mono font-medium truncate text-[11px]" style="{tweak.enabled ? 'color: var(--theme-text-primary);' : 'color: var(--theme-text-muted); text-decoration: line-through;'}">
+              <!-- Slot 4: Mod File Name -->
+              <div class="flex items-center min-w-0">
+                <span class="font-mono truncate text-[11px]" style="color: {tweak.enabled ? 'var(--theme-text-primary)' : 'var(--theme-text-muted)'};">
                   {tweak.name}
                 </span>
                 

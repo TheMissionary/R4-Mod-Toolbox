@@ -480,41 +480,58 @@
         oncontextmenu={(e) => openContextMenu(e, node, 'file')}
         onpointerenter={() => globalSelectedPath = node.path}
         onpointerleave={() => globalSelectedPath = ''}
-        class="group flex items-center justify-between pr-2 border-b transition density-row cursor-context-menu hover:bg-[var(--theme-surface)]"
+        class="group flex items-center justify-between px-2 border-b transition density-row cursor-context-menu hover:bg-[var(--theme-surface)]"
         style="padding-left: {4.5 + (depth - 1) * 1.375}rem; border-color: var(--theme-border);"
       >
-        <div class="flex items-center gap-2.5 min-w-0 flex-1">
-          {#if node.is_dir}
-            <button
-              type="button"
-              onclick={(e) => { e.stopPropagation(); toggleFolder(node.path); }}
-              class="flex items-center gap-1.5 transition cursor-pointer min-w-0 hover:brightness-125"
-              style="color: var(--theme-text-primary);"
-            >
+        <div class="flex items-center gap-1 min-w-0 flex-1">
+          <!-- Slot 1: Chevron (w-6) -->
+          <div class="w-6 flex justify-center shrink-0">
+            {#if node.is_dir}
+              <button
+                type="button"
+                onclick={(e) => { e.stopPropagation(); toggleFolder(node.path); }}
+                class="p-0.5 rounded transition cursor-pointer hover:bg-[var(--theme-card)]"
+                style="color: var(--theme-text-muted);"
+              >
+                {#if expandedFolders[node.path]}
+                  <ChevronDown class="h-3.5 w-3.5" />
+                {:else}
+                  <ChevronRight class="h-3.5 w-3.5" />
+                {/if}
+              </button>
+            {/if}
+          </div>
+
+          <!-- Slot 2: Type Icon (w-6) -->
+          <div class="w-6 flex justify-center shrink-0">
+            {#if node.is_dir}
               {#if expandedFolders[node.path]}
-                <ChevronDown class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
-                <FolderOpen class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
+                <FolderOpen class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
               {:else}
-                <ChevronRight class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
-                <Folder class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
+                <Folder class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
               {/if}
-              <span class="font-bold truncate text-[11px]">{node.name}</span>
-            </button>
-          {:else}
-            <div class="flex items-center gap-1.5 min-w-0">
-              <div class="w-4 shrink-0"></div>
-              <FileCode class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
-              <span class="font-mono truncate text-[11px]" style="color: var(--theme-text-primary);">{node.name}</span>
-            </div>
-          {/if}
+            {:else}
+              <FileCode class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
+            {/if}
+          </div>
+
+          <!-- Slot 3: File Name -->
+          <div class="flex items-center min-w-0">
+            <span class="font-mono truncate text-[11px]" style="color: var(--theme-text-primary);">
+              {node.name}
+            </span>
+          </div>
         </div>
         
-        <div class="flex items-center gap-2 shrink-0">
-          <div class="w-20 hidden lg:block"></div>
-          <div class="w-16 justify-end text-[10px] font-mono hidden lg:flex" style="color: var(--theme-text-muted);">
+        <!-- STRICT SLOT ARCHITECTURE: RIGHT ZONE (Folder Tree) -->
+        <div class="flex items-center gap-1 shrink-0">
+          <div class="w-6"></div> <!-- Note -->
+          <div class="w-10"></div> <!-- Multi-Link -->
+          <div class="w-20 hidden lg:block"></div> <!-- File Count -->
+          <div class="w-16 flex justify-end text-[10px] font-mono hidden lg:flex" style="color: var(--theme-text-muted);">
             {#if !node.is_dir}{formatBytes(node.size_bytes)}{/if}
           </div>
-          <div class="w-6 flex justify-end">
+          <div class="w-6 flex justify-end shrink-0">
             <button
               type="button"
               onclick={(e) => { e.stopPropagation(); openContextMenu(e, node, 'file'); }}
@@ -607,49 +624,68 @@
               'bg-transparent border-[var(--theme-border)] hover:bg-[color-mix(in_srgb,var(--theme-accent)_12%,transparent)]')}
               {pkg.enabled ? 'opacity-100' : 'opacity-50'}"
           >
-            <div class="flex items-center gap-2.5 min-w-0 flex-1 pl-1">
-              <!-- Solid Accent Checkbox with --theme-border when disabled -->
-              <button
-                type="button"
-                onclick={(e) => { e.stopPropagation(); handleToggle(pkg); }}
-                aria-label={pkg.enabled ? "Disable package " + pkg.name : "Enable package " + pkg.name}
-                class="w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors shrink-0 cursor-pointer"
-                style="border-color: {pkg.enabled ? 'var(--theme-accent)' : 'var(--theme-border)'}; background-color: {pkg.enabled ? 'var(--theme-accent)' : 'transparent'};"
-              >
-                {#if pkg.enabled}
-                  <Check class="h-2.5 w-2.5" style="color: var(--theme-accent-contrast);" strokeWidth={3} />
-                {/if}
-              </button>
-
-              {#if pkg.is_dir}
+            <!-- STRICT SLOT ARCHITECTURE: LEFT ZONE -->
+            <div class="flex items-center gap-1 min-w-0 flex-1 pl-1">
+              
+              <!-- Slot 1: Checkbox (w-6) -->
+              <div class="w-6 flex justify-center shrink-0">
                 <button
                   type="button"
-                  onclick={(e) => { e.stopPropagation(); toggleFolder(pkg.path); }}
-                  class="flex items-center gap-1.5 transition cursor-pointer min-w-0 hover:brightness-125"
-                  style="color: var(--theme-text-primary);"
+                  onclick={(e) => { e.stopPropagation(); handleToggle(pkg); }}
+                  aria-label={pkg.enabled ? "Disable package " + pkg.name : "Enable package " + pkg.name}
+                  class="w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                  style="border-color: {pkg.enabled ? 'var(--theme-accent)' : 'var(--theme-border)'}; background-color: {pkg.enabled ? 'var(--theme-accent)' : 'transparent'};"
                 >
-                  {#if expandedFolders[pkg.path]}
-                    <ChevronDown class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
-                    <FolderOpen class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
-                  {:else}
-                    <ChevronRight class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
-                    <Folder class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
+                  {#if pkg.enabled}
+                    <Check class="h-2.5 w-2.5" style="color: var(--theme-accent-contrast);" strokeWidth={3} />
                   {/if}
-                  <span class="font-bold truncate text-[11px]">{pkg.name}</span>
                 </button>
-              {:else}
-                <div class="flex items-center gap-1.5 min-w-0">
-                  <div class="w-4 shrink-0"></div>
-                  <FileCode class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
-                  <span class="font-mono truncate text-[11px]" style="{pkg.enabled ? 'color: var(--theme-text-primary);' : 'color: var(--theme-text-muted); text-decoration: line-through;'}">
-                    {pkg.name}
-                  </span>
-                </div>
-              {/if}
+              </div>
+
+              <!-- Slot 2: Chevron (w-6) -->
+              <div class="w-6 flex justify-center shrink-0">
+                {#if pkg.is_dir}
+                  <button
+                    type="button"
+                    onclick={(e) => { e.stopPropagation(); toggleFolder(pkg.path); }}
+                    class="p-0.5 rounded transition cursor-pointer hover:bg-[var(--theme-card)]"
+                    style="color: var(--theme-text-muted);"
+                  >
+                    {#if expandedFolders[pkg.path]}
+                      <ChevronDown class="h-3.5 w-3.5" />
+                    {:else}
+                      <ChevronRight class="h-3.5 w-3.5" />
+                    {/if}
+                  </button>
+                {/if}
+              </div>
+
+              <!-- Slot 3: Type Icon (w-6) -->
+              <div class="w-6 flex justify-center shrink-0">
+                {#if pkg.is_dir}
+                  {#if expandedFolders[pkg.path]}
+                    <FolderOpen class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
+                  {:else}
+                    <Folder class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
+                  {/if}
+                {:else}
+                  <FileCode class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
+                {/if}
+              </div>
+
+              <!-- Slot 4: Mod File Name -->
+              <div class="flex items-center min-w-0">
+                <span class="font-mono truncate text-[11px]" style="color: {pkg.enabled ? 'var(--theme-text-primary)' : 'var(--theme-text-muted)'};">
+                  {pkg.name}
+                </span>
+              </div>
             </div>
 
-            <div class="flex items-center gap-2 shrink-0">
-              <div class="w-4 flex items-center justify-center shrink-0">
+            <!-- STRICT SLOT ARCHITECTURE: RIGHT ZONE -->
+            <div class="flex items-center gap-1 shrink-0">
+              
+              <!-- Slot 1: Note Icon (w-6) -->
+              <div class="w-6 flex justify-center shrink-0">
                 {#if notesConfig[pkg.name]}
                   <button 
                     type="button"
@@ -662,15 +698,27 @@
                 {/if}
               </div>
 
-              <div class="w-20 justify-end hidden lg:flex">
-                <span class="px-1.5 py-0.2 rounded border text-[10px] font-semibold truncate" style="background-color: color-mix(in srgb, var(--theme-accent) 15%, transparent); border-color: color-mix(in srgb, var(--theme-accent) 30%, transparent); color: var(--theme-accent);">
-                  {pkg.file_count} {pkg.file_count === 1 ? 'file' : 'files'}
-                </span>
+              <!-- Slot 2: Multi-Link Icon + Chevron (w-10) -->
+              <div class="w-10 flex items-center justify-center gap-0.5 shrink-0">
+                <!-- Redscript doesn't currently support Multi-Link in the UI, but we keep the slot for alignment -->
               </div>
-              <div class="w-16 justify-end text-[10px] font-mono hidden lg:flex" style="color: var(--theme-text-muted);">
+
+              <!-- Slot 3: File Count (w-20) -->
+              <div class="w-20 flex justify-end hidden lg:flex">
+                {#if pkg.is_dir}
+                  <span class="px-1.5 py-0.2 rounded border text-[10px] font-semibold truncate" style="background-color: color-mix(in srgb, var(--theme-accent) 15%, transparent); border-color: color-mix(in srgb, var(--theme-accent) 30%, transparent); color: var(--theme-accent);">
+                    {pkg.file_count} {pkg.file_count === 1 ? 'file' : 'files'}
+                  </span>
+                {/if}
+              </div>
+
+              <!-- Slot 4: File Size (w-16) -->
+              <div class="w-16 flex justify-end text-[10px] font-mono hidden lg:flex" style="color: var(--theme-text-muted);">
                 {formatBytes(pkg.size_bytes)}
               </div>
-              <div class="w-6 flex justify-end">
+
+              <!-- Slot 5: Context Menu (w-6) -->
+              <div class="w-6 flex justify-end shrink-0">
                 <button
                   type="button"
                   onclick={(e) => { e.stopPropagation(); openContextMenu(e, pkg, 'pkg'); }}

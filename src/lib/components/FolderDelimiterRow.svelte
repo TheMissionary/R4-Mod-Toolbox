@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ArchiveItem } from '$lib/types';
-  import { GripVertical, Folder, FolderOpen, Pencil, Trash2, MoreVertical, ChevronDown, ChevronRight, Check } from 'lucide-svelte';
+  import { GripVertical, AlignLeft, Pencil, Trash2, MoreVertical, ChevronDown, ChevronRight, Check } from 'lucide-svelte';
 
   let {
     archive,
@@ -85,8 +85,8 @@
         </button>
       </div>
 
-      <!-- Slot 3: Folder Expand/Collapse (w-10) -> Aligns with Conflict Dot/Chevron -->
-      <div class="w-10 flex items-center justify-center shrink-0">
+      <!-- Slot 3: Folder Expand/Collapse (w-6) -->
+      <div class="w-6 flex justify-center shrink-0">
         <button
           type="button"
           onclick={() => onToggleCollapse && onToggleCollapse(archive.file_name)}
@@ -102,13 +102,13 @@
         </button>
       </div>
 
-      <!-- Slot 4: Folder Name & Mod Count -->
+      <!-- Slot 4: Type Icon (w-6) -->
+      <div class="w-6 flex justify-center shrink-0">
+        <AlignLeft class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
+      </div>
+
+      <!-- Slot 5: Folder Name & Mod Count -->
       <div class="flex items-center gap-1.5 min-w-0">
-        {#if collapsed}
-          <Folder class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-accent);" />
-        {:else}
-          <FolderOpen class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-accent);" />
-        {/if}
         <span class="font-bold uppercase tracking-wider truncate text-[11px]" style="color: var(--theme-text-primary);">
           {archive.category_name || archive.file_name.replace('[DIR] ', '').replace('.txt', '')}
         </span>

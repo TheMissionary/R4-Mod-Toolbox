@@ -7,14 +7,42 @@
     <title>R4 Mod Manager</title>
     
     <script>
-      // Synchronously load the user's accent color before the DOM renders to prevent color flashing
+      // Synchronously load the user's theme settings before the DOM renders to achieve an instant, solid-state splash screen
       try {
         const settings = localStorage.getItem('cp2077_theme_settings_v3');
         if (settings) {
           const parsed = JSON.parse(settings);
+          
+          // 1. Inject Accent Color
           if (parsed && parsed.accentHex) {
             document.documentElement.style.setProperty('--splash-accent', parsed.accentHex);
           }
+          
+          // 2. Calculate and Inject Background & Text Colors based on Mode and Atmosphere
+          const mode = parsed.mode || 'dark';
+          const atmosphere = parsed.atmosphere || 'graphite';
+          
+          let bg = '#121517';
+          let text = '#ffffff';
+          
+          if (mode === 'light') {
+            text = '#0f172a';
+            if (atmosphere === 'pearl') bg = '#ffffff';
+            else if (atmosphere === 'cloud') bg = '#f3f4f6';
+            else if (atmosphere === 'frost') bg = '#f1f5f9';
+            else if (atmosphere === 'parchment') bg = '#fdfbf7';
+            else bg = '#f3f4f6'; // fallback light
+          } else {
+            text = '#ffffff';
+            if (atmosphere === 'obsidian') bg = '#000000';
+            else if (atmosphere === 'slate') bg = '#0f172a';
+            else if (atmosphere === 'graphite') bg = '#121517';
+            else if (atmosphere === 'mocha') bg = '#1c1917';
+            else bg = '#121517'; // fallback dark
+          }
+          
+          document.documentElement.style.setProperty('--splash-bg', bg);
+          document.documentElement.style.setProperty('--splash-text', text);
         }
       } catch (e) {}
     </script>
@@ -30,23 +58,23 @@
 
       :root {
         --splash-accent: #76b900; /* Fallback default */
+        --splash-bg: #121517;     /* Fallback default */
+        --splash-text: #ffffff;   /* Fallback default */
       }
 
-      /* Ensure window body starts dark instantly to eliminate white flashes */
+      /* Ensure window body starts with the exact theme background instantly */
       body {
-        background-color: #101418;
+        background-color: var(--splash-bg);
         margin: 0;
         overflow: hidden;
       }
 
-      /* Raw HTML splash overlay: visible before JavaScript boots */
+      /* Raw HTML splash overlay: 100% opaque, zero blur, instant render */
       #app-splash {
         position: fixed;
         inset: 0;
         z-index: 999999;
-        background-color: rgba(18, 21, 23, 0.6);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
+        background-color: var(--splash-bg);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -94,7 +122,7 @@
         font-family: 'Geist', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         font-weight: 800;
         text-transform: uppercase;
-        color: #ffffff;
+        color: var(--splash-text);
         line-height: 0.85;
         text-align: left;
       }

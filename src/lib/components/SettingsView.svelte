@@ -15,7 +15,7 @@
   } from '$lib/theme';
   import {
     RotateCcw, Check, Settings, Sun, Moon, Sparkles, Palette, FolderSearch,
-    ChevronDown, ChevronRight, Wrench, GripVertical, Folder, FileCode, LayoutGrid, FileText, Image as ImageIcon, X, Download, Layers
+    ChevronDown, ChevronRight, Wrench, GripVertical, Folder, FileCode, LayoutGrid, FileText, Image as ImageIcon, X, Download, Layers, AlignLeft
   } from 'lucide-svelte';
   import DialogModal from './DialogModal.svelte';
 
@@ -153,7 +153,7 @@
       const selected = await open({
         multiple: false, directory: false,
         filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
-        title: 'Select Hero Banner Image'
+        title: 'Select Workspace Background Image'
       });
       if (typeof selected === 'string') {
         draft.heroBannerPath = selected;
@@ -309,7 +309,7 @@
           </button>
         </div>
 
-        <div class="p-5 space-y-6">
+        <div class="p-5 space-y-5">
           
           <!-- Top Row: Mode & Accent -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -372,30 +372,64 @@
 
           <div class="h-px" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
 
-          <!-- Base Atmosphere Selection -->
-          <div class="space-y-2">
-            <div class="flex items-center gap-2 text-xs font-semibold" style="color: var(--theme-text-primary);">
-              <LayoutGrid class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
-              <span>Base Atmosphere</span>
+          <!-- Second Row: Base Atmosphere & Workspace Background Image -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Base Atmosphere Selection -->
+            <div class="space-y-2">
+              <div class="flex items-center gap-2 text-xs font-semibold" style="color: var(--theme-text-primary);">
+                <LayoutGrid class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
+                <span>Base Atmosphere</span>
+              </div>
+              <div class="flex items-center gap-3 pt-1">
+                {#each availableAtmospheres as atm}
+                  {@const atmColors = draft.mode === 'light' ? LIGHT_ATMOSPHERES[atm] : DARK_ATMOSPHERES[atm]}
+                  <button
+                    type="button"
+                    onclick={() => handleAtmosphereSelect(atm)}
+                    class="h-8 w-8 rounded-full border-2 transition-all cursor-pointer shadow-sm"
+                    style="background-color: {atmColors.bg}; border-color: {draft.atmosphere === atm ? 'var(--theme-accent)' : 'var(--theme-border)'}; {draft.atmosphere === atm ? 'transform: scale(1.1);' : ''}"
+                    title={atm.charAt(0).toUpperCase() + atm.slice(1)}
+                  ></button>
+                {/each}
+              </div>
             </div>
-            <div class="flex items-center gap-3 pt-1">
-              {#each availableAtmospheres as atm}
-                {@const atmColors = draft.mode === 'light' ? LIGHT_ATMOSPHERES[atm] : DARK_ATMOSPHERES[atm]}
+
+            <!-- Workspace Background Image -->
+            <div class="space-y-2">
+              <div class="flex items-center gap-2 text-xs font-semibold" style="color: var(--theme-text-primary);">
+                <ImageIcon class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
+                <span>Workspace Background Image</span>
+              </div>
+              <div class="flex items-center gap-2 w-full">
                 <button
                   type="button"
-                  onclick={() => handleAtmosphereSelect(atm)}
-                  class="h-8 w-8 rounded-full border-2 transition-all cursor-pointer shadow-sm"
-                  style="background-color: {atmColors.bg}; border-color: {draft.atmosphere === atm ? 'var(--theme-accent)' : 'var(--theme-border)'}; {draft.atmosphere === atm ? 'transform: scale(1.1);' : ''}"
-                  title={atm.charAt(0).toUpperCase() + atm.slice(1)}
-                ></button>
-              {/each}
+                  onclick={handleBrowseBanner}
+                  class="flex-1 px-3 py-1.5 rounded border text-xs transition cursor-pointer truncate text-left min-w-0"
+                  style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
+                  title={draft.heroBannerPath || 'Select Image...'}
+                >
+                  {draft.heroBannerPath ? draft.heroBannerPath.split('\\').pop() : 'Select Image...'}
+                </button>
+                {#if draft.heroBannerPath}
+                  <button
+                    type="button"
+                    onclick={handleClearBanner}
+                    class="p-1.5 rounded transition cursor-pointer shrink-0 hover:bg-[var(--theme-surface)]"
+                    style="color: var(--color-danger);"
+                    title="Clear Background Image"
+                  >
+                    <X class="h-3.5 w-3.5" />
+                  </button>
+                {/if}
+              </div>
             </div>
           </div>
 
           <div class="h-px" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
 
-          <!-- Typography & Banner Grid -->
+          <!-- Third Row: Typography & Archive Group Title Bar -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Data Font -->
             <div class="space-y-2">
               <div class="flex items-center gap-2 text-xs font-semibold" style="color: var(--theme-text-primary);">
                 <FileCode class="h-3.5 w-3.5" style="color: var(--color-info);" />
@@ -414,57 +448,26 @@
               </select>
             </div>
 
+            <!-- Archive Group Title Bar -->
             <div class="space-y-2">
               <div class="flex items-center gap-2 text-xs font-semibold" style="color: var(--theme-text-primary);">
-                <ImageIcon class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
-                <span>Hero Banner Image</span>
+                <Layers class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
+                <span>Archive Group Title Bar</span>
               </div>
-              <div class="flex items-center gap-2">
-                <button
-                  type="button"
-                  onclick={handleBrowseBanner}
-                  class="flex-1 px-3 py-1.5 rounded border text-xs transition cursor-pointer truncate text-left"
-                  style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
-                  title={draft.heroBannerPath || 'Select Image...'}
-                >
-                  {draft.heroBannerPath ? draft.heroBannerPath.split('\\').pop() : 'Select Image...'}
-                </button>
-                {#if draft.heroBannerPath}
-                  <button
-                    type="button"
-                    onclick={handleClearBanner}
-                    class="p-1.5 rounded transition cursor-pointer hover:bg-[var(--theme-surface)]"
-                    style="color: var(--color-danger);"
-                    title="Clear Banner"
-                  >
-                    <X class="h-3.5 w-3.5" />
-                  </button>
-                {/if}
-              </div>
+              <select
+                onchange={handleGroupStyleChange}
+                class="w-full px-2 py-1.5 border rounded text-xs focus:outline-none cursor-pointer font-sans"
+                style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
+              >
+                <option value="default" selected={draft.groupBackgroundStyle === 'default' || !draft.groupBackgroundStyle} style="background-color: var(--theme-surface); color: var(--theme-text-primary);">Default (Subtle)</option>
+                <option value="accent-wash" selected={draft.groupBackgroundStyle === 'accent-wash'} style="background-color: var(--theme-surface); color: var(--theme-text-primary);">Accent Wash (Soft)</option>
+                <option value="gradient-flare" selected={draft.groupBackgroundStyle === 'gradient-flare'} style="background-color: var(--theme-surface); color: var(--theme-text-primary);">Gradient Flare (Modern)</option>
+              </select>
             </div>
-          </div>
-
-          <div class="h-px" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
-
-          <!-- Archive Group Distinction -->
-          <div class="space-y-2">
-            <div class="flex items-center gap-2 text-xs font-semibold" style="color: var(--theme-text-primary);">
-              <Layers class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
-              <span>Archive Group Distinction</span>
-            </div>
-            <select
-              onchange={handleGroupStyleChange}
-              class="w-full sm:w-1/2 px-2 py-1.5 border rounded text-xs focus:outline-none cursor-pointer font-sans"
-              style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
-            >
-              <option value="default" selected={draft.groupBackgroundStyle === 'default' || !draft.groupBackgroundStyle} style="background-color: var(--theme-surface); color: var(--theme-text-primary);">Default (Subtle)</option>
-              <option value="accent-wash" selected={draft.groupBackgroundStyle === 'accent-wash'} style="background-color: var(--theme-surface); color: var(--theme-text-primary);">Accent Wash (Soft)</option>
-              <option value="gradient-flare" selected={draft.groupBackgroundStyle === 'gradient-flare'} style="background-color: var(--theme-surface); color: var(--theme-text-primary);">Gradient Flare (Modern)</option>
-            </select>
           </div>
 
           <!-- Live Preview Mockup -->
-          <div class="pt-2">
+          <div class="pt-1">
             <div class="text-[10px] font-bold uppercase tracking-wider mb-2" style="color: var(--theme-text-muted);">Live Preview</div>
             <div
               class="rounded-lg border overflow-hidden flex flex-col shadow-inner relative"
@@ -494,7 +497,7 @@
                 >
                   <div class="absolute left-0 top-0 bottom-0 w-0.5" style="background-color: {activeColors.accent};"></div>
                   <ChevronDown class="h-3 w-3" style="color: {activeColors.textMuted};" />
-                  <Folder class="h-3 w-3" style="color: {activeColors.textMuted};" />
+                  <AlignLeft class="h-3 w-3" style="color: {activeColors.textMuted};" />
                   <span class="text-[9px] font-bold uppercase tracking-wider" style="color: {activeColors.textPrimary};">Gameplay Structure</span>
                 </div>
                 

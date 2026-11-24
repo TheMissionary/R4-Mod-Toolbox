@@ -1372,7 +1372,7 @@
                     {isHighlighted ? 'ring-1 bg-[color-mix(in_srgb,var(--theme-accent)_15%,transparent)] border-[var(--theme-accent)] shadow-[0_0_15px_color-mix(in_srgb,var(--theme-accent)_35%,transparent)]' : 
                     (isSelected ? 'bg-[color-mix(in_srgb,var(--theme-accent)_10%,transparent)] border-[color-mix(in_srgb,var(--theme-accent)_60%,transparent)]' : 
                     'bg-transparent border-[var(--theme-border)] hover:bg-[color-mix(in_srgb,var(--theme-accent)_12%,transparent)]')}
-                    {archive.enabled ? 'opacity-100' : 'opacity-40'} 
+                    {archive.enabled ? 'opacity-100' : 'opacity-50'} 
                     {isSource ? 'opacity-20 border-dashed' : ''}"
                 >
                   <div class="flex items-center justify-between px-2 gap-1 density-row relative">
@@ -1440,7 +1440,7 @@
                       </div>
 
                       <!-- Slot 5: Mod File Name -->
-                      <span class="font-mono font-medium truncate max-w-md" style="color: var(--theme-text-primary);">
+                      <span class="font-mono truncate max-w-md" style="color: var(--theme-text-primary);">
                         {archive.file_name}
                       </span>
                     </div>
@@ -1658,7 +1658,7 @@
                   >
                     <div class="flex items-center gap-2.5 min-w-0">
                       <FileCode class="h-3.5 w-3.5 shrink-0" style="color: var(--color-info);" />
-                      <span class="font-mono font-medium truncate" style="color: var(--theme-text-primary);">{xl.file_name}</span>
+                      <span class="font-mono truncate" style="color: var(--theme-text-primary);">{xl.file_name}</span>
                       <span class="text-[10px] font-mono shrink-0 hidden sm:block" style="color: var(--theme-text-muted);">
                         {formatBytes(xl.size_bytes)}
                       </span>
@@ -1721,7 +1721,7 @@
                 >
                   <div class="flex items-center gap-2 min-w-0 flex-1">
                     <div class="h-2 w-2 rounded-full shrink-0 shadow-[0_0_4px_currentColor]" style="background-color: {isLosing ? 'var(--color-danger)' : 'var(--color-success)'}; color: {isLosing ? 'var(--color-danger)' : 'var(--color-success)'};"></div>
-                    <span class="font-mono truncate font-medium" style="color: var(--theme-text-primary);">
+                    <span class="font-mono truncate" style="color: var(--theme-text-primary);">
                       {archive.file_name}
                     </span>
                   </div>

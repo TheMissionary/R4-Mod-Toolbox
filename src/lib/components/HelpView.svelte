@@ -4,7 +4,8 @@
   import { slide } from 'svelte/transition';
   import {
     HelpCircle, Link2, AlertTriangle, ExternalLink, FolderTree, Cpu,
-    ChevronDown, ChevronRight, Star, Code, FolderOpen, Trash2, Check, LayoutGrid, Link
+    ChevronDown, ChevronRight, Star, Code, FolderOpen, Trash2, Check, LayoutGrid, Link,
+    MessageSquare, FileCode
   } from 'lucide-svelte';
 
   let openSection = $state<string | null>('support');
@@ -66,7 +67,7 @@
         >
           <div class="flex items-center gap-2.5">
             <FolderTree class="h-4 w-4" style="color: var(--theme-accent);" />
-            <h3 class="text-sm font-bold uppercase tracking-wider">Load Order & Groups</h3>
+            <h3 class="text-sm font-bold uppercase tracking-wider">Archive Load Order and Groups</h3>
           </div>
           {#if openSection === 'load_order'}
             <ChevronDown class="h-4 w-4" style="color: var(--theme-text-muted);" />
@@ -161,7 +162,7 @@
           <div transition:slide={{ duration: 200 }} class="border-t" style="border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-bg) 30%, transparent);">
             <div class="p-5 space-y-4 text-xs leading-relaxed" style="color: var(--theme-text-muted);">
               <p>
-                R4 scans the internal hashes of every <span class="font-mono" style="color: var(--theme-text-primary);">.archive</span> file to detect exact file collisions.
+                R4 scans the internal hashes of every <span class="font-mono" style="color: var(--theme-text-primary);">.archive</span> file to detect exact file collisions. When a conflict is found, it is indicated by the red and green indicators (below). When an archive has zero conflicts, no indicator is shown.
               </p>
               <ul class="space-y-2 p-3 rounded border" style="background-color: color-mix(in srgb, var(--theme-surface) 30%, transparent); border-color: color-mix(in srgb, var(--theme-border) 50%, transparent);">
                 <li class="flex items-start gap-2.5">
@@ -228,7 +229,46 @@
         {/if}
       </div>
 
-      <!-- Accordion 5: XL Linking -->
+      <!-- Accordion 5: Notes -->
+      <div class="rounded-xl border overflow-hidden flex flex-col" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
+        <button 
+          type="button"
+          onclick={() => toggleSection('notes')}
+          class="w-full px-4 py-3 flex items-center justify-between transition-colors cursor-pointer hover:bg-[color-mix(in_srgb,var(--theme-surface)_90%,transparent)]"
+          style="background-color: color-mix(in srgb, var(--theme-surface) 60%, transparent);"
+        >
+          <div class="flex items-center gap-2.5">
+            <MessageSquare class="h-4 w-4" style="color: var(--color-warning);" />
+            <h3 class="text-sm font-bold uppercase tracking-wider">Notes</h3>
+          </div>
+          {#if openSection === 'notes'}
+            <ChevronDown class="h-4 w-4" style="color: var(--theme-text-muted);" />
+          {:else}
+            <ChevronRight class="h-4 w-4" style="color: var(--theme-text-muted);" />
+          {/if}
+        </button>
+        
+        {#if openSection === 'notes'}
+          <div transition:slide={{ duration: 200 }} class="border-t" style="border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-bg) 30%, transparent);">
+            <div class="p-5 space-y-4 text-xs leading-relaxed" style="color: var(--theme-text-muted);">
+              <p>
+                The Notes feature allows you to attach personal text to any mod in your load order. 
+              </p>
+              <p>
+                <strong style="color: var(--theme-text-primary);">Use Cases:</strong><br/>
+                • Store <span class="font-mono" style="color: var(--theme-text-primary);">Game.AddToInventory</span> CET codes for quick access.<br/>
+                • Save specific installation instructions or load order requirements from the mod author.<br/>
+                • Keep track of which in-game items a mod replaces.
+              </p>
+              <p>
+                <strong style="color: var(--color-warning);">How to use:</strong> Right-click any mod and select "Add Note..." (or "Edit Note..."). Once a note is saved, a yellow Note icon will appear next to the mod. Hover over the icon to read the note, or click it to edit.
+              </p>
+            </div>
+          </div>
+        {/if}
+      </div>
+
+      <!-- Accordion 6: XL Linking -->
       <div class="rounded-xl border overflow-hidden flex flex-col" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
         <button 
           type="button"
@@ -237,8 +277,8 @@
           style="background-color: color-mix(in srgb, var(--theme-surface) 60%, transparent);"
         >
           <div class="flex items-center gap-2.5">
-            <Link2 class="h-4 w-4" style="color: var(--color-info);" />
-            <h3 class="text-sm font-bold uppercase tracking-wider">XL Linking</h3>
+            <FileCode class="h-4 w-4" style="color: var(--color-info);" />
+            <h3 class="text-sm font-bold uppercase tracking-wider">Linking XL Files</h3>
           </div>
           {#if openSection === 'xl_linking'}
             <ChevronDown class="h-4 w-4" style="color: var(--theme-text-muted);" />
@@ -264,7 +304,7 @@
         {/if}
       </div>
 
-      <!-- Accordion 6: Frameworks & Scripts -->
+      <!-- Accordion 7: Frameworks & Scripts -->
       <div class="rounded-xl border overflow-hidden flex flex-col" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
         <button 
           type="button"
@@ -309,7 +349,7 @@
         {/if}
       </div>
 
-      <!-- Accordion 7: Support & Feedback -->
+      <!-- Accordion 8: Support & Feedback -->
       <div class="rounded-xl border overflow-hidden flex flex-col" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
         <button 
           type="button"
@@ -346,7 +386,7 @@
                     </div>
                     <div class="text-left">
                       <div class="text-xs font-bold" style="color: var(--theme-text-primary);">Nexus Mods</div>
-                      <div class="text-[10px]" style="color: var(--theme-text-muted);">Download updates</div>
+                      <div class="text-[10px]" style="color: var(--theme-text-muted);">Feedback, Requests & Updates</div>
                     </div>
                   </div>
                   <ExternalLink class="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity" style="color: var(--theme-text-muted);" />

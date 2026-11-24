@@ -42,7 +42,7 @@
       case 'red4ext': return [...base, 'red4ext', 'plugins'];
       case 'redscript': return [...base, 'r6', 'scripts'];
       case 'r6tweaks': return [...base, 'r6', 'tweaks'];
-      case 'history': return [...base, 'Mod History & Ledger'];
+      case 'history': return [...base, 'Mod Inventory History'];
       case 'settings': return [...base, 'Application Settings'];
       case 'help': return [...base, 'Help & Documentation'];
       case 'about': return [...base, 'About R4'];

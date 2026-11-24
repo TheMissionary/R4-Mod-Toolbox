@@ -32,9 +32,8 @@
   let copiedFeedback = $state(false);
   let searchQuery = $state('');
   
-  let sortBy = $state<'first_seen' | 'os_created' | 'os_modified'>('first_seen');
+  let sortBy = $state<'name' | 'mod_type' | 'first_seen' | 'os_created' | 'os_modified'>('first_seen');
   let sortDesc = $state(true);
-  let isSortMenuOpen = $state(false);
 
   let highlightedModName = $state<string | null>(null);
   let highlightTimeoutId: number | null = null;
@@ -137,13 +136,20 @@
     }
     
     arr.sort((a, b) => {
+      if (sortBy === 'name') {
+        return sortDesc ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name);
+      }
+      if (sortBy === 'mod_type') {
+        return sortDesc ? b.mod_type.localeCompare(a.mod_type) : a.mod_type.localeCompare(b.mod_type);
+      }
+      
       let valA = a[sortBy] || 0;
       let valB = b[sortBy] || 0;
       if (valA === valB) return a.name.localeCompare(b.name);
       return sortDesc ? valB - valA : valA - valB;
     });
 
-    return arr.map(mod => ({ ...mod, displayTime: new Date(mod[sortBy] || 0) }));
+    return arr.map(mod => ({ ...mod, displayTime: new Date(mod[sortBy === 'name' || sortBy === 'mod_type' ? 'first_seen' : sortBy] || 0) }));
   });
 
   function formatHistoryDate(d: Date) {
@@ -401,10 +407,19 @@
     } catch (e) { console.error(e); }
     closeContextMenu();
   }
+
+  function handleSort(column: 'name' | 'mod_type' | 'first_seen' | 'os_created' | 'os_modified') {
+    if (sortBy === column) {
+      sortDesc = !sortDesc;
+    } else {
+      sortBy = column;
+      sortDesc = true;
+    }
+  }
 </script>
 
 <svelte:window 
-  onclick={() => { closeContextMenu(); isSortMenuOpen = false; }} 
+  onclick={() => { closeContextMenu(); }} 
   oncontextmenu={(e) => e.preventDefault()} 
 />
 
@@ -632,97 +647,59 @@
         {/if}
       </div>
     </div>
-    
-    <div class="flex items-center gap-2.5 shrink-0">
+  </div>
+
+  <!-- Native Sorting Header Row -->
+  <div class="flex items-center justify-between px-2 py-2 border-b shrink-0 text-[10px] font-bold uppercase tracking-wider" style="border-color: var(--theme-border); color: var(--theme-text-muted); background-color: color-mix(in srgb, var(--theme-surface) 50%, transparent);">
+    <div class="flex items-center gap-3 min-w-0 flex-1 pl-1">
+      <div class="w-6 shrink-0"></div> <!-- Checkbox Spacer -->
       
-      <!-- Custom Sort Dropdown -->
-      <div class="relative">
-        <button
-          type="button"
-          onclick={(e) => { e.stopPropagation(); isSortMenuOpen = !isSortMenuOpen; }}
-          class="h-8 flex items-center gap-2 px-3 rounded border text-xs font-medium transition cursor-pointer hover:brightness-125"
-          style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
-        >
-          <Clock class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
-          <span class="uppercase tracking-wider">
-            {sortBy === 'first_seen' ? 'R4 First-Seen' : sortBy === 'os_created' ? 'OS Created' : 'OS Modified'}
-          </span>
-          <ChevronDown class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
-        </button>
-
-        {#if isSortMenuOpen}
-          <div
-            class="absolute right-0 top-full mt-1.5 w-44 rounded-md border py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md z-50"
-            style="background-color: var(--theme-card); border-color: var(--theme-border);"
-            onclick={(e) => e.stopPropagation()}
-          >
-            <div class="p-1 space-y-0.5">
-              <button
-                type="button"
-                onclick={() => { sortBy = 'first_seen'; isSortMenuOpen = false; }}
-                class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
-                style="color: {sortBy === 'first_seen' ? 'var(--theme-accent)' : 'var(--theme-text-primary)'};"
-              >
-                {#if sortBy === 'first_seen'}
-                  <Check class="h-3.5 w-3.5" />
-                {:else}
-                  <div class="h-3.5 w-3.5"></div>
-                {/if}
-                <span class="{sortBy === 'first_seen' ? 'font-bold' : 'font-medium'}">R4 First-Seen</span>
-              </button>
-              
-              <button
-                type="button"
-                onclick={() => { sortBy = 'os_created'; isSortMenuOpen = false; }}
-                class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
-                style="color: {sortBy === 'os_created' ? 'var(--theme-accent)' : 'var(--theme-text-primary)'};"
-              >
-                {#if sortBy === 'os_created'}
-                  <Check class="h-3.5 w-3.5" />
-                {:else}
-                  <div class="h-3.5 w-3.5"></div>
-                {/if}
-                <span class="{sortBy === 'os_created' ? 'font-bold' : 'font-medium'}">OS Created</span>
-              </button>
-
-              <button
-                type="button"
-                onclick={() => { sortBy = 'os_modified'; isSortMenuOpen = false; }}
-                class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
-                style="color: {sortBy === 'os_modified' ? 'var(--theme-accent)' : 'var(--theme-text-primary)'};"
-              >
-                {#if sortBy === 'os_modified'}
-                  <Check class="h-3.5 w-3.5" />
-                {:else}
-                  <div class="h-3.5 w-3.5"></div>
-                {/if}
-                <span class="{sortBy === 'os_modified' ? 'font-bold' : 'font-medium'}">OS Modified</span>
-              </button>
-            </div>
-          </div>
+      <button type="button" onclick={() => handleSort('name')} class="flex items-center gap-1 hover:text-[var(--theme-text-primary)] transition cursor-pointer min-w-0">
+        <span>Name</span>
+        {#if sortBy === 'name'}
+          {#if sortDesc}<ArrowDown class="h-3 w-3" style="color: var(--theme-accent);" />{:else}<ArrowUp class="h-3 w-3" style="color: var(--theme-accent);" />{/if}
         {/if}
-      </div>
-
-      <!-- Fixed Width Sort Direction Button -->
-      <button
-        type="button"
-        onclick={() => sortDesc = !sortDesc}
-        class="h-8 w-20 flex items-center justify-center gap-1.5 rounded border text-xs font-medium transition cursor-pointer hover:brightness-125 shrink-0"
-        style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
-      >
-        {#if sortDesc}
-          <ArrowDown class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
-        {:else}
-          <ArrowUp class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
-        {/if}
-        <span>Sort</span>
       </button>
+    </div>
+
+    <div class="flex items-center gap-1 shrink-0">
+      <button type="button" onclick={() => handleSort('mod_type')} class="w-24 flex items-center gap-1 hover:text-[var(--theme-text-primary)] transition cursor-pointer shrink-0">
+        <span>Mod Type</span>
+        {#if sortBy === 'mod_type'}
+          {#if sortDesc}<ArrowDown class="h-3 w-3" style="color: var(--theme-accent);" />{:else}<ArrowUp class="h-3 w-3" style="color: var(--theme-accent);" />{/if}
+        {/if}
+      </button>
+
+      <button type="button" onclick={() => handleSort('first_seen')} class="w-36 flex items-center gap-1 hover:text-[var(--theme-text-primary)] transition cursor-pointer shrink-0">
+        <span>R4 First-Seen</span>
+        {#if sortBy === 'first_seen'}
+          {#if sortDesc}<ArrowDown class="h-3 w-3" style="color: var(--theme-accent);" />{:else}<ArrowUp class="h-3 w-3" style="color: var(--theme-accent);" />{/if}
+        {/if}
+      </button>
+
+      <button type="button" onclick={() => handleSort('os_created')} class="w-36 flex items-center gap-1 hover:text-[var(--theme-text-primary)] transition cursor-pointer shrink-0 hidden xl:flex">
+        <span>OS Created</span>
+        {#if sortBy === 'os_created'}
+          {#if sortDesc}<ArrowDown class="h-3 w-3" style="color: var(--theme-accent);" />{:else}<ArrowUp class="h-3 w-3" style="color: var(--theme-accent);" />{/if}
+        {/if}
+      </button>
+
+      <button type="button" onclick={() => handleSort('os_modified')} class="w-36 flex items-center gap-1 hover:text-[var(--theme-text-primary)] transition cursor-pointer shrink-0 hidden 2xl:flex">
+        <span>OS Modified</span>
+        {#if sortBy === 'os_modified'}
+          {#if sortDesc}<ArrowDown class="h-3 w-3" style="color: var(--theme-accent);" />{:else}<ArrowUp class="h-3 w-3" style="color: var(--theme-accent);" />{/if}
+        {/if}
+      </button>
+
+      <div class="w-6 shrink-0"></div> <!-- Note Spacer -->
+      <div class="w-10 shrink-0"></div> <!-- Multi-Link Spacer -->
+      <div class="w-6 shrink-0"></div> <!-- Context Menu Spacer -->
     </div>
   </div>
 
   <div class="flex-1 overflow-y-auto space-y-0 pr-1">
     {#if displayMods.length === 0}
-      <div class="p-6 text-center text-xs border rounded" style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-muted);">
+      <div class="p-6 text-center text-xs border rounded mt-2" style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-muted);">
         {searchQuery ? 'No mods match your search query.' : 'No mods detected in the ledger.'}
       </div>
     {:else}
@@ -760,12 +737,16 @@
                 </button>
               </div>
 
-              <!-- Slot 2: Timestamp (w-36) -->
-              <div class="w-36 shrink-0 text-[10px] font-mono" style="color: var(--theme-text-muted);">
-                {formatHistoryDate(item.displayTime)}
-              </div>
+              <!-- Slot 2: Mod File Name -->
+              <span class="font-mono text-[11px] truncate" style="color: {item.enabled ? 'var(--theme-text-primary)' : 'var(--theme-text-muted)'};">
+                {item.name}
+              </span>
+            </div>
 
-              <!-- Slot 3: Mod Type Badge (w-24) -->
+            <!-- HYBRID SLOT ARCHITECTURE: RIGHT ZONE -->
+            <div class="flex items-center gap-1 shrink-0">
+              
+              <!-- Slot 1: Mod Type Badge (w-24) -->
               <div class="w-24 shrink-0">
                 <span class="inline-flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border" style="background-color: color-mix(in srgb, var(--theme-text-muted) 15%, transparent); color: var(--theme-text-muted); border-color: color-mix(in srgb, var(--theme-text-muted) 30%, transparent);">
                   {#if item.mod_type === 'archive'}
@@ -783,16 +764,22 @@
                 </span>
               </div>
 
-              <!-- Slot 4: Mod File Name -->
-              <span class="font-mono text-[11px] truncate {item.enabled ? 'font-medium' : 'line-through'}" style="color: {item.enabled ? 'var(--theme-text-primary)' : 'var(--theme-text-muted)'};">
-                {item.name}
-              </span>
-            </div>
+              <!-- Slot 2: R4 First-Seen (w-36) -->
+              <div class="w-36 shrink-0 text-[10px] font-mono" style="color: var(--theme-text-muted);">
+                {formatHistoryDate(new Date(item.first_seen || 0))}
+              </div>
 
-            <!-- HYBRID SLOT ARCHITECTURE: RIGHT ZONE -->
-            <div class="flex items-center gap-1 shrink-0">
-              
-              <!-- Slot 1: Note Icon (w-6) -->
+              <!-- Slot 3: OS Created (w-36) -->
+              <div class="w-36 shrink-0 text-[10px] font-mono hidden xl:block" style="color: var(--theme-text-muted);">
+                {formatHistoryDate(new Date(item.os_created || 0))}
+              </div>
+
+              <!-- Slot 4: OS Modified (w-36) -->
+              <div class="w-36 shrink-0 text-[10px] font-mono hidden 2xl:block" style="color: var(--theme-text-muted);">
+                {formatHistoryDate(new Date(item.os_modified || 0))}
+              </div>
+
+              <!-- Slot 5: Note Icon (w-6) -->
               <div class="w-6 flex justify-center shrink-0">
                 {#if notesConfig[item.name]}
                   <button 
@@ -806,7 +793,7 @@
                 {/if}
               </div>
 
-              <!-- Slot 2: Multi-Link Icon + Chevron (w-10) -->
+              <!-- Slot 6: Multi-Link Icon + Chevron (w-10) -->
               <div class="w-10 flex items-center justify-center gap-0.5 shrink-0">
                 {#if activeCluster}
                   <Link class="h-3.5 w-3.5" style="color: var(--color-warning);" title="Part of Multi-Link Cluster: {activeCluster.name}" />
@@ -826,7 +813,7 @@
                 {/if}
               </div>
 
-              <!-- Slot 3: Context Menu (w-6) -->
+              <!-- Slot 7: Context Menu (w-6) -->
               <div class="w-6 flex justify-end shrink-0">
                 <button
                   type="button"

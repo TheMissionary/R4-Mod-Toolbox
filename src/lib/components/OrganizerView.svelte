@@ -992,7 +992,7 @@
                       <div class="flex items-center gap-2 min-w-0">
                         <GripVertical class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
                         <FileArchive class="h-3.5 w-3.5 shrink-0" style="color: {isTargetMatch ? 'var(--color-info)' : 'var(--theme-text-muted)'};" />
-                        <span class="text-[11px] font-mono truncate {isTargetMatch ? 'font-bold' : (mod.enabled ? '' : 'opacity-50 line-through')}" style="color: {isTargetMatch ? 'var(--color-info)' : 'var(--theme-text-primary)'};">
+                        <span class="text-[11px] font-mono truncate {isTargetMatch ? 'font-bold' : (mod.enabled ? '' : 'opacity-50')}" style="color: {isTargetMatch ? 'var(--color-info)' : 'var(--theme-text-primary)'};">
                           {mod.file_name}
                         </span>
                       </div>
@@ -1127,7 +1127,7 @@
                     <div class="flex items-center gap-2 min-w-0">
                       <GripVertical class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
                       <FileArchive class="h-3.5 w-3.5 shrink-0" style="color: {isTargetMatch ? 'var(--color-info)' : 'var(--theme-text-muted)'};" />
-                      <span class="text-[11px] font-mono truncate {isTargetMatch ? 'font-bold' : (mod.enabled ? '' : 'opacity-50 line-through')}" style="color: {isTargetMatch ? 'var(--color-info)' : 'var(--theme-text-primary)'};">
+                      <span class="text-[11px] font-mono truncate {isTargetMatch ? 'font-bold' : (mod.enabled ? '' : 'opacity-50')}" style="color: {isTargetMatch ? 'var(--color-info)' : 'var(--theme-text-primary)'};">
                         {mod.file_name}
                       </span>
                     </div>
