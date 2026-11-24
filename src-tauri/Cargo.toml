@@ -1,5 +1,5 @@
 [package]
-name = "r4-mod-toolbox"
+name = "r4-mod-manager"
 version = "0.45.1"
 description = "Cyberpunk 2077 Mod and Conflict Management Tool"
 authors = ["Jason"]

@@ -21,6 +21,21 @@ fn mute_watcher(state: &tauri::State<'_, WatcherState>) {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct ThemeSegment {
+    #[serde(default)]
+    pub background: Option<String>,
+    #[serde(default)]
+    pub opacity: Option<u8>,
+    #[serde(default)]
+    pub blur: Option<String>,
+    #[serde(default)]
+    pub border: Option<String>,
+    #[serde(default)]
+    pub box_shadow: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct ThemeConfig {
     pub mode: String,
     #[serde(default = "default_atmosphere")]
@@ -45,6 +60,20 @@ pub struct ThemeConfig {
     pub border_thickness: Option<String>,
     #[serde(default)]
     pub neon_intensity: Option<String>,
+    #[serde(default)]
+    pub group_background_style: Option<String>,
+    
+    // Modular Theme Segments
+    #[serde(default)]
+    pub sidebar: Option<ThemeSegment>,
+    #[serde(default)]
+    pub header: Option<ThemeSegment>,
+    #[serde(default)]
+    pub footer: Option<ThemeSegment>,
+    #[serde(default)]
+    pub canvas: Option<ThemeSegment>,
+    #[serde(default)]
+    pub drawer: Option<ThemeSegment>,
 }
 
 fn default_atmosphere() -> String { "graphite".to_string() }
@@ -66,6 +95,12 @@ impl Default for ThemeConfig {
             ui_rounding: None,
             border_thickness: None,
             neon_intensity: None,
+            group_background_style: None,
+            sidebar: None,
+            header: None,
+            footer: None,
+            canvas: None,
+            drawer: None,
         }
     }
 }
@@ -129,6 +164,19 @@ impl Default for AppConfig {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MultiLinkMember {
+    pub mod_type: String,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MultiLinkCluster {
+    pub id: String,
+    pub name: String,
+    pub members: Vec<MultiLinkMember>,
+}
+
 fn get_app_config_path() -> PathBuf {
     if let Ok(appdata) = std::env::var("APPDATA") {
         PathBuf::from(appdata).join("r4-mod-toolbox").join("config.json")
@@ -159,12 +207,28 @@ fn get_notes_path() -> PathBuf {
     }
 }
 
+fn get_multilinks_path() -> PathBuf {
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        PathBuf::from(appdata).join("r4-mod-toolbox").join("r4_multilinks.json")
+    } else if let Ok(userprofile) = std::env::var("USERPROFILE") {
+        PathBuf::from(userprofile).join("AppData").join("Roaming").join("r4-mod-toolbox").join("r4_multilinks.json")
+    } else {
+        PathBuf::from("r4_multilinks.json")
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct LedgerEntry {
     pub name: String,
     pub mod_type: String,
     pub path: String,
     pub first_seen: u64,
+    #[serde(default)]
+    pub os_created: u64,
+    #[serde(default)]
+    pub os_modified: u64,
+    #[serde(default)]
+    pub enabled: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -345,6 +409,30 @@ fn save_notes_config(notes: std::collections::HashMap<String, String>) -> Result
     Ok(())
 }
 
+#[tauri::command]
+fn load_multilinks_config() -> Result<Vec<MultiLinkCluster>, String> {
+    let path = get_multilinks_path();
+    if path.exists() {
+        if let Ok(content) = fs::read_to_string(&path) {
+            if let Ok(clusters) = serde_json::from_str(&content) {
+                return Ok(clusters);
+            }
+        }
+    }
+    Ok(Vec::new())
+}
+
+#[tauri::command]
+fn save_multilinks_config(clusters: Vec<MultiLinkCluster>) -> Result<(), String> {
+    let path = get_multilinks_path();
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let serialized = serde_json::to_string_pretty(&clusters).map_err(|e| e.to_string())?;
+    fs::write(&path, serialized).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 fn resolve_game_root(candidate: &Path) -> Option<PathBuf> {
     if candidate.join("bin").join("x64").join("Cyberpunk2077.exe").exists() {
         return Some(candidate.to_path_buf());
@@ -379,62 +467,120 @@ fn validate_and_resolve_game_path(candidate_path: String) -> Result<Option<Strin
     Ok(resolved)
 }
 
+fn get_os_timestamps(path: &str) -> (u64, u64) {
+    let mut c = 0;
+    let mut m = 0;
+    if let Ok(meta) = fs::metadata(path) {
+        if let Ok(created) = meta.created() {
+            c = created.duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+        }
+        if let Ok(modified) = meta.modified() {
+            m = modified.duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+        }
+    }
+    (c, m)
+}
+
 fn update_ledger(game_path: &str) {
     let mut current_mods: Vec<LedgerEntry> = Vec::new();
 
     if let Ok(report) = archive::scan_archives(game_path) {
         for item in report.archives {
             if !item.is_delimiter {
+                let (c, m) = get_os_timestamps(&item.path);
                 current_mods.push(LedgerEntry {
-                    name: item.file_name,
+                    name: item.file_name.clone(),
                     mod_type: "archive".to_string(),
-                    path: item.path,
+                    path: item.path.clone(),
                     first_seen: 0,
+                    os_created: c,
+                    os_modified: m,
+                    enabled: item.enabled,
                 });
+                for xl in item.associated_xls {
+                    let (xc, xm) = get_os_timestamps(&xl.path);
+                    current_mods.push(LedgerEntry {
+                        name: xl.file_name,
+                        mod_type: "archive".to_string(),
+                        path: xl.path,
+                        first_seen: 0,
+                        os_created: xc,
+                        os_modified: xm,
+                        enabled: xl.enabled,
+                    });
+                }
             }
+        }
+        for xl in report.unassociated_xl {
+            let (xc, xm) = get_os_timestamps(&xl.path);
+            current_mods.push(LedgerEntry {
+                name: xl.file_name,
+                mod_type: "archive".to_string(),
+                path: xl.path,
+                first_seen: 0,
+                os_created: xc,
+                os_modified: xm,
+                enabled: xl.enabled,
+            });
         }
     }
 
     if let Ok(cet_list) = get_cet_details(game_path.to_string()) {
         for item in cet_list {
+            let (c, m) = get_os_timestamps(&item.path);
             current_mods.push(LedgerEntry {
                 name: item.name,
                 mod_type: "cet".to_string(),
                 path: item.path,
                 first_seen: 0,
+                os_created: c,
+                os_modified: m,
+                enabled: item.enabled,
             });
         }
     }
 
     if let Ok(r4e_list) = get_red4ext_details(game_path.to_string()) {
         for item in r4e_list {
+            let (c, m) = get_os_timestamps(&item.path);
             current_mods.push(LedgerEntry {
                 name: item.name,
                 mod_type: "red4ext".to_string(),
                 path: item.path,
                 first_seen: 0,
+                os_created: c,
+                os_modified: m,
+                enabled: item.enabled,
             });
         }
     }
 
     if let Ok(rs_list) = get_redscript_details(game_path.to_string()) {
         for item in rs_list {
+            let (c, m) = get_os_timestamps(&item.path);
             current_mods.push(LedgerEntry {
                 name: item.name,
                 mod_type: "redscript".to_string(),
                 path: item.path,
                 first_seen: 0,
+                os_created: c,
+                os_modified: m,
+                enabled: item.enabled,
             });
         }
     }
 
     if let Ok(tw_list) = get_r6tweaks_details(game_path.to_string()) {
         for item in tw_list {
+            let (c, m) = get_os_timestamps(&item.path);
             current_mods.push(LedgerEntry {
                 name: item.name,
                 mod_type: "r6tweaks".to_string(),
                 path: item.path,
                 first_seen: 0,
+                os_created: c,
+                os_modified: m,
+                enabled: item.enabled,
             });
         }
     }
@@ -617,7 +763,8 @@ fn is_valid_mod_event(event: &notify::Event) -> bool {
                     let ignored_names = [
                         "r4_loadorder.txt", "modlist.txt", "r4_labels.json", 
                         "modcategories.json", "modxl_associations.json", 
-                        "mod_history.json", "r4_notes.json", "config.json"
+                        "mod_history.json", "r4_notes.json", "config.json",
+                        "r4_multilinks.json"
                     ];
                     if ignored_names.contains(&name) {
                         continue;
@@ -973,6 +1120,34 @@ fn save_ledger_data(ledger: &Vec<LedgerEntry>) -> Result<(), String> {
     Ok(())
 }
 
+fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
+    fs::create_dir_all(&dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_dir_all(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        } else {
+            fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        }
+    }
+    Ok(())
+}
+
+fn rename_or_merge(source: &Path, target: &Path) -> std::io::Result<()> {
+    match fs::rename(source, target) {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            if target.is_dir() && fs::remove_dir(target).is_ok() {
+                return fs::rename(source, target);
+            }
+            copy_dir_all(source, target)?;
+            fs::remove_dir_all(source)?;
+            Ok(())
+        }
+    }
+}
+
 fn toggle_plugin_logic(
     game_path: &str,
     mod_type: &str,
@@ -1015,7 +1190,7 @@ fn toggle_plugin_logic(
         let _ = fs::create_dir_all(parent);
     }
 
-    fs::rename(&source, &target).map_err(|e| e.to_string())?;
+    rename_or_merge(&source, &target).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -1029,6 +1204,41 @@ fn toggle_plugin_state(
 ) -> Result<(), String> {
     mute_watcher(&state);
     toggle_plugin_logic(&game_path, &mod_type, &mod_name, enable)
+}
+
+#[tauri::command]
+fn toggle_multilink_cluster(
+    state: tauri::State<'_, WatcherState>,
+    game_path: String,
+    cluster: MultiLinkCluster,
+    enable: bool,
+) -> Result<(), String> {
+    mute_watcher(&state);
+    let mut success_list = Vec::new();
+
+    for member in &cluster.members {
+        let res = if member.mod_type == "archive" {
+            archive::toggle_mod(&game_path, &member.name, enable)
+        } else {
+            toggle_plugin_logic(&game_path, &member.mod_type, &member.name, enable)
+        };
+
+        match res {
+            Ok(_) => success_list.push(member.clone()),
+            Err(e) => {
+                // Transactional Rollback
+                for success_member in success_list {
+                    if success_member.mod_type == "archive" {
+                        let _ = archive::toggle_mod(&game_path, &success_member.name, !enable);
+                    } else {
+                        let _ = toggle_plugin_logic(&game_path, &success_member.mod_type, &success_member.name, !enable);
+                    }
+                }
+                return Err(format!("Failed to toggle {}: {}. Transaction rolled back.", member.name, e));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -1154,7 +1364,7 @@ fn open_custom_folder(folder_path: String) -> Result<(), String> {
 #[tauri::command]
 fn export_mod_list(game_path: String, export_path: String) -> Result<(), String> {
     let mut output = String::new();
-    output.push_str("R4 Mod Toolbox - Exported Mod List\r\n");
+    output.push_str("R4 Mod Manager - Exported Mod List\r\n");
     output.push_str("==================================\r\n\r\n");
 
     // Archive
@@ -1329,6 +1539,8 @@ pub fn run() {
             save_app_config,
             load_notes_config,
             save_notes_config,
+            load_multilinks_config,
+            save_multilinks_config,
             validate_and_resolve_game_path,
             scan_game_directory,
             get_archive_details,
@@ -1350,6 +1562,7 @@ pub fn run() {
             get_r6tweaks_details,
             get_recent_mods,
             toggle_plugin_state,
+            toggle_multilink_cluster,
             bulk_toggle_mod_type,
             get_folder_contents,
             open_in_text_editor,

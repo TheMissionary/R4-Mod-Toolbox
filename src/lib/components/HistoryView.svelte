@@ -2,12 +2,13 @@
   import { onMount, untrack, tick } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
-  import { loadConfigFromDisk, saveConfigToDisk } from '$lib/theme';
-  import type { LedgerEntry, ScanResult } from '$lib/types';
+  import type { LedgerEntry, ScanResult, MultiLinkCluster } from '$lib/types';
   import {
-    Clock, FolderSearch, ExternalLink, Copy, Check, CalendarDays, Search, X,
-    Archive, Cpu, Puzzle, FileCode2, Sliders
+    FolderSearch, ExternalLink, Copy, Check, Search, X,
+    Archive, Cpu, Puzzle, FileCode2, Sliders, Power, ArrowDown, ArrowUp, Clock, ChevronDown,
+    Link, Unlink, MessageSquare, MoreVertical, ChevronRight
   } from 'lucide-svelte';
+  import NoteModal from '$lib/components/NoteModal.svelte';
 
   let {
     gamePath = '',
@@ -18,7 +19,7 @@
     scanResult = null
   }: {
     gamePath: string;
-    newModsHours: number;
+    newModsHours?: number;
     targetHighlightMod?: string | null;
     onNavigateToMod: (tab: string, modName: string) => void;
     currentTab?: string;
@@ -26,12 +27,25 @@
   } = $props();
 
   let recentMods = $state<LedgerEntry[]>([]);
+  let multiLinks = $state<MultiLinkCluster[]>([]);
+  let notesConfig = $state<Record<string, string>>({});
   let copiedFeedback = $state(false);
   let searchQuery = $state('');
+  
+  let sortBy = $state<'first_seen' | 'os_created' | 'os_modified'>('first_seen');
+  let sortDesc = $state(true);
+  let isSortMenuOpen = $state(false);
 
   let highlightedModName = $state<string | null>(null);
   let highlightTimeoutId: number | null = null;
   const modNodeMap = new Map<string, HTMLElement>();
+
+  let selectedMods = $state<Set<string>>(new Set());
+  let lastSelectedPath = $state<string | null>(null);
+
+  let expandedMultiLinks = $state<Record<string, boolean>>({});
+  let isNoteModalOpen = $state(false);
+  let targetNoteModName = $state('');
 
   let contextMenu = $state<{
     visible: boolean;
@@ -44,6 +58,11 @@
     y: 0,
     entry: null
   });
+
+  // Multi-Link Modal State
+  let isLinkModalOpen = $state(false);
+  let linkDraftName = $state('');
+  let linkDraftMembers = $state<LedgerEntry[]>([]);
 
   const MOD_TYPE_LABELS: Record<string, string> = {
     'archive': 'Archive',
@@ -78,15 +97,10 @@
   $effect(() => {
     const trigger = scanResult;
     if (trigger && gamePath) {
-      untrack(() => { loadRecentMods(); });
-    }
-  });
-
-  $effect(() => {
-    if (searchQuery.trim() !== '' && newModsHours !== 999999) {
-      untrack(() => {
-        newModsHours = 999999;
-        handleTimeframeChange();
+      untrack(() => { 
+        loadRecentMods(); 
+        loadMultiLinks();
+        loadNotes();
       });
     }
   });
@@ -99,10 +113,6 @@
 
   async function focusModInHistory(modName: string) {
     if (searchQuery !== '') { searchQuery = ''; }
-    if (newModsHours !== 999999) {
-      newModsHours = 999999;
-      await handleTimeframeChange();
-    }
     await tick();
     let targetElement = modNodeMap.get(modName);
     let retries = 0;
@@ -119,57 +129,145 @@
     }
   }
 
-  let groupedMods = $derived.by(() => {
+  let displayMods = $derived.by(() => {
+    let arr = [...recentMods];
     const query = searchQuery.toLowerCase().trim();
-    const filtered = query ? recentMods.filter(m => m.name.toLowerCase().includes(query)) : recentMods;
-    const groups = new Map<number, LedgerEntry[]>();
-    for (const mod of filtered) {
-      if (!groups.has(mod.first_seen)) { groups.set(mod.first_seen, []); }
-      groups.get(mod.first_seen)!.push(mod);
+    if (query) {
+      arr = arr.filter(m => m.name.toLowerCase().includes(query));
     }
-    const arr = Array.from(groups.entries()).map(([ts, mods]) => {
-      mods.sort((a, b) => a.name.localeCompare(b.name));
-      return { timestamp: ts, mods };
+    
+    arr.sort((a, b) => {
+      let valA = a[sortBy] || 0;
+      let valB = b[sortBy] || 0;
+      if (valA === valB) return a.name.localeCompare(b.name);
+      return sortDesc ? valB - valA : valA - valB;
     });
-    arr.sort((a, b) => b.timestamp - a.timestamp);
-    return arr;
+
+    return arr.map(mod => ({ ...mod, displayTime: new Date(mod[sortBy] || 0) }));
   });
 
-  function formatGroupHeader(ts: number) {
-    if (!ts) return 'Unknown Date';
-    const d = new Date(ts);
-    const today = new Date();
-    const isToday = d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
-    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    if (isToday) { return `Today at ${timeStr}`; }
-    return `${d.toLocaleDateString()} at ${timeStr}`;
+  function formatHistoryDate(d: Date) {
+    if (d.getTime() === 0) return 'Unknown';
+    const datePart = d.toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' });
+    const timePart = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return `${datePart} ${timePart}`;
   }
 
   async function loadRecentMods() {
     if (!gamePath) return;
     try {
-      recentMods = await invoke<LedgerEntry[]>('get_recent_mods', { gamePath, hours: newModsHours });
+      recentMods = await invoke<LedgerEntry[]>('get_recent_mods', { gamePath, hours: 999999 });
     } catch (err) { console.error(`Failed to load recent mods: ${err}`); }
   }
 
-  async function handleTimeframeChange() {
-    await loadRecentMods();
-    loadConfigFromDisk().then(config => {
-      config.newModsHours = newModsHours;
-      saveConfigToDisk(config);
-    });
+  async function loadMultiLinks() {
+    if (!gamePath) return;
+    try {
+      multiLinks = await invoke<MultiLinkCluster[]>('load_multilinks_config');
+    } catch (err) { console.error(`Failed to load multilinks: ${err}`); }
   }
 
-  onMount(() => { loadRecentMods(); });
+  async function loadNotes() {
+    if (!gamePath) return;
+    try {
+      notesConfig = await invoke<Record<string, string>>('load_notes_config');
+    } catch (err) { console.error(`Failed to load notes: ${err}`); }
+  }
 
-  $effect(() => { if (gamePath) { loadRecentMods(); } });
+  onMount(() => { 
+    newModsHours = 999999;
+    loadRecentMods(); 
+    loadMultiLinks();
+    loadNotes();
+  });
+
+  function getClusterForMod(modName: string): MultiLinkCluster | undefined {
+    return multiLinks.find(c => c.members.some(m => m.name === modName));
+  }
+
+  function toggleMultiLink(fileName: string) {
+    expandedMultiLinks[fileName] = !expandedMultiLinks[fileName];
+  }
+
+  function handlePointerDown(e: PointerEvent, entry: LedgerEntry) {
+    if (e.button !== 0) return;
+    const isCtrl = e.ctrlKey || e.metaKey;
+    const isShift = e.shiftKey;
+
+    if (isShift && lastSelectedPath) {
+      const startIdx = displayMods.findIndex(m => m.path === lastSelectedPath);
+      const endIdx = displayMods.findIndex(m => m.path === entry.path);
+      if (startIdx !== -1 && endIdx !== -1) {
+        const min = Math.min(startIdx, endIdx);
+        const max = Math.max(startIdx, endIdx);
+        if (!isCtrl) selectedMods.clear();
+        for (let i = min; i <= max; i++) {
+          selectedMods.add(displayMods[i].path);
+        }
+      }
+    } else if (isCtrl) {
+      if (selectedMods.has(entry.path)) selectedMods.delete(entry.path);
+      else selectedMods.add(entry.path);
+      lastSelectedPath = entry.path;
+    } else {
+      selectedMods.clear();
+      selectedMods.add(entry.path);
+      lastSelectedPath = entry.path;
+    }
+    selectedMods = new Set(selectedMods);
+  }
+
+  async function handleToggle(entry: LedgerEntry) {
+    const nextState = !entry.enabled;
+    const cluster = getClusterForMod(entry.name);
+
+    if (cluster) {
+      // Transactional Multi-Link Toggle
+      try {
+        await invoke('toggle_multilink_cluster', { gamePath, cluster, enable: nextState });
+        // Update local state for all members
+        const memberNames = new Set(cluster.members.map(m => m.name));
+        recentMods = recentMods.map(m => {
+          if (memberNames.has(m.name)) {
+            return { ...m, enabled: nextState };
+          }
+          return m;
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      // Standard Single Toggle
+      entry.enabled = nextState;
+      recentMods = [...recentMods];
+      try {
+        if (entry.mod_type === 'archive') {
+          await invoke('toggle_mod_state', { gamePath, modName: entry.name, enable: nextState });
+        } else {
+          await invoke('toggle_plugin_state', { gamePath, modType: entry.mod_type, modName: entry.name, enable: nextState });
+        }
+      } catch (err) {
+        console.error(err);
+        entry.enabled = !nextState;
+        recentMods = [...recentMods];
+      }
+    }
+  }
 
   function openContextMenu(event: MouseEvent, entry: LedgerEntry) {
     event.preventDefault();
     event.stopPropagation();
     copiedFeedback = false;
+    
+    if (!selectedMods.has(entry.path)) {
+      selectedMods.clear();
+      selectedMods.add(entry.path);
+      selectedMods = new Set(selectedMods);
+      lastSelectedPath = entry.path;
+    }
+
     const menuWidth = 200;
-    const menuHeight = 120;
+    const menuHeight = selectedMods.size > 1 ? 200 : 160;
     const posX = (event.clientX + menuWidth > window.innerWidth) ? (window.innerWidth - menuWidth - 10) : event.clientX;
     const posY = (event.clientY + menuHeight > window.innerHeight) ? (window.innerHeight - menuHeight - 10) : event.clientY;
     contextMenu = { visible: true, x: posX, y: posY, entry };
@@ -181,6 +279,32 @@
       contextMenu.entry = null;
       copiedFeedback = false;
     }
+  }
+
+  async function handleContextMenuToggle() {
+    if (!contextMenu.entry) return;
+    const targetState = !contextMenu.entry.enabled;
+    
+    if (selectedMods.size > 1 && selectedMods.has(contextMenu.entry.path)) {
+      const itemsToToggle = displayMods.filter(m => selectedMods.has(m.path) && m.enabled !== targetState);
+      for (const item of itemsToToggle) {
+        item.enabled = targetState;
+      }
+      recentMods = [...recentMods];
+      
+      for (const item of itemsToToggle) {
+        try {
+          if (item.mod_type === 'archive') {
+            await invoke('toggle_mod_state', { gamePath, modName: item.name, enable: targetState });
+          } else {
+            await invoke('toggle_plugin_state', { gamePath, modType: item.mod_type, modName: item.name, enable: targetState });
+          }
+        } catch (err) { console.error(err); }
+      }
+    } else {
+      handleToggle(contextMenu.entry);
+    }
+    closeContextMenu();
   }
 
   async function handleShowInExplorer() {
@@ -208,21 +332,98 @@
       setTimeout(() => { closeContextMenu(); }, 400);
     } catch (err) { console.error(err); closeContextMenu(); }
   }
+
+  async function handleNoteConfirm(note: string) {
+    if (!targetNoteModName) return;
+    const targetName = targetNoteModName;
+    
+    if (note.trim() === '') {
+      delete notesConfig[targetName];
+    } else {
+      notesConfig[targetName] = note.trim();
+    }
+    notesConfig = { ...notesConfig };
+    try {
+      await invoke('save_notes_config', { notes: notesConfig });
+    } catch (err) {
+      console.error('Failed to save notes:', err);
+    }
+  }
+
+  // Multi-Link Logic
+  function openLinkModalFromSelection() {
+    const selected = displayMods.filter(m => selectedMods.has(m.path));
+    // Filter out mods that are already in a cluster
+    linkDraftMembers = selected.filter(m => !getClusterForMod(m.name));
+    
+    if (linkDraftMembers.length < 2) {
+      // If they selected mods that are already linked, we can't create a new link with them.
+      closeContextMenu();
+      return;
+    }
+    
+    linkDraftName = '';
+    isLinkModalOpen = true;
+    closeContextMenu();
+  }
+
+  async function confirmMultiLink() {
+    if (!linkDraftName.trim() || linkDraftMembers.length < 2) return;
+    const newCluster: MultiLinkCluster = {
+      id: crypto.randomUUID(),
+      name: linkDraftName.trim(),
+      members: linkDraftMembers.map(m => ({ mod_type: m.mod_type, name: m.name }))
+    };
+    multiLinks = [...multiLinks, newCluster];
+    try {
+      await invoke('save_multilinks_config', { clusters: multiLinks });
+    } catch (e) { console.error(e); }
+    isLinkModalOpen = false;
+    selectedMods.clear();
+  }
+
+  async function handleUnlink(clusterId: string, modName: string) {
+    const clusterIdx = multiLinks.findIndex(c => c.id === clusterId);
+    if (clusterIdx === -1) return;
+    
+    let cluster = multiLinks[clusterIdx];
+    cluster.members = cluster.members.filter(m => m.name !== modName);
+    
+    if (cluster.members.length < 2) {
+      multiLinks.splice(clusterIdx, 1);
+    } else {
+      multiLinks[clusterIdx] = cluster;
+    }
+    
+    multiLinks = [...multiLinks];
+    try {
+      await invoke('save_multilinks_config', { clusters: multiLinks });
+    } catch (e) { console.error(e); }
+    closeContextMenu();
+  }
 </script>
 
-<svelte:window onclick={closeContextMenu} oncontextmenu={(e) => e.preventDefault()} />
+<svelte:window 
+  onclick={() => { closeContextMenu(); isSortMenuOpen = false; }} 
+  oncontextmenu={(e) => e.preventDefault()} 
+/>
 
 <!-- Context Menu -->
 {#if contextMenu.visible && contextMenu.entry}
+  {@const activeCluster = getClusterForMod(contextMenu.entry.name)}
   <div
-    class="fixed z-50 w-48 rounded-md border py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
+    class="fixed z-50 w-56 rounded-md border py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
     style="left: {contextMenu.x}px; top: {contextMenu.y}px; background-color: var(--theme-card); border-color: var(--theme-border);"
     onclick={(e) => e.stopPropagation()}
     oncontextmenu={(e) => e.preventDefault()}
   >
     <div class="px-3 py-1.5 border-b flex items-center gap-2" style="border-color: var(--theme-border); background-color: var(--theme-surface);">
       <span class="font-mono text-[11px] font-bold truncate" style="color: var(--theme-text-primary);" title={contextMenu.entry.name}>
-        {contextMenu.entry.name}
+        {#if selectedMods.size > 1}
+          {selectedMods.size} Mods Selected
+        {:else}
+          {contextMenu.entry.name}
+        {/if}
       </span>
     </div>
     <div class="p-1 space-y-0.5">
@@ -235,6 +436,7 @@
         <FolderSearch class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
         <span>Show in Explorer</span>
       </button>
+      
       <button
         type="button"
         onclick={handleShowInApp}
@@ -245,6 +447,63 @@
         <ExternalLink class="h-3.5 w-3.5" style="color: var(--color-info);" />
         <span>Show in App</span>
       </button>
+
+      <button
+        type="button"
+        onclick={handleContextMenuToggle}
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+        style="color: var(--theme-text-primary);"
+      >
+        <Power class="h-3.5 w-3.5" style="color: {contextMenu.entry.enabled ? 'var(--color-warning)' : 'var(--theme-accent)'};" />
+        {#if selectedMods.size > 1}
+          <span>{contextMenu.entry.enabled ? 'Disable ' + selectedMods.size + ' Mods' : 'Enable ' + selectedMods.size + ' Mods'}</span>
+        {:else}
+          <span>{contextMenu.entry.enabled ? 'Disable Mod' : 'Enable Mod'}</span>
+        {/if}
+      </button>
+
+      <div class="h-px my-1 mx-1" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
+
+      <button
+        type="button"
+        onclick={() => { 
+          targetNoteModName = contextMenu.entry?.name || ''; 
+          closeContextMenu(); 
+          isNoteModalOpen = true; 
+        }}
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+        style="color: var(--theme-text-primary);"
+      >
+        <MessageSquare class="h-3.5 w-3.5" style="color: var(--color-warning);" />
+        <span>{notesConfig[contextMenu.entry?.name || ''] ? 'Edit Note...' : 'Add Note...'}</span>
+      </button>
+
+      {#if activeCluster}
+        <div class="h-px my-1 mx-1" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
+        <button
+          type="button"
+          onclick={() => handleUnlink(activeCluster.id, contextMenu.entry!.name)}
+          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+          style="color: var(--theme-text-primary);"
+        >
+          <Unlink class="h-3.5 w-3.5" style="color: var(--color-warning);" />
+          <span class="truncate">Unlink from {activeCluster.name}</span>
+        </button>
+      {:else if selectedMods.size > 1}
+        <div class="h-px my-1 mx-1" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
+        <button
+          type="button"
+          onclick={openLinkModalFromSelection}
+          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+          style="color: var(--theme-text-primary);"
+        >
+          <Link class="h-3.5 w-3.5" style="color: var(--color-info);" />
+          <span>Create Multi-Link...</span>
+        </button>
+      {/if}
+
+      <div class="h-px my-1 mx-1" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
+
       <button
         type="button"
         onclick={handleCopyName}
@@ -265,136 +524,348 @@
   </div>
 {/if}
 
-<div class="flex flex-col h-full overflow-hidden select-none" style="background-color: var(--theme-bg); color: var(--theme-text-primary);">
-  
-  <!-- Top Control Bar -->
-  <div class="p-6 pb-4 shrink-0 border-b flex items-start justify-between gap-4" style="border-color: var(--theme-border); background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent);">
-    <div>
-      <div class="flex items-center gap-2 text-xs font-mono mb-2" style="color: var(--theme-accent);">
-        <Clock class="h-4 w-4" />
-        <span>MOD HISTORY & LEDGER</span>
+<!-- Multi-Link Creation Modal -->
+{#if isLinkModalOpen}
+  <div
+    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 select-none"
+    onclick={() => isLinkModalOpen = false}
+    role="presentation"
+  >
+    <div
+      class="w-full max-w-md rounded-xl border shadow-2xl overflow-hidden flex flex-col"
+      style="background-color: var(--theme-card); border-color: var(--theme-border);"
+      onclick={(e) => e.stopPropagation()}
+      role="dialog"
+    >
+      <div class="px-5 py-3.5 border-b flex items-center justify-between shrink-0" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
+        <div class="flex items-center gap-2.5">
+          <Link class="h-4 w-4" style="color: var(--color-info);" />
+          <span class="text-xs font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">Create Multi-Link</span>
+        </div>
+        <button
+          type="button"
+          onclick={() => isLinkModalOpen = false}
+          class="p-1 rounded transition cursor-pointer hover:bg-[var(--theme-bg)]"
+          style="color: var(--theme-text-muted);"
+        >
+          <X class="h-4 w-4 hover:text-[var(--theme-text-primary)]" />
+        </button>
       </div>
-      <h2 class="text-xl font-bold mb-1" style="color: var(--theme-text-primary);">Recently Added Mods</h2>
-      <p class="text-xs max-w-2xl" style="color: var(--theme-text-muted);">
-        Track all mods by R4's "First Seen" date.
-      </p>
+
+      <div class="p-5 space-y-4">
+        <p class="text-xs leading-relaxed" style="color: var(--theme-text-muted);">
+          Linking these <strong style="color: var(--theme-text-primary);">{linkDraftMembers.length}</strong> mods will ensure they are always enabled or disabled together across all framework tabs.
+        </p>
+        
+        <div class="space-y-2">
+          <label class="text-xs font-semibold" style="color: var(--theme-text-primary);">Cluster Name</label>
+          <input
+            type="text"
+            bind:value={linkDraftName}
+            placeholder="e.g., My Custom Outfit Cluster"
+            class="w-full px-3 py-2 border rounded text-xs focus:outline-none font-sans"
+            style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
+          />
+        </div>
+
+        <div class="space-y-2">
+          <label class="text-xs font-semibold" style="color: var(--theme-text-primary);">Included Mods</label>
+          <div class="max-h-40 overflow-y-auto border rounded p-2 space-y-1" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
+            {#each linkDraftMembers as member}
+              <div class="text-[11px] font-mono truncate flex items-center gap-2" style="color: var(--theme-text-primary);">
+                <div class="h-1.5 w-1.5 rounded-full shrink-0" style="background-color: var(--color-info);"></div>
+                {member.name}
+              </div>
+            {/each}
+          </div>
+        </div>
+      </div>
+
+      <div class="px-5 py-3 border-t flex items-center justify-end gap-2.5 shrink-0" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
+        <button
+          type="button"
+          onclick={() => isLinkModalOpen = false}
+          class="px-3.5 py-1.5 rounded text-xs transition cursor-pointer hover:bg-[var(--theme-bg)]"
+          style="color: var(--theme-text-muted);"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="button"
+          onclick={confirmMultiLink}
+          disabled={!linkDraftName.trim()}
+          class="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold transition shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
+          style="background-color: var(--color-info); color: #000000;"
+        >
+          <Check class="h-3.5 w-3.5 stroke-[2.5]" />
+          <span>Create Link</span>
+        </button>
+      </div>
     </div>
   </div>
+{/if}
 
-  <!-- Ledger Table Area -->
-  <div class="flex-1 flex flex-col p-6 overflow-hidden">
-    <div class="rounded-lg border flex flex-col h-full shadow-sm overflow-hidden" style="background-color: var(--theme-card); border-color: var(--theme-border);">
+<div class="flex flex-col h-full select-none p-6" oncontextmenu={(e) => e.preventDefault()}>
+  
+  <div class="flex items-center justify-between gap-3 mb-3 shrink-0">
+    <div class="flex items-center gap-3 flex-1 max-w-md">
+      <div class="relative flex-1">
+        <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
+        <input
+          type="text"
+          bind:value={searchQuery}
+          placeholder="Filter Mod History..."
+          class="w-full pl-9 pr-8 py-1.5 rounded text-xs focus:outline-none border font-sans"
+          style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
+        />
+        {#if searchQuery !== ''}
+          <button
+            type="button"
+            onclick={() => searchQuery = ''}
+            class="absolute right-2 top-1/2 -translate-y-1/2 p-1 transition cursor-pointer hover:brightness-125"
+            style="color: var(--theme-text-muted);"
+            title="Clear search"
+          >
+            <X class="h-3.5 w-3.5" />
+          </button>
+        {/if}
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-2.5 shrink-0">
       
-      <!-- Table Toolbar -->
-      <div class="px-4 py-3 border-b flex items-center justify-between shrink-0 gap-4" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
-        <div class="flex items-center gap-3 flex-1">
-          <span class="text-xs font-bold uppercase tracking-wider shrink-0" style="color: var(--theme-text-primary);">Ledger Entries</span>
-          
-          <div class="relative max-w-md flex-1 ml-2">
-            <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
-            <input
-              type="text"
-              bind:value={searchQuery}
-              placeholder="Search All Mods..."
-              class="w-full pl-9 pr-8 py-1.5 rounded border text-xs focus:outline-none font-sans"
-              style="background-color: var(--theme-bg); border-color: var(--theme-border); color: var(--theme-text-primary);"
-            />
-            {#if searchQuery !== ''}
+      <!-- Custom Sort Dropdown -->
+      <div class="relative">
+        <button
+          type="button"
+          onclick={(e) => { e.stopPropagation(); isSortMenuOpen = !isSortMenuOpen; }}
+          class="h-8 flex items-center gap-2 px-3 rounded border text-xs font-medium transition cursor-pointer hover:brightness-125"
+          style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
+        >
+          <Clock class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
+          <span class="uppercase tracking-wider">
+            {sortBy === 'first_seen' ? 'R4 First-Seen' : sortBy === 'os_created' ? 'OS Created' : 'OS Modified'}
+          </span>
+          <ChevronDown class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
+        </button>
+
+        {#if isSortMenuOpen}
+          <div
+            class="absolute right-0 top-full mt-1.5 w-44 rounded-md border py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md z-50"
+            style="background-color: var(--theme-card); border-color: var(--theme-border);"
+            onclick={(e) => e.stopPropagation()}
+          >
+            <div class="p-1 space-y-0.5">
               <button
                 type="button"
-                onclick={() => searchQuery = ''}
-                class="absolute right-2 top-1/2 -translate-y-1/2 p-1 transition cursor-pointer hover:brightness-125"
-                style="color: var(--theme-text-muted);"
-                title="Clear search"
+                onclick={() => { sortBy = 'first_seen'; isSortMenuOpen = false; }}
+                class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+                style="color: {sortBy === 'first_seen' ? 'var(--theme-accent)' : 'var(--theme-text-primary)'};"
               >
-                <X class="h-3.5 w-3.5" />
+                {#if sortBy === 'first_seen'}
+                  <Check class="h-3.5 w-3.5" />
+                {:else}
+                  <div class="h-3.5 w-3.5"></div>
+                {/if}
+                <span class="{sortBy === 'first_seen' ? 'font-bold' : 'font-medium'}">R4 First-Seen</span>
               </button>
-            {/if}
-          </div>
-        </div>
+              
+              <button
+                type="button"
+                onclick={() => { sortBy = 'os_created'; isSortMenuOpen = false; }}
+                class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+                style="color: {sortBy === 'os_created' ? 'var(--theme-accent)' : 'var(--theme-text-primary)'};"
+              >
+                {#if sortBy === 'os_created'}
+                  <Check class="h-3.5 w-3.5" />
+                {:else}
+                  <div class="h-3.5 w-3.5"></div>
+                {/if}
+                <span class="{sortBy === 'os_created' ? 'font-bold' : 'font-medium'}">OS Created</span>
+              </button>
 
-        <div class="flex items-center gap-3 shrink-0">
-          <select
-            bind:value={newModsHours}
-            onchange={handleTimeframeChange}
-            class="py-1.5 px-2 border rounded text-xs font-bold focus:outline-none cursor-pointer"
-            style="background-color: var(--theme-bg); border-color: var(--theme-border); color: var(--theme-text-primary);"
-          >
-            <option value={1}>Last 1 Hour</option>
-            <option value={6}>Last 6 Hours</option>
-            <option value={24}>Last 24 Hours</option>
-            <option value={72}>Last 3 Days</option>
-            <option value={168}>Last 7 Days</option>
-            <option value={720}>Last 30 Days</option>
-            <option value={999999}>All Time</option>
-          </select>
-
-          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded border" style="background-color: var(--theme-bg); border-color: var(--theme-border); color: var(--theme-text-muted);">
-            {searchQuery ? groupedMods.reduce((acc, g) => acc + g.mods.length, 0) : recentMods.length}
-          </span>
-        </div>
-      </div>
-
-      <!-- Table Body (Grouped) -->
-      <div class="flex-1 overflow-y-auto p-2 space-y-4" style="background-color: color-mix(in srgb, var(--theme-bg) 30%, transparent);">
-        {#if groupedMods.length === 0}
-          <div class="p-10 flex flex-col items-center justify-center text-center h-full" style="color: var(--theme-text-muted);">
-            <Clock class="h-8 w-8 mb-3 opacity-20" />
-            <p class="text-xs font-mono">
-              {searchQuery ? 'No mods match your search query.' : 'No new mods detected in the selected timeframe.'}
-            </p>
-          </div>
-        {:else}
-          {#each groupedMods as group (group.timestamp)}
-            <div class="space-y-0">
-              <!-- Group Header -->
-              <div class="flex items-center gap-2 px-2 py-1.5 mb-1 border-b" style="border-color: color-mix(in srgb, var(--theme-border) 50%, transparent);">
-                <CalendarDays class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
-                <span class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">
-                  Added {formatGroupHeader(group.timestamp)}
-                </span>
-                <span class="text-[10px] font-mono ml-1" style="color: var(--theme-text-muted);">
-                  ({group.mods.length} {group.mods.length === 1 ? 'mod' : 'mods'})
-                </span>
-              </div>
-
-              <!-- Group Items (Seamless List) -->
-              {#each group.mods as entry (entry.path)}
-                {@const isHighlighted = highlightedModName === entry.name}
-                <div
-                  use:registerModNode={entry.name}
-                  oncontextmenu={(e) => openContextMenu(e, entry)}
-                  class="grid grid-cols-[140px_1fr] gap-4 px-2 py-1.5 border-b transition-all duration-200 items-center cursor-context-menu density-row ml-2
-                    {isHighlighted ? 'ring-1 z-10 relative' : 'hover:bg-[var(--theme-surface)]'}"
-                  style="border-color: var(--theme-border); {isHighlighted ? 'background-color: color-mix(in srgb, var(--theme-accent) 15%, transparent); border-color: var(--theme-accent); box-shadow: 0 0 15px color-mix(in srgb, var(--theme-accent) 35%, transparent);' : ''}"
-                >
-                  <div>
-                    <!-- Monochromatic Badge -->
-                    <span class="inline-flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border" style="background-color: color-mix(in srgb, var(--theme-text-muted) 15%, transparent); color: var(--theme-text-muted); border-color: color-mix(in srgb, var(--theme-text-muted) 30%, transparent);">
-                      {#if entry.mod_type === 'archive'}
-                        <Archive class="h-3 w-3" />
-                      {:else if entry.mod_type === 'cet'}
-                        <Cpu class="h-3 w-3" />
-                      {:else if entry.mod_type === 'red4ext'}
-                        <Puzzle class="h-3 w-3" />
-                      {:else if entry.mod_type === 'redscript'}
-                        <FileCode2 class="h-3 w-3" />
-                      {:else if entry.mod_type === 'r6tweaks'}
-                        <Sliders class="h-3 w-3" />
-                      {/if}
-                      {MOD_TYPE_LABELS[entry.mod_type] || entry.mod_type}
-                    </span>
-                  </div>
-                  <div class="text-xs font-mono truncate" style="color: var(--theme-text-primary);" title={entry.name}>
-                    {entry.name}
-                  </div>
-                </div>
-              {/each}
+              <button
+                type="button"
+                onclick={() => { sortBy = 'os_modified'; isSortMenuOpen = false; }}
+                class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+                style="color: {sortBy === 'os_modified' ? 'var(--theme-accent)' : 'var(--theme-text-primary)'};"
+              >
+                {#if sortBy === 'os_modified'}
+                  <Check class="h-3.5 w-3.5" />
+                {:else}
+                  <div class="h-3.5 w-3.5"></div>
+                {/if}
+                <span class="{sortBy === 'os_modified' ? 'font-bold' : 'font-medium'}">OS Modified</span>
+              </button>
             </div>
-          {/each}
+          </div>
         {/if}
       </div>
 
+      <!-- Fixed Width Sort Direction Button -->
+      <button
+        type="button"
+        onclick={() => sortDesc = !sortDesc}
+        class="h-8 w-20 flex items-center justify-center gap-1.5 rounded border text-xs font-medium transition cursor-pointer hover:brightness-125 shrink-0"
+        style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
+      >
+        {#if sortDesc}
+          <ArrowDown class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
+        {:else}
+          <ArrowUp class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
+        {/if}
+        <span>Sort</span>
+      </button>
     </div>
   </div>
+
+  <div class="flex-1 overflow-y-auto space-y-0 pr-1">
+    {#if displayMods.length === 0}
+      <div class="p-6 text-center text-xs border rounded" style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-muted);">
+        {searchQuery ? 'No mods match your search query.' : 'No mods detected in the ledger.'}
+      </div>
+    {:else}
+      {#each displayMods as item (item.path)}
+        {@const isSelected = selectedMods.has(item.path)}
+        {@const isHighlighted = highlightedModName === item.name}
+        {@const activeCluster = getClusterForMod(item.name)}
+        {@const isMultiLinkExpanded = !!expandedMultiLinks[item.name]}
+        <div class="flex flex-col">
+          <div
+            use:registerModNode={item.name}
+            onpointerdown={(e) => handlePointerDown(e, item)}
+            oncontextmenu={(e) => openContextMenu(e, item)}
+            class="flex items-center justify-between px-2 py-1.5 border-b transition-all duration-200 density-row cursor-context-menu
+              {isHighlighted ? 'ring-1 z-10 relative bg-[color-mix(in_srgb,var(--theme-accent)_15%,transparent)] border-[var(--theme-accent)] shadow-[0_0_15px_color-mix(in_srgb,var(--theme-accent)_35%,transparent)]' : 
+              (isSelected ? 'bg-[color-mix(in_srgb,var(--theme-accent)_10%,transparent)] border-[color-mix(in_srgb,var(--theme-accent)_60%,transparent)]' : 
+              'bg-transparent border-[var(--theme-border)] hover:bg-[color-mix(in_srgb,var(--theme-accent)_12%,transparent)]')}
+              {item.enabled ? 'opacity-100' : 'opacity-50'}"
+          >
+            <!-- HYBRID SLOT ARCHITECTURE: LEFT ZONE -->
+            <div class="flex items-center gap-3 min-w-0 flex-1 pl-1">
+              
+              <!-- Slot 1: Checkbox (w-6) -->
+              <div class="w-6 flex justify-center shrink-0">
+                <button
+                  type="button"
+                  onclick={(e) => { e.stopPropagation(); handleToggle(item); }}
+                  aria-label={item.enabled ? "Disable mod " + item.name : "Enable mod " + item.name}
+                  class="w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors cursor-pointer"
+                  style="border-color: {item.enabled ? 'var(--theme-accent)' : 'var(--theme-border)'}; background-color: {item.enabled ? 'var(--theme-accent)' : 'transparent'};"
+                >
+                  {#if item.enabled}
+                    <Check class="h-2.5 w-2.5" style="color: var(--theme-accent-contrast);" strokeWidth={3} />
+                  {/if}
+                </button>
+              </div>
+
+              <!-- Slot 2: Timestamp (w-36) -->
+              <div class="w-36 shrink-0 text-[10px] font-mono" style="color: var(--theme-text-muted);">
+                {formatHistoryDate(item.displayTime)}
+              </div>
+
+              <!-- Slot 3: Mod Type Badge (w-24) -->
+              <div class="w-24 shrink-0">
+                <span class="inline-flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border" style="background-color: color-mix(in srgb, var(--theme-text-muted) 15%, transparent); color: var(--theme-text-muted); border-color: color-mix(in srgb, var(--theme-text-muted) 30%, transparent);">
+                  {#if item.mod_type === 'archive'}
+                    <Archive class="h-3 w-3" />
+                  {:else if item.mod_type === 'cet'}
+                    <Cpu class="h-3 w-3" />
+                  {:else if item.mod_type === 'red4ext'}
+                    <Puzzle class="h-3 w-3" />
+                  {:else if item.mod_type === 'redscript'}
+                    <FileCode2 class="h-3 w-3" />
+                  {:else if item.mod_type === 'r6tweaks'}
+                    <Sliders class="h-3 w-3" />
+                  {/if}
+                  {MOD_TYPE_LABELS[item.mod_type] || item.mod_type}
+                </span>
+              </div>
+
+              <!-- Slot 4: Mod File Name -->
+              <span class="font-mono text-[11px] truncate {item.enabled ? 'font-medium' : 'line-through'}" style="color: {item.enabled ? 'var(--theme-text-primary)' : 'var(--theme-text-muted)'};">
+                {item.name}
+              </span>
+            </div>
+
+            <!-- HYBRID SLOT ARCHITECTURE: RIGHT ZONE -->
+            <div class="flex items-center gap-1 shrink-0">
+              
+              <!-- Slot 1: Note Icon (w-6) -->
+              <div class="w-6 flex justify-center shrink-0">
+                {#if notesConfig[item.name]}
+                  <button 
+                    type="button"
+                    onclick={(e) => { e.stopPropagation(); targetNoteModName = item.name; isNoteModalOpen = true; }}
+                    class="hover:scale-110 transition-transform cursor-pointer"
+                    title={notesConfig[item.name]}
+                  >
+                    <MessageSquare class="h-3.5 w-3.5" style="color: var(--color-warning);" />
+                  </button>
+                {/if}
+              </div>
+
+              <!-- Slot 2: Multi-Link Icon + Chevron (w-10) -->
+              <div class="w-10 flex items-center justify-center gap-0.5 shrink-0">
+                {#if activeCluster}
+                  <Link class="h-3.5 w-3.5" style="color: var(--color-warning);" title="Part of Multi-Link Cluster: {activeCluster.name}" />
+                  <button
+                    type="button"
+                    onclick={(e) => { e.stopPropagation(); toggleMultiLink(item.name); }}
+                    class="p-0.5 rounded transition cursor-pointer hover:bg-[var(--theme-card)]"
+                    style="color: var(--color-warning);"
+                    title="Toggle Multi-Link details"
+                  >
+                    {#if isMultiLinkExpanded}
+                      <ChevronDown class="h-3.5 w-3.5" />
+                    {:else}
+                      <ChevronRight class="h-3.5 w-3.5" />
+                    {/if}
+                  </button>
+                {/if}
+              </div>
+
+              <!-- Slot 3: Context Menu (w-6) -->
+              <div class="w-6 flex justify-end shrink-0">
+                <button
+                  type="button"
+                  onclick={(e) => { e.stopPropagation(); openContextMenu(e, item); }}
+                  class="p-1 rounded transition cursor-pointer opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-surface)]"
+                  style="color: var(--theme-text-muted);"
+                  title="More options"
+                >
+                  <MoreVertical class="h-3.5 w-3.5 hover:text-[var(--theme-text-primary)]" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Inline Drawer: Multi-Link -->
+          {#if isMultiLinkExpanded && activeCluster}
+            <div class="px-4 py-2 border-t space-y-2 text-xs" style="border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-card) 30%, transparent);">
+              <div>
+                <span class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--color-warning);">Multi-Link Cluster: {activeCluster.name}</span>
+                <div class="mt-1 flex flex-wrap gap-1">
+                  {#each activeCluster.members as member}
+                    <button type="button" onclick={(e) => { e.stopPropagation(); if(onNavigateToMod) onNavigateToMod(member.mod_type === 'archive' ? 'archive' : member.mod_type, member.name); }} class="px-1.5 py-0.2 rounded border text-[10px] font-mono cursor-pointer hover:brightness-125 transition-all" style="background-color: color-mix(in srgb, var(--color-warning) 15%, transparent); border-color: color-mix(in srgb, var(--color-warning) 40%, transparent); color: var(--color-warning);" title="Jump to mod">
+                      {member.name}
+                    </button>
+                  {/each}
+                </div>
+              </div>
+            </div>
+          {/if}
+        </div>
+      {/each}
+    {/if}
+  </div>
 </div>
+
+<NoteModal
+  bind:isOpen={isNoteModalOpen}
+  modName={targetNoteModName}
+  initialNote={notesConfig[targetNoteModName] || ''}
+  onConfirm={handleNoteConfirm}
+  onCancel={() => isNoteModalOpen = false}
+/>

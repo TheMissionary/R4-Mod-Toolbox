@@ -6,11 +6,13 @@
   let { 
     gamePath = '', 
     currentTab = 'archive',
-    customLaunchPath = ''
+    customLaunchPath = '',
+    globalSelectedPath = ''
   }: { 
     gamePath: string; 
     currentTab?: string;
     customLaunchPath?: string;
+    globalSelectedPath?: string;
   } = $props();
 
   let isValid = $derived(gamePath.length > 0);
@@ -49,17 +51,22 @@
   });
 </script>
 
-<header data-tauri-drag-region class="relative z-10 h-14 border-b flex items-center justify-between px-6 select-none shrink-0" style="background-color: color-mix(in srgb, var(--theme-surface) 35%, transparent); border-color: var(--theme-border); backdrop-blur-xs;">
+<header data-tauri-drag-region class="relative z-10 h-14 flex items-center justify-between px-6 select-none shrink-0" style="background-color: color-mix(in srgb, var(--theme-header-bg, var(--theme-surface)) var(--theme-header-opacity, 35%), transparent); border-bottom: var(--theme-border-macro, 1px) solid var(--theme-header-border, var(--theme-border)); backdrop-filter: blur(var(--theme-header-blur, var(--theme-backdrop-blur, 4px))); -webkit-backdrop-filter: blur(var(--theme-header-blur, var(--theme-backdrop-blur, 4px))); box-shadow: var(--theme-header-shadow, none);">
   <!-- Left: Breadcrumbs -->
   <div class="flex items-center gap-2 pointer-events-none">
     {#each breadcrumbs as crumb, i}
-      <span class="text-xs font-mono font-semibold" style="color: {i === breadcrumbs.length - 1 ? 'var(--theme-text-primary)' : 'var(--theme-text-muted)'};">
+      <span class="text-xs font-mono font-semibold" style="color: {i === breadcrumbs.length - 1 && !globalSelectedPath ? 'var(--theme-text-primary)' : 'var(--theme-text-muted)'};">
         {crumb}
       </span>
-      {#if i < breadcrumbs.length - 1}
+      {#if i < breadcrumbs.length - 1 || globalSelectedPath}
         <ChevronRight class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
       {/if}
     {/each}
+    {#if globalSelectedPath && globalSelectedPath !== 'Ready'}
+      <span class="text-xs font-mono font-bold truncate max-w-md" style="color: var(--theme-accent);" title={globalSelectedPath}>
+        {globalSelectedPath.split('\\').pop()}
+      </span>
+    {/if}
   </div>
 
   <!-- Right: Launch Game -->

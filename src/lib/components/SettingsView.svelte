@@ -15,7 +15,7 @@
   } from '$lib/theme';
   import {
     RotateCcw, Check, Settings, Sun, Moon, Sparkles, Palette, FolderSearch,
-    ChevronDown, ChevronRight, Wrench, GripVertical, Folder, FileCode, LayoutGrid, FileText, Image as ImageIcon, X, Download
+    ChevronDown, ChevronRight, Wrench, GripVertical, Folder, FileCode, LayoutGrid, FileText, Image as ImageIcon, X, Download, Layers
   } from 'lucide-svelte';
   import DialogModal from './DialogModal.svelte';
 
@@ -142,6 +142,12 @@
     markDirty();
   }
 
+  function handleGroupStyleChange(e: Event) {
+    const val = (e.target as HTMLSelectElement).value as 'default' | 'accent-wash' | 'gradient-flare';
+    draft.groupBackgroundStyle = val;
+    markDirty();
+  }
+
   async function handleBrowseBanner() {
     try {
       const selected = await open({
@@ -242,6 +248,7 @@
     draft.uiRounding = undefined;
     draft.borderThickness = undefined;
     draft.neonIntensity = undefined;
+    draft.groupBackgroundStyle = 'default';
     selectedModsPreset = MOD_FONT_PRESETS[0].value;
     customEditorPath = '';
     customPhotoPath = '';
@@ -277,7 +284,7 @@
     </div>
     <h2 class="text-xl font-bold mb-1" style="color: var(--theme-text-primary);">Configuration & Theming</h2>
     <p class="text-xs max-w-xl" style="color: var(--theme-text-muted);">
-      Customize the visual appearance, typography, and external tool integrations for the R4 Mod Toolbox.
+      Customize the visual appearance, typography, and external tool integrations for the R4 Mod Manager.
     </p>
   </div>
 
@@ -437,6 +444,25 @@
             </div>
           </div>
 
+          <div class="h-px" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
+
+          <!-- Archive Group Distinction -->
+          <div class="space-y-2">
+            <div class="flex items-center gap-2 text-xs font-semibold" style="color: var(--theme-text-primary);">
+              <Layers class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
+              <span>Archive Group Distinction</span>
+            </div>
+            <select
+              onchange={handleGroupStyleChange}
+              class="w-full sm:w-1/2 px-2 py-1.5 border rounded text-xs focus:outline-none cursor-pointer font-sans"
+              style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
+            >
+              <option value="default" selected={draft.groupBackgroundStyle === 'default' || !draft.groupBackgroundStyle} style="background-color: var(--theme-surface); color: var(--theme-text-primary);">Default (Subtle)</option>
+              <option value="accent-wash" selected={draft.groupBackgroundStyle === 'accent-wash'} style="background-color: var(--theme-surface); color: var(--theme-text-primary);">Accent Wash (Soft)</option>
+              <option value="gradient-flare" selected={draft.groupBackgroundStyle === 'gradient-flare'} style="background-color: var(--theme-surface); color: var(--theme-text-primary);">Gradient Flare (Modern)</option>
+            </select>
+          </div>
+
           <!-- Live Preview Mockup -->
           <div class="pt-2">
             <div class="text-[10px] font-bold uppercase tracking-wider mb-2" style="color: var(--theme-text-muted);">Live Preview</div>
@@ -454,7 +480,7 @@
                 {/if}
                 <div class="relative z-10 flex items-center gap-2">
                   <div class="h-4 w-4 rounded flex items-center justify-center text-[8px] font-black" style="background-color: {activeColors.accent}; color: {activeColors.accentContrast};">R4</div>
-                  <span class="text-[10px] font-bold tracking-wider uppercase" style="color: {activeColors.textPrimary};">R4 Mod Toolbox</span>
+                  <span class="text-[10px] font-bold tracking-wider uppercase" style="color: {activeColors.textPrimary};">R4 Mod Manager</span>
                 </div>
                 <div class="relative z-10 h-4 w-16 rounded" style="background-color: {activeColors.accent};"></div>
               </div>
@@ -462,7 +488,10 @@
               <!-- Mini Body (Seamless List) -->
               <div class="p-3 space-y-0">
                 <!-- Group -->
-                <div class="border-b px-2 py-1.5 flex items-center gap-2 relative overflow-hidden" style="border-color: {activeColors.border};">
+                <div class="border-b px-2 py-1.5 flex items-center gap-2 relative overflow-hidden" 
+                  style="border-color: {draft.groupBackgroundStyle === 'gradient-flare' ? 'transparent' : draft.groupBackgroundStyle === 'accent-wash' ? `color-mix(in srgb, ${activeColors.accent} 20%, transparent)` : `color-mix(in srgb, ${activeColors.border} 50%, transparent)`}; 
+                         background: {draft.groupBackgroundStyle === 'gradient-flare' ? `linear-gradient(to right, color-mix(in srgb, ${activeColors.accent} 15%, transparent) 0%, transparent 60%)` : draft.groupBackgroundStyle === 'accent-wash' ? `color-mix(in srgb, ${activeColors.accent} 8%, transparent)` : `color-mix(in srgb, ${activeColors.surface} 60%, transparent)`};"
+                >
                   <div class="absolute left-0 top-0 bottom-0 w-0.5" style="background-color: {activeColors.accent};"></div>
                   <ChevronDown class="h-3 w-3" style="color: {activeColors.textMuted};" />
                   <Folder class="h-3 w-3" style="color: {activeColors.textMuted};" />
@@ -500,7 +529,7 @@
           
           <div class="p-5 space-y-2">
             <p class="text-[11px] leading-tight" style="color: var(--theme-text-muted);">
-              The root installation folder for Cyberpunk 2077. Required for the toolbox to function.
+              The root installation folder for Cyberpunk 2077. Required for the manager to function.
             </p>
             <div class="flex items-center gap-2 pt-1">
               <div class="flex-1 px-3 py-1.5 border rounded text-xs font-mono truncate select-all" style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);">

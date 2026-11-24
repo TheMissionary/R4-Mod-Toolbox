@@ -105,6 +105,9 @@ export interface LedgerEntry {
   mod_type: string;
   path: string;
   first_seen: number;
+  os_created?: number;
+  os_modified?: number;
+  enabled?: boolean;
 }
 
 export interface FileNode {
@@ -118,12 +121,21 @@ export interface FileNode {
 export interface AppThemeColors {
   accent: string;
   accentHover: string;
+  accentContrast: string;
   bg: string;
   surface: string;
   card: string;
   border: string;
   textMuted: string;
   textPrimary: string;
+}
+
+export interface ThemeSegment {
+  background?: string;
+  opacity?: number;
+  blur?: string;
+  border?: string;
+  boxShadow?: string;
 }
 
 export interface ThemeSettings {
@@ -139,6 +151,14 @@ export interface ThemeSettings {
   uiRounding?: 'sharp' | 'standard' | 'soft';
   borderThickness?: 'thin' | 'standard' | 'thick';
   neonIntensity?: 'none' | 'low' | 'high';
+  groupBackgroundStyle?: 'default' | 'accent-wash' | 'gradient-flare';
+  
+  // Modular Theme Segments (For imported .r4theme packs)
+  sidebar?: ThemeSegment;
+  header?: ThemeSegment;
+  footer?: ThemeSegment;
+  canvas?: ThemeSegment;
+  drawer?: ThemeSegment;
 }
 
 export interface CategoryLabel {
@@ -172,4 +192,15 @@ export interface AppConfig {
   showCategoryLabelsInLoadOrder?: boolean;
   organizerColumns?: 'auto' | '1' | '2' | '3';
   theme: ThemeSettings;
+}
+
+export interface MultiLinkMember {
+  mod_type: string;
+  name: string;
+}
+
+export interface MultiLinkCluster {
+  id: string;
+  name: string;
+  members: MultiLinkMember[];
 }

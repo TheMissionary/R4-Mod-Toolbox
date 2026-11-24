@@ -1,13 +1,12 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
-  import type { R6TweaksItem, FileNode } from '$lib/types';
-  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen, EyeOff, Clock, MessageSquare } from 'lucide-svelte';
+  import type { R6TweaksItem, FileNode, MultiLinkCluster } from '$lib/types';
+  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen, EyeOff, Clock, MessageSquare, Link } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { tick } from 'svelte';
   import { loadConfigFromDisk, isModNew } from '$lib/theme';
   import NoteModal from '$lib/components/NoteModal.svelte';
-  import DialogModal from '$lib/components/DialogModal.svelte';
 
   let {
     tweaks = $bindable([]),
@@ -19,7 +18,8 @@
     onNewModsConfigChanged,
     onRouteToHistory,
     currentTab = 'r6tweaks',
-    globalSelectedPath = $bindable('')
+    globalSelectedPath = $bindable(''),
+    hideDisabled = false
   }: {
     tweaks: R6TweaksItem[];
     gamePath: string;
@@ -31,6 +31,7 @@
     onRouteToHistory?: (modName: string) => void;
     currentTab?: string;
     globalSelectedPath?: string;
+    hideDisabled?: boolean;
   } = $props();
 
   let searchQuery = $state('');
@@ -47,21 +48,11 @@
   let loadingFolders = $state<Record<string, boolean>>({});
 
   let notesConfig = $state<Record<string, string>>({});
+  let multiLinks = $state<MultiLinkCluster[]>([]);
+  let expandedMultiLinks = $state<Record<string, boolean>>({});
+
   let isNoteModalOpen = $state(false);
   let targetNoteModName = $state('');
-
-  let dialogState = $state<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    mode: 'prompt' | 'confirm';
-    initialValue: string;
-    confirmText: string;
-    isDanger: boolean;
-    onConfirm: (val: string) => void;
-  }>({
-    isOpen: false, title: '', message: '', mode: 'prompt', initialValue: '', confirmText: 'Confirm', isDanger: false, onConfirm: () => {}
-  });
 
   let contextMenu = $state<{
     visible: boolean;
@@ -103,6 +94,9 @@
       invoke<Record<string, string>>('load_notes_config').then(res => {
         notesConfig = res;
       }).catch(err => console.error('Failed to load notes config:', err));
+      invoke<MultiLinkCluster[]>('load_multilinks_config').then(res => {
+        multiLinks = res;
+      }).catch(err => console.error('Failed to load multilinks config:', err));
     }
   });
 
@@ -185,6 +179,14 @@
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
+  function getClusterForMod(modName: string): MultiLinkCluster | undefined {
+    return multiLinks.find(c => c.members.some(m => m.name === modName));
+  }
+
+  function toggleMultiLink(fileName: string) {
+    expandedMultiLinks[fileName] = !expandedMultiLinks[fileName];
+  }
+
   let toggleDebounceTimer: number | null = null;
 
   async function handleToggle(tweak: R6TweaksItem) {
@@ -213,30 +215,6 @@
         tweaks = [...tweaks];
       }
     })();
-  }
-
-  function confirmBulkAction(enable: boolean) {
-    dialogState = {
-      isOpen: true,
-      title: enable ? 'Enable All R6\\Tweaks' : 'Disable All R6\\Tweaks',
-      message: enable 
-        ? 'Are you sure you want to enable all R6\\Tweaks? This will activate every mod in this list.' 
-        : 'Are you sure you want to disable all R6\\Tweaks? This is a nuclear option that will deactivate every mod in this list.',
-      mode: 'confirm',
-      initialValue: '',
-      confirmText: enable ? 'Enable All' : 'Disable All',
-      isDanger: !enable,
-      onConfirm: async () => {
-        dialogState.isOpen = false;
-        try {
-          await invoke('bulk_toggle_mod_type', { gamePath, modType: 'r6tweaks', enable });
-          tweaks = await invoke<R6TweaksItem[]>('get_r6tweaks_details', { gamePath });
-          if (onStateChanged) onStateChanged();
-        } catch (err) {
-          console.error(err);
-        }
-      }
-    };
   }
 
   async function toggleFolder(path: string) {
@@ -371,9 +349,15 @@
   }
 
   let filteredTweaks = $derived.by(() => {
-    if (!searchQuery.trim()) return tweaks;
-    const q = searchQuery.toLowerCase().trim();
-    return tweaks.filter(p => p.name.toLowerCase().includes(q));
+    let arr = tweaks;
+    if (hideDisabled) {
+      arr = arr.filter(p => p.enabled || p.is_dir);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      arr = arr.filter(p => p.name.toLowerCase().includes(q));
+    }
+    return arr;
   });
 </script>
 
@@ -516,10 +500,10 @@
         oncontextmenu={(e) => openContextMenu(e, node, 'file')}
         onpointerenter={() => globalSelectedPath = node.path}
         onpointerleave={() => globalSelectedPath = ''}
-        class="group flex items-center justify-between pr-2 border-b transition density-row cursor-context-menu hover:bg-[var(--theme-surface)]"
+        class="group flex items-center justify-between px-2 border-b transition density-row cursor-context-menu hover:bg-[var(--theme-surface)]"
         style="padding-left: {4.5 + (depth - 1) * 1.375}rem; border-color: var(--theme-border);"
       >
-        <div class="flex items-center gap-2.5 min-w-0 flex-1">
+        <div class="flex items-center gap-1 min-w-0 flex-1">
           {#if node.is_dir}
             <button
               type="button"
@@ -545,12 +529,15 @@
           {/if}
         </div>
         
-        <div class="flex items-center gap-2 shrink-0">
-          <div class="w-20 hidden lg:block"></div>
-          <div class="w-16 justify-end text-[10px] font-mono hidden lg:flex" style="color: var(--theme-text-muted);">
+        <!-- STRICT SLOT ARCHITECTURE: RIGHT ZONE (Folder Tree) -->
+        <div class="flex items-center gap-1 shrink-0">
+          <div class="w-6"></div> <!-- Note -->
+          <div class="w-10"></div> <!-- Multi-Link -->
+          <div class="w-20 hidden lg:block"></div> <!-- File Count -->
+          <div class="w-16 flex justify-end text-[10px] font-mono hidden lg:flex" style="color: var(--theme-text-muted);">
             {#if !node.is_dir}{formatBytes(node.size_bytes)}{/if}
           </div>
-          <div class="w-6 flex justify-end">
+          <div class="w-6 flex justify-end shrink-0">
             <button
               type="button"
               onclick={(e) => { e.stopPropagation(); openContextMenu(e, node, 'file'); }}
@@ -631,28 +618,6 @@
           <span>Expand All</span>
         {/if}
       </button>
-
-      <div class="w-px h-5 mx-1" style="background-color: var(--theme-border);"></div>
-
-      <button
-        onclick={() => confirmBulkAction(true)}
-        class="h-8 flex items-center gap-1.5 px-3 rounded border text-xs font-medium transition cursor-pointer hover:brightness-125"
-        style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
-        title="Enable All R6\Tweaks"
-      >
-        <Check class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
-        <span class="hidden xl:inline">Enable All</span>
-      </button>
-
-      <button
-        onclick={() => confirmBulkAction(false)}
-        class="h-8 flex items-center gap-1.5 px-3 rounded border text-xs font-medium transition cursor-pointer hover:brightness-125"
-        style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--color-danger);"
-        title="Disable All R6\Tweaks"
-      >
-        <Power class="h-3.5 w-3.5" style="color: var(--color-danger);" />
-        <span class="hidden xl:inline">Disable All</span>
-      </button>
     </div>
   </div>
 
@@ -665,6 +630,8 @@
       {#each filteredTweaks as tweak (tweak.name)}
         {@const isHighlighted = highlightedModName === tweak.name}
         {@const isSelected = selectedMod === tweak.name}
+        {@const activeCluster = getClusterForMod(tweak.name)}
+        {@const isMultiLinkExpanded = !!expandedMultiLinks[tweak.name]}
         <div class="flex flex-col">
           <div
             use:registerModNode={tweak.name}
@@ -683,59 +650,74 @@
               'bg-transparent border-[var(--theme-border)] hover:bg-[color-mix(in_srgb,var(--theme-accent)_12%,transparent)]')}
               {tweak.enabled ? 'opacity-100' : 'opacity-50'}"
           >
-            <div class="flex items-center gap-2.5 min-w-0 flex-1 pl-1">
-              <!-- Solid Accent Checkbox with --theme-border when disabled -->
-              <button
-                type="button"
-                onclick={(e) => { e.stopPropagation(); handleToggle(tweak); }}
-                aria-label={tweak.enabled ? "Disable tweak " + tweak.name : "Enable tweak " + tweak.name}
-                class="w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors shrink-0 cursor-pointer"
-                style="border-color: {tweak.enabled ? 'var(--theme-accent)' : 'var(--theme-border)'}; background-color: {tweak.enabled ? 'var(--theme-accent)' : 'transparent'};"
-              >
-                {#if tweak.enabled}
-                  <Check class="h-2.5 w-2.5" style="color: var(--theme-accent-contrast);" strokeWidth={3} />
-                {/if}
-              </button>
-
-              {#if tweak.is_dir}
+            <!-- STRICT SLOT ARCHITECTURE: LEFT ZONE -->
+            <div class="flex items-center gap-1 min-w-0 flex-1 pl-1">
+              
+              <!-- Slot 1: Checkbox (w-6) -->
+              <div class="w-6 flex justify-center shrink-0">
                 <button
                   type="button"
-                  onclick={(e) => { e.stopPropagation(); toggleFolder(tweak.path); }}
-                  class="flex items-center gap-1.5 transition cursor-pointer min-w-0 hover:brightness-125"
-                  style="color: var(--theme-text-primary);"
+                  onclick={(e) => { e.stopPropagation(); handleToggle(tweak); }}
+                  aria-label={tweak.enabled ? "Disable tweak " + tweak.name : "Enable tweak " + tweak.name}
+                  class="w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors cursor-pointer"
+                  style="border-color: {tweak.enabled ? 'var(--theme-accent)' : 'var(--theme-border)'}; background-color: {tweak.enabled ? 'var(--theme-accent)' : 'transparent'};"
                 >
+                  {#if tweak.enabled}
+                    <Check class="h-2.5 w-2.5" style="color: var(--theme-accent-contrast);" strokeWidth={3} />
+                  {/if}
+                </button>
+              </div>
+
+              <!-- Slot 2: Folder Toggle / File Icon (w-6) -->
+              <div class="w-6 flex justify-center shrink-0">
+                {#if tweak.is_dir}
+                  <button
+                    type="button"
+                    onclick={(e) => { e.stopPropagation(); toggleFolder(tweak.path); }}
+                    class="p-0.5 rounded transition cursor-pointer hover:bg-[var(--theme-card)]"
+                    style="color: var(--theme-text-muted);"
+                  >
+                    {#if expandedFolders[tweak.path]}
+                      <ChevronDown class="h-3.5 w-3.5" />
+                    {:else}
+                      <ChevronRight class="h-3.5 w-3.5" />
+                    {/if}
+                  </button>
+                {:else}
+                  <FileCode class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
+                {/if}
+              </div>
+
+              <!-- Slot 3: Mod File Name -->
+              <div class="flex items-center gap-1.5 min-w-0">
+                {#if tweak.is_dir}
                   {#if expandedFolders[tweak.path]}
-                    <ChevronDown class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
                     <FolderOpen class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
                   {:else}
-                    <ChevronRight class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
                     <Folder class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
                   {/if}
-                  <span class="font-bold truncate text-[11px]">{tweak.name}</span>
-                </button>
-              {:else}
-                <div class="flex items-center gap-1.5 min-w-0">
-                  <div class="w-4 shrink-0"></div>
-                  <FileCode class="h-3.5 w-3.5 shrink-0" style="color: var(--theme-text-muted);" />
-                  <span class="font-mono truncate text-[11px]" style="{tweak.enabled ? 'color: var(--theme-text-primary);' : 'color: var(--theme-text-muted); text-decoration: line-through;'}">
-                    {tweak.name}
-                  </span>
-                </div>
-              {/if}
-
-              {#if showNewMods && isModNew(tweak.created_at_ms, newModsHours)}
-                <span
-                  class="inline-flex items-center justify-center px-1.5 py-0.2 rounded text-[9px] font-mono font-bold tracking-wider uppercase shrink-0 shadow-xs"
-                  style="background-color: var(--theme-accent); color: var(--theme-accent-contrast);"
-                  title="Installed/modified in the last {newModsHours} hours"
-                >
-                  NEW
+                {/if}
+                <span class="font-mono font-medium truncate text-[11px]" style="{tweak.enabled ? 'color: var(--theme-text-primary);' : 'color: var(--theme-text-muted); text-decoration: line-through;'}">
+                  {tweak.name}
                 </span>
-              {/if}
+                
+                {#if showNewMods && isModNew(tweak.created_at_ms, newModsHours)}
+                  <span
+                    class="inline-flex items-center justify-center px-1.5 py-0.2 rounded text-[9px] font-mono font-bold tracking-wider uppercase shrink-0 shadow-xs ml-1"
+                    style="background-color: var(--theme-accent); color: var(--theme-accent-contrast);"
+                    title="Installed/modified in the last {newModsHours} hours"
+                  >
+                    NEW
+                  </span>
+                {/if}
+              </div>
             </div>
 
-            <div class="flex items-center gap-2 shrink-0">
-              <div class="w-4 flex items-center justify-center shrink-0">
+            <!-- STRICT SLOT ARCHITECTURE: RIGHT ZONE -->
+            <div class="flex items-center gap-1 shrink-0">
+              
+              <!-- Slot 1: Note Icon (w-6) -->
+              <div class="w-6 flex justify-center shrink-0">
                 {#if notesConfig[tweak.name]}
                   <button 
                     type="button"
@@ -748,15 +730,42 @@
                 {/if}
               </div>
 
-              <div class="w-20 justify-end hidden lg:flex">
-                <span class="px-1.5 py-0.2 rounded border text-[10px] font-semibold truncate" style="background-color: color-mix(in srgb, var(--theme-accent) 15%, transparent); border-color: color-mix(in srgb, var(--theme-accent) 30%, transparent); color: var(--theme-accent);">
-                  {tweak.file_count} {tweak.file_count === 1 ? 'file' : 'files'}
-                </span>
+              <!-- Slot 2: Multi-Link Icon + Chevron (w-10) -->
+              <div class="w-10 flex items-center justify-center gap-0.5 shrink-0">
+                {#if activeCluster}
+                  <Link class="h-3.5 w-3.5" style="color: var(--color-warning);" title="Part of Multi-Link Cluster: {activeCluster.name}" />
+                  <button
+                    type="button"
+                    onclick={(e) => { e.stopPropagation(); toggleMultiLink(tweak.name); }}
+                    class="p-0.5 rounded transition cursor-pointer hover:bg-[var(--theme-card)]"
+                    style="color: var(--color-warning);"
+                    title="Toggle Multi-Link details"
+                  >
+                    {#if isMultiLinkExpanded}
+                      <ChevronDown class="h-3.5 w-3.5" />
+                    {:else}
+                      <ChevronRight class="h-3.5 w-3.5" />
+                    {/if}
+                  </button>
+                {/if}
               </div>
-              <div class="w-16 justify-end text-[10px] font-mono hidden lg:flex" style="color: var(--theme-text-muted);">
+
+              <!-- Slot 3: File Count (w-20) -->
+              <div class="w-20 flex justify-end hidden lg:flex">
+                {#if tweak.is_dir}
+                  <span class="px-1.5 py-0.2 rounded border text-[10px] font-semibold truncate" style="background-color: color-mix(in srgb, var(--theme-accent) 15%, transparent); border-color: color-mix(in srgb, var(--theme-accent) 30%, transparent); color: var(--theme-accent);">
+                    {tweak.file_count} {tweak.file_count === 1 ? 'file' : 'files'}
+                  </span>
+                {/if}
+              </div>
+
+              <!-- Slot 4: File Size (w-16) -->
+              <div class="w-16 flex justify-end text-[10px] font-mono hidden lg:flex" style="color: var(--theme-text-muted);">
                 {formatBytes(tweak.size_bytes)}
               </div>
-              <div class="w-6 flex justify-end">
+
+              <!-- Slot 5: Context Menu (w-6) -->
+              <div class="w-6 flex justify-end shrink-0">
                 <button
                   type="button"
                   onclick={(e) => { e.stopPropagation(); openContextMenu(e, tweak, 'tweak'); }}
@@ -769,6 +778,22 @@
               </div>
             </div>
           </div>
+
+          <!-- Inline Drawer: Multi-Link -->
+          {#if isMultiLinkExpanded && activeCluster}
+            <div class="px-4 py-2 border-t space-y-2 text-xs" style="border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-card) 30%, transparent);">
+              <div>
+                <span class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--color-warning);">Multi-Link Cluster: {activeCluster.name}</span>
+                <div class="mt-1 flex flex-wrap gap-1">
+                  {#each activeCluster.members as member}
+                    <button type="button" onclick={(e) => { e.stopPropagation(); if(onRouteToHistory) onRouteToHistory(member.name); }} class="px-1.5 py-0.2 rounded border text-[10px] font-mono cursor-pointer hover:brightness-125 transition-all" style="background-color: color-mix(in srgb, var(--color-warning) 15%, transparent); border-color: color-mix(in srgb, var(--color-warning) 40%, transparent); color: var(--color-warning);" title="Jump to mod">
+                      {member.name}
+                    </button>
+                  {/each}
+                </div>
+              </div>
+            </div>
+          {/if}
 
           {#if tweak.is_dir && expandedFolders[tweak.path]}
             {@render folderTree(tweak.path, 1)}
@@ -785,16 +810,4 @@
   initialNote={notesConfig[targetNoteModName] || ''}
   onConfirm={handleNoteConfirm}
   onCancel={() => isNoteModalOpen = false}
-/>
-
-<DialogModal
-  bind:isOpen={dialogState.isOpen}
-  title={dialogState.title}
-  message={dialogState.message}
-  mode={dialogState.mode}
-  initialValue={dialogState.initialValue}
-  confirmText={dialogState.confirmText}
-  isDanger={dialogState.isDanger}
-  onConfirm={dialogState.onConfirm}
-  onCancel={() => dialogState.isOpen = false}
 />

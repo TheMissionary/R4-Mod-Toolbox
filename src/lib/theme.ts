@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { AppThemeColors, ThemeSettings, AppConfig } from '$lib/types';
+import type { AppThemeColors, ThemeSettings, AppConfig, ThemeSegment } from '$lib/types';
 
 export type { AppThemeColors, ThemeSettings, AppConfig };
 
@@ -100,6 +100,22 @@ export const DEFAULT_THEME_SETTINGS: ThemeSettings = {
   accentHex: '#76B900',
   fontFamilyMods: MOD_FONT_PRESETS[0].value,
   isCompact: true,
+  groupBackgroundStyle: 'default'
+};
+
+export const DEFAULT_APP_CONFIG: AppConfig = {
+  targetGamePath: '',
+  activeTab: 'archive',
+  showConflictSummary: true,
+  windowWidth: 1600,
+  windowHeight: 1000,
+  recentDaysThreshold: 30,
+  newModsHours: 6,
+  showNewMods: false,
+  enableOrganizerView: false,
+  showCategoryLabelsInLoadOrder: true,
+  organizerColumns: 'auto',
+  theme: DEFAULT_THEME_SETTINGS
 };
 
 const STORAGE_KEY = 'cp2077_theme_settings_v3';
@@ -164,6 +180,34 @@ export function applyThemeSettings(settings: ThemeSettings) {
   };
   root.style.setProperty('--theme-neon-shadow', neonMap[settings.neonIntensity || 'none'] || 'none');
 
+  // Group Background Style (Calculated CSS Variables)
+  const groupStyle = settings.groupBackgroundStyle || 'default';
+  if (groupStyle === 'accent-wash') {
+    root.style.setProperty('--theme-group-bg', `color-mix(in srgb, ${activeColors.accent} 8%, transparent)`);
+    root.style.setProperty('--theme-group-border', `color-mix(in srgb, ${activeColors.accent} 20%, transparent)`);
+  } else if (groupStyle === 'gradient-flare') {
+    root.style.setProperty('--theme-group-bg', `linear-gradient(to right, color-mix(in srgb, ${activeColors.accent} 15%, transparent) 0%, transparent 60%)`);
+    root.style.setProperty('--theme-group-border', 'transparent');
+  } else {
+    root.style.setProperty('--theme-group-bg', `color-mix(in srgb, ${activeColors.surface} 75%, transparent)`);
+    root.style.setProperty('--theme-group-border', `color-mix(in srgb, ${activeColors.border} 50%, transparent)`);
+  }
+
+  // 4. Modular Theme Segments (For imported .r4theme packs)
+  const applySegment = (name: string, data: ThemeSegment | undefined, fallbackBg: string, fallbackOpacity: string, fallbackBlur: string) => {
+    root.style.setProperty(`--theme-${name}-bg`, data?.background || fallbackBg);
+    root.style.setProperty(`--theme-${name}-opacity`, data?.opacity !== undefined ? `${data.opacity}%` : fallbackOpacity);
+    root.style.setProperty(`--theme-${name}-blur`, data?.blur || fallbackBlur);
+    root.style.setProperty(`--theme-${name}-border`, data?.border || 'var(--theme-border)');
+    root.style.setProperty(`--theme-${name}-shadow`, data?.boxShadow || 'none');
+  };
+
+  applySegment('sidebar', settings.sidebar, 'var(--theme-surface)', 'var(--theme-surface-opacity)', 'var(--theme-backdrop-blur)');
+  applySegment('header', settings.header, 'var(--theme-surface)', 'var(--theme-surface-opacity)', 'var(--theme-backdrop-blur)');
+  applySegment('footer', settings.footer, 'var(--theme-surface)', 'var(--theme-surface-opacity)', 'var(--theme-backdrop-blur)');
+  applySegment('canvas', settings.canvas, 'var(--theme-bg)', '100%', '0px');
+  applySegment('drawer', settings.drawer, 'var(--theme-surface)', 'var(--theme-surface-opacity)', 'var(--theme-backdrop-blur)');
+
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   }
@@ -176,6 +220,7 @@ export async function loadConfigFromDisk(): Promise<AppConfig> {
       config.theme.atmosphere = config.theme.atmosphere || 'graphite';
       config.theme.accentHex = config.theme.accentHex || '#76B900';
       config.theme.fontFamilyMods = config.theme.fontFamilyMods || MOD_FONT_PRESETS[0].value;
+      config.theme.groupBackgroundStyle = config.theme.groupBackgroundStyle || 'default';
       
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(config.theme));

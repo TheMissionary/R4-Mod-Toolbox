@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ArchiveItem, ArchiveScanReport, XlItem, LabelsConfig } from '$lib/types';
+  import type { ArchiveItem, ArchiveScanReport, XlItem, LabelsConfig, MultiLinkCluster } from '$lib/types';
   import FolderDelimiterRow from '$lib/components/FolderDelimiterRow.svelte';
   import DialogModal from '$lib/components/DialogModal.svelte';
   import MoveFolderModal from '$lib/components/MoveFolderModal.svelte';
@@ -12,7 +12,7 @@
     GripVertical, ChevronDown, ChevronRight, Search, X, FolderPlus, Folder, FolderOpen,
     Eye, EyeOff, AlertTriangle, HelpCircle, FileCode, Info, FolderSearch, Copy, Power,
     Check, Pencil, Trash2, MoreVertical, FolderInput, Link2, Unlink, ArrowUp, LayoutGrid,
-    ListTree, Clock, Tag, MessageSquare
+    ListTree, Clock, Tag, MessageSquare, Link
   } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -30,7 +30,8 @@
     showCategoryLabelsInLoadOrder = true,
     onLabelsToggle,
     currentTab = 'archive',
-    globalSelectedPath = $bindable('Ready')
+    globalSelectedPath = $bindable('Ready'),
+    hideDisabled = false
   }: {
     archives: ArchiveItem[];
     gamePath: string;
@@ -44,10 +45,12 @@
     onLabelsToggle?: (val: boolean) => void;
     currentTab?: string;
     globalSelectedPath?: string;
+    hideDisabled?: boolean;
   } = $props();
 
   let searchQuery = $state('');
   let expandedRows = $state<Record<string, boolean>>({});
+  let expandedMultiLinks = $state<Record<string, boolean>>({});
   
   let localArchives = $state<ArchiveItem[]>([]);
   let scrollContainer = $state<HTMLElement | null>(null);
@@ -56,6 +59,8 @@
 
   let labelsConfig = $state<LabelsConfig>({ categories: [], assignments: {}, orders: {} });
   let notesConfig = $state<Record<string, string>>({});
+  let multiLinks = $state<MultiLinkCluster[]>([]);
+  
   let activeViewMode = $state<'load_order' | 'organizer'>('load_order');
   let showUncategorizedDrawer = $state(true);
 
@@ -73,6 +78,10 @@
   
   let isNoteModalOpen = $state(false);
   let targetNoteModName = $state('');
+
+  let isDeleteGroupModalOpen = $state(false);
+  let groupToDelete = $state<ArchiveItem | null>(null);
+  let deleteGroupOption = $state<'merge' | 'top'>('merge');
 
   let dialogState = $state<{
     isOpen: boolean;
@@ -164,6 +173,24 @@
     localStorage.setItem('cp2077_show_conflict_summary', showConflictSummary.toString());
   }
 
+  function getClusterForMod(modName: string): MultiLinkCluster | undefined {
+    return multiLinks.find(c => c.members.some(m => m.name === modName));
+  }
+
+  function toggleConflict(fileName: string) {
+    expandedRows[fileName] = !expandedRows[fileName];
+    if (expandedRows[fileName]) {
+      expandedMultiLinks[fileName] = false;
+    }
+  }
+
+  function toggleMultiLink(fileName: string) {
+    expandedMultiLinks[fileName] = !expandedMultiLinks[fileName];
+    if (expandedMultiLinks[fileName]) {
+      expandedRows[fileName] = false;
+    }
+  }
+
   $effect(() => { if (archives && archives.length >= 0) { localArchives = [...archives]; } });
 
   $effect(() => {
@@ -178,6 +205,7 @@
     if (gamePath) {
       invoke<LabelsConfig>('load_labels_config', { gamePath }).then(res => { labelsConfig = res; }).catch(err => console.error(err));
       invoke<Record<string, string>>('load_notes_config').then(res => { notesConfig = res; }).catch(err => console.error(err));
+      invoke<MultiLinkCluster[]>('load_multilinks_config').then(res => { multiLinks = res; }).catch(err => console.error(err));
     }
   });
 
@@ -290,7 +318,9 @@
           if (report && Array.isArray(report.archives)) {
             archives = report.archives;
             if (onStateChanged) onStateChanged();
-            const newFileName = `[DIR] ${name.trim()}.txt`;
+            const forbidden = /[<>:"/\\|?*\x00-\x1F]/g;
+            const safeName = name.replace(forbidden, '').trim();
+            const newFileName = `[DIR] ${safeName}.txt`;
             setTimeout(() => { focusModInMainList(newFileName); }, 100);
           }
         } catch (err) { console.error(err); }
@@ -312,7 +342,9 @@
           if (report && Array.isArray(report.archives)) {
             const wasCollapsed = !!collapsedFolders[archive.file_name];
             delete collapsedFolders[archive.file_name];
-            const newFileName = `[DIR] ${newName.trim()}.txt`;
+            const forbidden = /[<>:"/\\|?*\x00-\x1F]/g;
+            const safeName = newName.replace(forbidden, '').trim();
+            const newFileName = `[DIR] ${safeName}.txt`;
             if (wasCollapsed) { collapsedFolders[newFileName] = true; }
             archives = report.archives;
             if (onStateChanged) onStateChanged();
@@ -323,45 +355,54 @@
   }
 
   function handleDeleteFolder(archive: ArchiveItem) {
-    dialogState = {
-      isOpen: true, title: 'Delete Group',
-      message: 'Are you sure you wish to delete this group? The marker will be removed, but all contained mods will remain preserved in their exact sequential order.',
-      mode: 'confirm', initialValue: '', confirmText: 'Delete Group', isDanger: true,
-      onConfirm: async () => {
-        dialogState.isOpen = false;
-        try {
-          const report = await invoke<ArchiveScanReport>('delete_physical_folder', { gamePath, folderFileName: archive.file_name });
-          if (report && Array.isArray(report.archives)) {
-            delete collapsedFolders[archive.file_name];
-            archives = report.archives;
-            if (onStateChanged) onStateChanged();
-          }
-        } catch (err) { console.error(err); }
-      }
-    };
+    groupToDelete = archive;
+    deleteGroupOption = 'merge';
+    isDeleteGroupModalOpen = true;
   }
 
-  function confirmBulkAction(enable: boolean) {
-    dialogState = {
-      isOpen: true,
-      title: enable ? 'Enable All Archive Mods' : 'Disable All Archive Mods',
-      message: enable 
-        ? 'Are you sure you want to enable all archive mods? This will activate every mod in this list.' 
-        : 'Are you sure you want to disable all archive mods? This is a nuclear option that will deactivate every mod in this list.',
-      mode: 'confirm',
-      initialValue: '',
-      confirmText: enable ? 'Enable All' : 'Disable All',
-      isDanger: !enable,
-      onConfirm: async () => {
-        dialogState.isOpen = false;
-        try {
-          await invoke('bulk_toggle_mod_type', { gamePath, modType: 'archive', enable });
-          if (onScanRequested) onScanRequested();
-        } catch (err) {
-          console.error(err);
+  async function confirmDeleteGroup() {
+    if (!groupToDelete) return;
+    const archive = groupToDelete;
+    isDeleteGroupModalOpen = false;
+    
+    try {
+      // 1. Delete physical folder
+      const report = await invoke<ArchiveScanReport>('delete_physical_folder', { gamePath, folderFileName: archive.file_name });
+      delete collapsedFolders[archive.file_name];
+
+      if (deleteGroupOption === 'top') {
+        // Find the mods that were under this group in the original localArchives
+        const groupIdx = localArchives.findIndex(a => a.file_name === archive.file_name);
+        const extractedNames = new Set<string>();
+        if (groupIdx !== -1) {
+          let i = groupIdx + 1;
+          while (i < localArchives.length && !localArchives[i].is_delimiter) {
+            extractedNames.add(localArchives[i].file_name);
+            i++;
+          }
         }
+
+        if (extractedNames.size > 0) {
+          // Reorder the newly returned archives array
+          let updated = [...report.archives];
+          const extractedItems = updated.filter(a => extractedNames.has(a.file_name));
+          updated = updated.filter(a => !extractedNames.has(a.file_name));
+          updated.unshift(...extractedItems);
+          
+          localArchives = updated;
+          await persistState(); // Saves new order and updates scanReport
+        } else {
+          archives = report.archives;
+          localArchives = [...archives];
+        }
+      } else {
+        archives = report.archives;
+        localArchives = [...archives];
       }
-    };
+      if (onStateChanged) onStateChanged();
+    } catch (err) { console.error(err); }
+    
+    groupToDelete = null;
   }
 
   let toggleDebounceTimer: number | null = null;
@@ -411,7 +452,10 @@
       for (let i = targetIndex - 1; i >= 0; i--) {
         const item = localArchives[i];
         if (item.is_delimiter) {
-          if (collapsedFolders[item.file_name]) { collapsedFolders[item.file_name] = false; }
+          if (collapsedFolders[item.file_name]) { 
+            collapsedFolders[item.file_name] = false; 
+            collapsedFolders = { ...collapsedFolders }; // Trigger Svelte 5 reactivity
+          }
           break;
         }
       }
@@ -571,10 +615,13 @@
           try {
             const report = await invoke<ArchiveScanReport>('create_physical_folder', { gamePath, folderName: name.trim() });
             if (report && Array.isArray(report.archives)) {
-              archives = report.archives;
-              localArchives = [...archives];
-              const newFileName = `[DIR] ${name.trim()}.txt`;
+              const forbidden = /[<>:"/\\|?*\x00-\x1F]/g;
+              const safeName = name.replace(forbidden, '').trim();
+              const newFileName = `[DIR] ${safeName}.txt`;
+              
+              localArchives = [...report.archives];
               executeMoveToFolder(newFileName);
+              
               if (onStateChanged) onStateChanged();
               setTimeout(() => { focusModInMainList(newFileName); }, 100);
             }
@@ -588,11 +635,23 @@
 
   function executeMoveToFolder(targetFolderFileName: string) {
     if (selectedMods.size === 0) return;
+    
+    let targetIsDisabled = false;
+    if (targetFolderFileName !== '[TOP]') {
+      const targetFolder = localArchives.find(a => a.file_name === targetFolderFileName);
+      if (targetFolder && !targetFolder.enabled) {
+        targetIsDisabled = true;
+      }
+    }
+
     const updated = [...localArchives];
     const extracted: ArchiveItem[] = [];
     for (let i = updated.length - 1; i >= 0; i--) {
-      if (selectedMods.has(updated[i].file_name)) { extracted.unshift(updated.splice(i, 1)[0]); }
+      if (selectedMods.has(updated[i].file_name)) { 
+        extracted.unshift(updated.splice(i, 1)[0]); 
+      }
     }
+    
     let insertIndex = 0;
     if (targetFolderFileName !== '[TOP]') {
       const catIndex = updated.findIndex(a => a.file_name === targetFolderFileName);
@@ -603,6 +662,15 @@
         insertIndex = updated.length;
       }
     }
+    
+    if (targetIsDisabled) {
+      const modsToDisable = extracted.filter(m => m.enabled);
+      for (const mod of modsToDisable) {
+        mod.enabled = false;
+        invoke('toggle_mod_state', { gamePath, modName: mod.file_name, enable: false }).catch(console.error);
+      }
+    }
+
     updated.splice(insertIndex, 0, ...extracted);
     localArchives = updated;
     persistState();
@@ -700,15 +768,22 @@
 
   async function handleContextMenuShowInExplorer() {
     if (!gamePath) return;
-    let targetFilename = '';
-    if (contextMenu.targetType === 'unassociated_xl' && contextMenu.unassociatedXl) { targetFilename = contextMenu.unassociatedXl?.file_name; }
-    else if (contextMenu.archive) {
-      targetFilename = contextMenu.archive?.file_name;
-      if (contextMenu.targetType === 'xl' && contextMenu.archive?.associated_xls?.length) { targetFilename = contextMenu.archive.associated_xls[0].file_name; }
+    let targetPath = '';
+    const baseDir = `${gamePath}\\archive\\pc\\mod`;
+    
+    if (contextMenu.targetType === 'unassociated_xl' && contextMenu.unassociatedXl) { 
+      targetPath = `${baseDir}\\${contextMenu.unassociatedXl.file_name}${contextMenu.unassociatedXl.enabled ? '' : '.disabled'}`;
     }
-    if (!targetFilename) return;
-    const fullPath = `${gamePath}\\archive\\pc\\mod\\${targetFilename}`;
-    try { await revealItemInDir(fullPath); } catch (err) { console.error(err); }
+    else if (contextMenu.archive) {
+      if (contextMenu.targetType === 'xl' && contextMenu.archive.associated_xls?.length) { 
+        const xl = contextMenu.archive.associated_xls[0];
+        targetPath = `${baseDir}\\${xl.file_name}${xl.enabled ? '' : '.disabled'}`;
+      } else {
+        targetPath = `${baseDir}\\${contextMenu.archive.file_name}${contextMenu.archive.enabled ? '' : '.disabled'}`;
+      }
+    }
+    if (!targetPath) return;
+    try { await revealItemInDir(targetPath); } catch (err) { console.error(err); }
     closeContextMenu();
   }
 
@@ -813,6 +888,7 @@
         }
       } else {
         rank += 1;
+        if (hideDisabled && !archive.enabled) continue;
         if (!currentCategoryCollapsed || searchQuery !== '') {
           if (searchQuery === '' || archive.name.toLowerCase().includes(searchQuery.toLowerCase())) {
             result.push({ archive, originalIndex: i, archiveRank: rank, inCategory });
@@ -1051,6 +1127,55 @@
   </div>
 {/if}
 
+<!-- Delete Group Modal -->
+{#if isDeleteGroupModalOpen}
+  <div class="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 select-none" onclick={() => isDeleteGroupModalOpen = false} role="presentation">
+    <div class="w-full max-w-md rounded-xl border shadow-2xl overflow-hidden flex flex-col" style="background-color: var(--theme-card); border-color: var(--theme-border);" onclick={(e) => e.stopPropagation()} role="dialog">
+      <div class="px-5 py-3.5 border-b flex items-center justify-between" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
+        <div class="flex items-center gap-2.5">
+          <Trash2 class="h-4 w-4" style="color: var(--color-danger);" />
+          <span class="text-xs font-bold uppercase tracking-wider" style="color: var(--theme-text-primary);">Delete Group</span>
+        </div>
+        <button type="button" onclick={() => isDeleteGroupModalOpen = false} class="p-1 rounded transition cursor-pointer hover:bg-[var(--theme-bg)]" style="color: var(--theme-text-muted);">
+          <X class="h-4 w-4 hover:text-[var(--theme-text-primary)]" />
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <p class="text-xs leading-relaxed" style="color: var(--theme-text-muted);">
+          Deleting <strong style="color: var(--theme-text-primary);">{groupToDelete?.category_name || groupToDelete?.file_name.replace('[DIR] ', '').replace('.txt', '')}</strong> will not delete your mod files. What would you like to do with the mods inside?
+        </p>
+        <div class="space-y-2">
+          <button type="button" onclick={() => deleteGroupOption = 'merge'} class="w-full flex items-start gap-3 p-3 rounded border transition cursor-pointer text-left" style="background-color: {deleteGroupOption === 'merge' ? 'color-mix(in srgb, var(--theme-accent) 10%, transparent)' : 'var(--theme-surface)'}; border-color: {deleteGroupOption === 'merge' ? 'var(--theme-accent)' : 'var(--theme-border)'};">
+            <div class="mt-0.5 h-3.5 w-3.5 rounded-full border flex items-center justify-center shrink-0" style="border-color: {deleteGroupOption === 'merge' ? 'var(--theme-accent)' : 'var(--theme-text-muted)'};">
+              {#if deleteGroupOption === 'merge'}<div class="h-1.5 w-1.5 rounded-full" style="background-color: var(--theme-accent);"></div>{/if}
+            </div>
+            <div>
+              <div class="text-xs font-bold" style="color: var(--theme-text-primary);">Merge Up (Keep Order)</div>
+              <div class="text-[10px] mt-0.5" style="color: var(--theme-text-muted);">Mods remain in their exact load order position.</div>
+            </div>
+          </button>
+          <button type="button" onclick={() => deleteGroupOption = 'top'} class="w-full flex items-start gap-3 p-3 rounded border transition cursor-pointer text-left" style="background-color: {deleteGroupOption === 'top' ? 'color-mix(in srgb, var(--theme-accent) 10%, transparent)' : 'var(--theme-surface)'}; border-color: {deleteGroupOption === 'top' ? 'var(--theme-accent)' : 'var(--theme-border)'};">
+            <div class="mt-0.5 h-3.5 w-3.5 rounded-full border flex items-center justify-center shrink-0" style="border-color: {deleteGroupOption === 'top' ? 'var(--theme-accent)' : 'var(--theme-text-muted)'};">
+              {#if deleteGroupOption === 'top'}<div class="h-1.5 w-1.5 rounded-full" style="background-color: var(--theme-accent);"></div>{/if}
+            </div>
+            <div>
+              <div class="text-xs font-bold" style="color: var(--theme-text-primary);">Move to Top (Unsorted)</div>
+              <div class="text-[10px] mt-0.5" style="color: var(--theme-text-muted);">Mods are moved to the top of the load order.</div>
+            </div>
+          </button>
+        </div>
+      </div>
+      <div class="px-5 py-3 border-t flex items-center justify-end gap-2.5" style="background-color: var(--theme-surface); border-color: var(--theme-border);">
+        <button type="button" onclick={() => isDeleteGroupModalOpen = false} class="px-3.5 py-1.5 rounded text-xs transition cursor-pointer hover:bg-[var(--theme-bg)]" style="color: var(--theme-text-muted);">Cancel</button>
+        <button type="button" onclick={confirmDeleteGroup} class="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold transition shadow-sm cursor-pointer hover:brightness-110" style="background-color: var(--color-danger); color: #ffffff;">
+          <Trash2 class="h-3.5 w-3.5" />
+          <span>Delete Group</span>
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <div class="flex flex-col h-full select-none" oncontextmenu={(e) => e.preventDefault()}>
   
   <!-- Toolbar Header -->
@@ -1105,15 +1230,6 @@
 
       {#if activeViewMode === 'load_order'}
         <button
-          onclick={toggleSummaryDrawer}
-          class="h-8 px-2.5 rounded border transition cursor-pointer flex items-center justify-center hover:brightness-125"
-          style="{showConflictSummary ? 'background-color: color-mix(in srgb, var(--theme-accent) 15%, transparent); border-color: var(--theme-accent); color: var(--theme-accent);' : 'background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-muted);'}"
-          title="Toggle Conflict Summary"
-        >
-          <AlertTriangle class="h-4 w-4" />
-        </button>
-
-        <button
           onclick={toggleAllFolders}
           disabled={totalFolders === 0}
           class="h-8 flex items-center gap-1.5 px-3 rounded border text-xs font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-125"
@@ -1137,26 +1253,23 @@
           <span>Add Group</span>
         </button>
 
-        <div class="w-px h-5 mx-1" style="background-color: var(--theme-border);"></div>
-
         <button
-          onclick={() => confirmBulkAction(true)}
+          onclick={toggleSummaryDrawer}
           class="h-8 flex items-center gap-1.5 px-3 rounded border text-xs font-medium transition cursor-pointer hover:brightness-125"
-          style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
-          title="Enable All Archive Mods"
+          style="{showConflictSummary ? 'background-color: color-mix(in srgb, var(--theme-accent) 15%, transparent); border-color: var(--theme-accent); color: var(--theme-accent);' : 'background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-muted);'}"
+          title="Toggle Conflict Summary"
         >
-          <Check class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
-          <span class="hidden xl:inline">Enable All</span>
-        </button>
-
-        <button
-          onclick={() => confirmBulkAction(false)}
-          class="h-8 flex items-center gap-1.5 px-3 rounded border text-xs font-medium transition cursor-pointer hover:brightness-125"
-          style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--color-danger);"
-          title="Disable All Archive Mods"
-        >
-          <Power class="h-3.5 w-3.5" style="color: var(--color-danger);" />
-          <span class="hidden xl:inline">Disable All</span>
+          {#if showConflictSummary}
+            <Eye class="h-3.5 w-3.5" />
+          {:else}
+            <EyeOff class="h-3.5 w-3.5" />
+          {/if}
+          <span>Conflicts</span>
+          {#if conflictingArchives.length > 0}
+            <span class="ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none" style="background-color: var(--color-danger); color: #ffffff;">
+              {conflictingArchives.length}
+            </span>
+          {/if}
         </button>
       {:else}
         <button
@@ -1238,11 +1351,13 @@
                 />
               {:else}
                 {@const isExpanded = !!expandedRows[archive.file_name]}
+                {@const isMultiLinkExpanded = !!expandedMultiLinks[archive.file_name]}
                 {@const isHighlighted = highlightedModName === archive.file_name}
                 {@const isSelected = selectedMods.has(archive.file_name)}
                 {@const activeConflicts = previewConflictState?.get(archive.file_name) || { wins: archive.wins, loses: archive.loses }}
                 {@const catId = labelsConfig.assignments[archive.file_name]}
                 {@const assignedCat = catId ? labelsConfig.categories.find(c => c.id === catId) : null}
+                {@const activeCluster = getClusterForMod(archive.file_name)}
 
                 <div
                   role="group"
@@ -1260,114 +1375,57 @@
                     {archive.enabled ? 'opacity-100' : 'opacity-40'} 
                     {isSource ? 'opacity-20 border-dashed' : ''}"
                 >
-                  <div class="flex items-center justify-between px-2 gap-2 density-row relative">
+                  <div class="flex items-center justify-between px-2 gap-1 density-row relative">
                     
-                    <div class="flex items-center gap-2.5 min-w-0 flex-1 pl-1">
-                      <div
-                        role="button"
-                        tabindex="0"
-                        aria-label="Drag to adjust load order"
-                        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
-                        onpointerdown={(e) => { e.stopPropagation(); startDrag(e, originalIndex); }}
-                        class="cursor-grab active:cursor-grabbing p-1 rounded transition shrink-0 hover:bg-[var(--theme-surface)]"
-                        style="color: var(--theme-text-muted);"
-                        title="Drag to adjust load order"
-                      >
-                        <GripVertical class="h-3.5 w-3.5" />
+                    <!-- STRICT SLOT ARCHITECTURE: LEFT ZONE -->
+                    <div class="flex items-center gap-1 min-w-0 flex-1 pl-1">
+                      
+                      <!-- Slot 1: Drag Handle (w-6) -->
+                      <div class="w-6 flex justify-center shrink-0">
+                        <div
+                          role="button"
+                          tabindex="0"
+                          aria-label="Drag to adjust load order"
+                          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
+                          onpointerdown={(e) => { e.stopPropagation(); startDrag(e, originalIndex); }}
+                          class="cursor-grab active:cursor-grabbing p-1 rounded transition hover:bg-[var(--theme-surface)]"
+                          style="color: var(--theme-text-muted);"
+                          title="Drag to adjust load order"
+                        >
+                          <GripVertical class="h-3.5 w-3.5" />
+                        </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onclick={(e) => { e.stopPropagation(); toggleMod(archive); }}
-                        aria-label={archive.enabled ? "Disable mod " + archive.file_name : "Enable mod " + archive.file_name}
-                        class="w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors shrink-0 cursor-pointer"
-                        style="border-color: {archive.enabled ? 'var(--theme-accent)' : 'var(--theme-border)'}; background-color: {archive.enabled ? 'var(--theme-accent)' : 'transparent'};"
-                      >
-                        {#if archive.enabled}
-                          <Check class="h-2.5 w-2.5" style="color: var(--theme-accent-contrast);" strokeWidth={3} />
-                        {/if}
-                      </button>
+                      <!-- Slot 2: Checkbox (w-6) -->
+                      <div class="w-6 flex justify-center shrink-0">
+                        <button
+                          type="button"
+                          onclick={(e) => { e.stopPropagation(); toggleMod(archive); }}
+                          aria-label={archive.enabled ? "Disable mod " + archive.file_name : "Enable mod " + archive.file_name}
+                          class="w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors cursor-pointer"
+                          style="border-color: {archive.enabled ? 'var(--theme-accent)' : 'var(--theme-border)'}; background-color: {archive.enabled ? 'var(--theme-accent)' : 'transparent'};"
+                        >
+                          {#if archive.enabled}
+                            <Check class="h-2.5 w-2.5" style="color: var(--theme-accent-contrast);" strokeWidth={3} />
+                          {/if}
+                        </button>
+                      </div>
 
+                      <!-- Slot 3: Tree Guide Wires (w-4) -->
                       {#if inCategory}
-                        <div class="flex items-center shrink-0 w-4 h-full relative">
+                        <div class="w-4 flex justify-center shrink-0 relative h-full">
                           <div class="absolute left-1 top-0 bottom-0 w-[1px] pointer-events-none" style="background-color: color-mix(in srgb, var(--theme-border) 70%, transparent);"></div>
                           <div class="absolute left-1 top-1/2 w-2.5 h-[1px] pointer-events-none" style="background-color: color-mix(in srgb, var(--theme-border) 70%, transparent);"></div>
                         </div>
                       {/if}
 
-                      <span class="text-[10px] font-mono px-1 py-0.2 min-w-[34px] text-center rounded border shrink-0" style="background-color: var(--theme-card); color: var(--theme-text-muted); border-color: var(--theme-border);">
-                        #{archiveRank}
-                      </span>
-
-                      <span class="font-mono font-medium truncate max-w-md" style="color: var(--theme-text-primary);">
-                        {archive.file_name}
-                      </span>
-
-                      {#if archive.associated_xls && archive.associated_xls.length > 0}
-                        <span
-                          role="button"
-                          tabindex="0"
-                          oncontextmenu={(e) => { e.stopPropagation(); openContextMenu(e, archive, 'xl'); }}
-                          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
-                          class="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border transition-colors shrink-0 cursor-context-menu"
-                          style="{archive.enabled ? 'background-color: color-mix(in srgb, var(--color-info) 15%, transparent); color: var(--color-info); border-color: color-mix(in srgb, var(--color-info) 40%, transparent);' : 'background-color: var(--theme-card); color: var(--theme-text-muted); border-color: var(--theme-border); opacity: 0.5;'}"
-                          title="Companions: {archive.associated_xls.map(x => x.file_name).join(', ')} - Right-click for options"
-                        >
-                          XL {#if archive.associated_xls.length > 1}({archive.associated_xls.length}){/if}
-                        </span>
-                      {/if}
-
-                      <div class="flex items-center gap-1.5 text-[10px] shrink-0 opacity-80 hidden lg:flex" style="color: var(--theme-text-muted);">
-                        <span>({archive.file_count})</span>
-                        <span>•</span>
-                        <span>{formatBytes(archive.size_bytes)}</span>
-                      </div>
-                    </div>
-
-                    <div class="flex items-center gap-2 shrink-0">
-                      
-                      <div class="w-28 flex justify-end pr-2">
-                        {#if showCategoryLabelsInLoadOrder && assignedCat && !assignedCat.stashed}
-                          <span 
-                            class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded border shrink-0 truncate max-w-full"
-                            style="background-color: color-mix(in srgb, {assignedCat.color} 15%, transparent); color: {assignedCat.color}; border-color: color-mix(in srgb, {assignedCat.color} 40%, transparent);"
-                            title="Assigned to {assignedCat.name}"
-                          >
-                            {assignedCat.name}
-                          </span>
-                        {/if}
-                      </div>
-
-                      <div class="w-4 flex items-center justify-center shrink-0">
-                        {#if notesConfig[archive.file_name]}
-                          <button 
-                            type="button"
-                            onclick={(e) => { e.stopPropagation(); targetNoteModName = archive.file_name; isNoteModalOpen = true; }}
-                            class="hover:scale-110 transition-transform cursor-pointer"
-                            title={notesConfig[archive.file_name]}
-                          >
-                            <MessageSquare class="h-3.5 w-3.5" style="color: var(--color-warning);" />
-                          </button>
-                        {/if}
-                      </div>
-
-                      <div class="w-3 flex items-center justify-center shrink-0">
-                        {#if !archive.enabled}
-                          <div class="h-2 w-2 rounded-full opacity-50" style="background-color: var(--theme-text-muted);" title="Disabled"></div>
-                        {:else if activeConflicts.loses.length > 0}
-                          <div class="h-2 w-2 rounded-full shadow-[0_0_4px_var(--color-danger)]" style="background-color: var(--color-danger);" title="Overwritten by higher mod"></div>
-                        {:else if activeConflicts.wins.length > 0}
-                          <div class="h-2 w-2 rounded-full shadow-[0_0_4px_var(--color-success)]" style="background-color: var(--color-success);" title="Winning overwrites"></div>
-                        {:else}
-                          <div class="h-2 w-2 rounded-full opacity-50" style="background-color: var(--color-success);" title="Clean (No conflicts)"></div>
-                        {/if}
-                      </div>
-
-                      <div class="flex items-center min-w-0 w-6">
+                      <!-- Slot 4: Conflict Dot + Chevron (w-10) -->
+                      <div class="w-10 flex items-center justify-center gap-1 shrink-0">
                         {#if archive.has_conflicts}
+                          <div class="h-2 w-2 rounded-full shrink-0" style="background-color: {activeConflicts.loses.length > 0 ? 'var(--color-danger)' : 'var(--color-success)'}; box-shadow: 0 0 4px {activeConflicts.loses.length > 0 ? 'var(--color-danger)' : 'var(--color-success)'};" title={activeConflicts.loses.length > 0 ? 'Overwritten by higher mod' : 'Winning overwrites'}></div>
                           <button
                             type="button"
-                            onclick={(e) => { e.stopPropagation(); expandedRows[archive.file_name] = !expandedRows[archive.file_name]; }}
+                            onclick={(e) => { e.stopPropagation(); toggleConflict(archive.file_name); }}
                             class="p-0.5 rounded transition cursor-pointer hover:bg-[var(--theme-card)]"
                             style="color: var(--theme-text-muted);"
                             title="Toggle conflict details"
@@ -1381,7 +1439,86 @@
                         {/if}
                       </div>
 
-                      <div class="flex items-center justify-end shrink-0 w-6">
+                      <!-- Slot 5: Mod File Name -->
+                      <span class="font-mono font-medium truncate max-w-md" style="color: var(--theme-text-primary);">
+                        {archive.file_name}
+                      </span>
+                    </div>
+
+                    <!-- STRICT SLOT ARCHITECTURE: RIGHT ZONE -->
+                    <div class="flex items-center gap-1 shrink-0">
+                      
+                      <!-- Slot 1: Category Label (w-28) -->
+                      <div class="w-28 flex justify-end pr-2">
+                        {#if showCategoryLabelsInLoadOrder && assignedCat && !assignedCat.stashed}
+                          <span 
+                            class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded border shrink-0 truncate max-w-full"
+                            style="background-color: color-mix(in srgb, {assignedCat.color} 15%, transparent); color: {assignedCat.color}; border-color: color-mix(in srgb, {assignedCat.color} 40%, transparent);"
+                            title="Assigned to {assignedCat.name}"
+                          >
+                            {assignedCat.name}
+                          </span>
+                        {/if}
+                      </div>
+
+                      <!-- Slot 2: XL Icon (w-6) -->
+                      <div class="w-6 flex justify-center shrink-0">
+                        {#if archive.associated_xls && archive.associated_xls.length > 0}
+                          <span
+                            role="button"
+                            tabindex="0"
+                            oncontextmenu={(e) => { e.stopPropagation(); openContextMenu(e, archive, 'xl'); }}
+                            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
+                            class="text-[10px] font-black cursor-context-menu"
+                            style="color: var(--color-warning);"
+                            title="Companions: {archive.associated_xls.map(x => x.file_name).join(', ')} - Right-click for options"
+                          >
+                            XL
+                          </span>
+                        {/if}
+                      </div>
+
+                      <!-- Slot 3: Note Icon (w-6) -->
+                      <div class="w-6 flex justify-center shrink-0">
+                        {#if notesConfig[archive.file_name]}
+                          <button 
+                            type="button"
+                            onclick={(e) => { e.stopPropagation(); targetNoteModName = archive.file_name; isNoteModalOpen = true; }}
+                            class="hover:scale-110 transition-transform cursor-pointer"
+                            title={notesConfig[archive.file_name]}
+                          >
+                            <MessageSquare class="h-3.5 w-3.5" style="color: var(--color-warning);" />
+                          </button>
+                        {/if}
+                      </div>
+
+                      <!-- Slot 4: Multi-Link Icon + Chevron (w-10) -->
+                      <div class="w-10 flex items-center justify-center gap-0.5 shrink-0">
+                        {#if activeCluster}
+                          <Link class="h-3.5 w-3.5" style="color: var(--color-warning);" title="Part of Multi-Link Cluster: {activeCluster.name}" />
+                          <button
+                            type="button"
+                            onclick={(e) => { e.stopPropagation(); toggleMultiLink(archive.file_name); }}
+                            class="p-0.5 rounded transition cursor-pointer hover:bg-[var(--theme-card)]"
+                            style="color: var(--color-warning);"
+                            title="Toggle Multi-Link details"
+                          >
+                            {#if isMultiLinkExpanded}
+                              <ChevronDown class="h-3.5 w-3.5" />
+                            {:else}
+                              <ChevronRight class="h-3.5 w-3.5" />
+                            {/if}
+                          </button>
+                        {/if}
+                      </div>
+
+                      <!-- Slot 5: File Size (w-16) -->
+                      <div class="w-16 flex justify-end text-[10px] font-mono hidden lg:flex" style="color: var(--theme-text-muted);">
+                        {formatBytes(archive.size_bytes)}
+                      </div>
+
+                      <!-- Slot 6: Context Menu (w-6) -->
+                      <div class="w-6 flex justify-end shrink-0">
                         <button
                           type="button"
                           onclick={(e) => { e.stopPropagation(); openContextMenu(e, archive, 'archive'); }}
@@ -1395,6 +1532,7 @@
                     </div>
                   </div>
 
+                  <!-- Inline Drawer: Conflicts -->
                   {#if isExpanded && archive.has_conflicts}
                     <div class="px-4 py-2 border-t space-y-2 text-xs" style="border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-card) 30%, transparent);">
                       {#if activeConflicts.wins.length > 0}
@@ -1402,9 +1540,9 @@
                           <span class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--color-success);">Overwrites Lower Mods:</span>
                           <div class="mt-1 flex flex-wrap gap-1">
                             {#each activeConflicts.wins as target}
-                              <span class="px-1.5 py-0.2 rounded border text-[10px] font-mono" style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);">
+                              <button type="button" onclick={(e) => { e.stopPropagation(); focusModInMainList(target); }} class="px-1.5 py-0.2 rounded border text-[10px] font-mono cursor-pointer hover:brightness-125 transition-all" style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);" title="Jump to mod">
                                 {target}
-                              </span>
+                              </button>
                             {/each}
                           </div>
                         </div>
@@ -1415,13 +1553,29 @@
                           <span class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--color-danger);">Loses To Higher Mods:</span>
                           <div class="mt-1 flex flex-wrap gap-1">
                             {#each activeConflicts.loses as target}
-                              <span class="px-1.5 py-0.2 rounded border text-[10px] font-mono font-semibold" style="background-color: color-mix(in srgb, var(--color-danger) 15%, transparent); border-color: color-mix(in srgb, var(--color-danger) 40%, transparent); color: var(--color-danger);">
+                              <button type="button" onclick={(e) => { e.stopPropagation(); focusModInMainList(target); }} class="px-1.5 py-0.2 rounded border text-[10px] font-mono font-semibold cursor-pointer hover:brightness-125 transition-all" style="background-color: color-mix(in srgb, var(--color-danger) 15%, transparent); border-color: color-mix(in srgb, var(--color-danger) 40%, transparent); color: var(--color-danger);" title="Jump to mod">
                                 {target}
-                              </span>
+                              </button>
                             {/each}
                           </div>
                         </div>
                       {/if}
+                    </div>
+                  {/if}
+
+                  <!-- Inline Drawer: Multi-Link -->
+                  {#if isMultiLinkExpanded && activeCluster}
+                    <div class="px-4 py-2 border-t space-y-2 text-xs" style="border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-card) 30%, transparent);">
+                      <div>
+                        <span class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--color-warning);">Multi-Link Cluster: {activeCluster.name}</span>
+                        <div class="mt-1 flex flex-wrap gap-1">
+                          {#each activeCluster.members as member}
+                            <button type="button" onclick={(e) => { e.stopPropagation(); if(onRouteToHistory) onRouteToHistory(member.name); }} class="px-1.5 py-0.2 rounded border text-[10px] font-mono cursor-pointer hover:brightness-125 transition-all" style="background-color: color-mix(in srgb, var(--color-warning) 15%, transparent); border-color: color-mix(in srgb, var(--color-warning) 40%, transparent); color: var(--color-warning);" title="Jump to mod">
+                              {member.name}
+                            </button>
+                          {/each}
+                        </div>
+                      </div>
                     </div>
                   {/if}
                 </div>

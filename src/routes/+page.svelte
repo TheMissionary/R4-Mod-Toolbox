@@ -3,6 +3,7 @@
   import { invoke, convertFileSrc } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
   import { info, error, warn } from '@tauri-apps/plugin-log';
+  import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import {
     loadThemeSettings,
     applyThemeSettings,
@@ -29,6 +30,7 @@
   import SettingsView from '$lib/components/SettingsView.svelte';
   import HelpView from '$lib/components/HelpView.svelte';
   import AboutView from '$lib/components/AboutView.svelte';
+  import DialogModal from '$lib/components/DialogModal.svelte';
 
   import {
     Folder,
@@ -42,7 +44,10 @@
     AlertTriangle,
     RefreshCw,
     Check,
-    Power
+    Power,
+    FolderSearch,
+    Eye,
+    EyeOff
   } from 'lucide-svelte';
 
   type TabType = 'archive' | 'cet' | 'red4ext' | 'redscript' | 'r6tweaks' | 'history' | 'settings' | 'help' | 'about';
@@ -55,6 +60,26 @@
 
   let heroBannerUrl = $state<string | null>(null);
   let sidebarImageUrl = $state<string | null>(null);
+
+  let hideDisabled = $state<Record<string, boolean>>({
+    archive: false,
+    cet: false,
+    red4ext: false,
+    redscript: false,
+    r6tweaks: false
+  });
+
+  let dialogState = $state<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    mode: 'prompt' | 'confirm';
+    confirmText: string;
+    isDanger: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false, title: '', message: '', mode: 'confirm', confirmText: 'Confirm', isDanger: false, onConfirm: () => {}
+  });
 
   function updateHeroBanner() {
     const settings = loadThemeSettings();
@@ -116,7 +141,7 @@
     event.preventDefault();
     event.stopPropagation();
     const menuWidth = 160;
-    const menuHeight = 80;
+    const menuHeight = 110;
     const posX = (event.clientX + menuWidth > window.innerWidth) ? (window.innerWidth - menuWidth - 10) : event.clientX;
     const posY = (event.clientY + menuHeight > window.innerHeight) ? (window.innerHeight - menuHeight - 10) : event.clientY;
     sidebarContextMenu = { visible: true, x: posX, y: posY, modType, label };
@@ -128,30 +153,67 @@
     }
   }
 
-  async function handleBulkToggle(enable: boolean) {
+  async function handleSidebarOpenFolder() {
     if (!gamePath || !sidebarContextMenu.modType) return;
     const type = sidebarContextMenu.modType;
     closeSidebarContextMenu();
-    isLoading = true;
-    try {
-      await invoke('bulk_toggle_mod_type', { gamePath, modType: type, enable });
-      await refreshAll();
-    } catch (err) {
-      error(`Failed to bulk toggle ${type}: ${err}`);
-      isLoading = false;
+    
+    let targetPath = '';
+    if (type === 'archive') targetPath = `${gamePath}\\archive\\pc\\mod`;
+    else if (type === 'cet') targetPath = `${gamePath}\\bin\\x64\\plugins\\cyber_engine_tweaks\\mods`;
+    else if (type === 'red4ext') targetPath = `${gamePath}\\red4ext\\plugins`;
+    else if (type === 'redscript') targetPath = `${gamePath}\\r6\\scripts`;
+    else if (type === 'r6tweaks') targetPath = `${gamePath}\\r6\\tweaks`;
+    
+    if (targetPath) {
+      try {
+        await revealItemInDir(targetPath);
+      } catch (err) {
+        error(`Failed to open folder for ${type}: ${err}`);
+      }
     }
   }
 
-  function handleNavigateToMod(tab: string, modName: string) {
-    setTab(tab as TabType);
+  function confirmGlobalBulkAction(enable: boolean, targetType?: string) {
+    const type = targetType || currentTab;
+    if (!gamePath || !type) return;
+
+    const count = enable ? disabledCount : activeCount;
+    const typeLabel = type === 'archive' ? 'Archive' : type === 'cet' ? 'CET' : type === 'red4ext' ? 'RED4ext' : type === 'redscript' ? 'R6\\Scripts' : 'R6\\Tweaks';
+
+    dialogState = {
+      isOpen: true,
+      title: enable ? `Global Enable: ${typeLabel}` : `Global Disable: ${typeLabel}`,
+      message: enable
+        ? `Are you sure you want to ENABLE ALL mods in the ${typeLabel} framework? This operation will physically restore ${count} disabled files to the active directory. This may introduce severe load order conflicts or engine instability if incompatible mods are activated simultaneously.`
+        : `This is an effective but potentially abrupt option that will disable all ${typeLabel} mods. It is safe to continue, though loading game saves created with these mods now disabled can potentially compromise the save file. This will also disable any mods you have associated via the Multi-Link feature.`,
+      mode: 'confirm',
+      confirmText: enable ? 'Execute Enable All' : 'Execute Disable All',
+      isDanger: !enable,
+      onConfirm: async () => {
+        dialogState.isOpen = false;
+        isLoading = true;
+        try {
+          await invoke('bulk_toggle_mod_type', { gamePath, modType: type, enable });
+          await refreshAll();
+        } catch (err) {
+          error(`Failed to bulk toggle ${type}: ${err}`);
+          isLoading = false;
+        }
+      }
+    };
+  }
+
+  async function handleNavigateToMod(tab: string, modName: string) {
+    await setTab(tab as TabType);
     targetHighlightMod = modName;
-    setTimeout(() => { targetHighlightMod = null; }, 100);
+    setTimeout(() => { targetHighlightMod = null; }, 500);
   }
 
   function handleNavigateToHistory(modName: string) {
     setTab('history');
     targetHighlightMod = modName;
-    setTimeout(() => { targetHighlightMod = null; }, 100);
+    setTimeout(() => { targetHighlightMod = null; }, 500);
   }
 
   async function handleOpenPhotos() {
@@ -316,13 +378,26 @@
       default: return 0;
     }
   });
+
+  let disabledCount = $derived(totalCount - activeCount);
 </script>
 
 <svelte:window onclick={closeSidebarContextMenu} oncontextmenu={(e) => e.preventDefault()} />
 
+<DialogModal
+  bind:isOpen={dialogState.isOpen}
+  title={dialogState.title}
+  message={dialogState.message}
+  mode={dialogState.mode}
+  confirmText={dialogState.confirmText}
+  isDanger={dialogState.isDanger}
+  onConfirm={dialogState.onConfirm}
+  onCancel={() => dialogState.isOpen = false}
+/>
+
 {#if sidebarContextMenu.visible}
   <div
-    class="fixed z-50 w-40 rounded-md border py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
+    class="fixed z-50 w-48 rounded-md border py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
     style="left: {sidebarContextMenu.x}px; top: {sidebarContextMenu.y}px; background-color: var(--theme-card); border-color: var(--theme-border);"
     onclick={(e) => e.stopPropagation()}
     oncontextmenu={(e) => e.preventDefault()}
@@ -335,7 +410,17 @@
     <div class="p-1 space-y-0.5">
       <button
         type="button"
-        onclick={() => handleBulkToggle(true)}
+        onclick={handleSidebarOpenFolder}
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+        style="color: var(--theme-text-primary);"
+      >
+        <FolderSearch class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
+        <span>Open Folder Location</span>
+      </button>
+      <div class="h-px my-1 mx-1" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
+      <button
+        type="button"
+        onclick={() => { confirmGlobalBulkAction(true, sidebarContextMenu.modType); closeSidebarContextMenu(); }}
         class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
         style="color: var(--theme-text-primary);"
       >
@@ -344,7 +429,7 @@
       </button>
       <button
         type="button"
-        onclick={() => handleBulkToggle(false)}
+        onclick={() => { confirmGlobalBulkAction(false, sidebarContextMenu.modType); closeSidebarContextMenu(); }}
         class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
         style="color: var(--theme-text-primary);"
       >
@@ -358,7 +443,7 @@
 <div class="flex h-screen w-screen overflow-hidden font-sans" style="background-color: var(--theme-bg); color: var(--theme-text-primary);">
   
   <!-- Left Navigation Sidebar (Advanced Theme Enabled) -->
-  <aside class="w-64 border-r flex flex-col justify-between shrink-0 select-none z-20 relative overflow-hidden" style="border-color: var(--theme-border); border-right-width: var(--theme-border-macro, 1px);">
+  <aside class="w-64 flex flex-col justify-between shrink-0 select-none z-20 relative overflow-hidden" style="border-right: var(--theme-border-macro, 1px) solid var(--theme-sidebar-border, var(--theme-border)); box-shadow: var(--theme-sidebar-shadow, none);">
     
     <!-- 1. Sidebar Image (Bottom Layer) -->
     {#if sidebarImageUrl}
@@ -368,9 +453,9 @@
     {/if}
 
     <!-- 2. Surface Color & Blur Layer (Middle Layer) -->
-    <div class="absolute inset-0 z-0 pointer-events-none" style="background-color: color-mix(in srgb, var(--theme-surface) var(--theme-surface-opacity, 100%), transparent); backdrop-filter: blur(var(--theme-backdrop-blur, 0px));">
+    <div class="absolute inset-0 z-0 pointer-events-none" style="background-color: color-mix(in srgb, var(--theme-sidebar-bg, var(--theme-surface)) var(--theme-sidebar-opacity, var(--theme-surface-opacity, 100%)), transparent); backdrop-filter: blur(var(--theme-sidebar-blur, var(--theme-backdrop-blur, 0px))); -webkit-backdrop-filter: blur(var(--theme-sidebar-blur, var(--theme-backdrop-blur, 0px)));">
       {#if sidebarImageUrl}
-        <div class="absolute inset-0" style="background: linear-gradient(to bottom, transparent 0%, var(--theme-surface) 95%);"></div>
+        <div class="absolute inset-0" style="background: linear-gradient(to bottom, transparent 0%, var(--theme-sidebar-bg, var(--theme-surface)) 95%);"></div>
       {/if}
     </div>
 
@@ -382,7 +467,7 @@
         <div class="h-7 w-7 rounded flex items-center justify-center font-black text-sm shadow-sm shrink-0" style="background-color: var(--theme-accent); color: var(--theme-accent-contrast); box-shadow: var(--theme-neon-shadow, none);">
           R4
         </div>
-        <h1 class="text-xs font-bold tracking-wider uppercase truncate" style="color: var(--theme-text-primary);">R4 Mod Toolbox</h1>
+        <h1 class="text-xs font-bold tracking-wider uppercase truncate" style="color: var(--theme-text-primary);">R4 Mod Manager</h1>
       </div>
 
       <!-- Quick Access Navigation -->
@@ -394,13 +479,13 @@
             oncontextmenu={(e) => openSidebarContextMenu(e, 'archive', 'Archive Mods')}
             title="Right-click for options"
             class="relative w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition cursor-pointer border"
-            style="{currentTab === 'archive' ? 'background-color: color-mix(in srgb, var(--theme-card) var(--theme-surface-opacity, 100%), transparent); border-color: var(--theme-border); color: var(--theme-text-primary);' : 'border-color: transparent; color: var(--theme-text-muted);'}"
+            style={currentTab === 'archive' ? 'background-color: color-mix(in srgb, var(--theme-card) var(--theme-surface-opacity, 100%), transparent); border-color: var(--theme-border); color: var(--theme-text-primary);' : 'border-color: transparent; color: var(--theme-text-muted);'}
           >
             {#if currentTab === 'archive'}
               <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md" style="background-color: var(--theme-accent); box-shadow: var(--theme-neon-shadow, none);"></div>
             {/if}
             <div class="flex items-center gap-3">
-              <Folder class="h-4 w-4" style="{currentTab === 'archive' ? 'color: var(--theme-accent);' : ''}" />
+              <Folder class="h-4 w-4" style={currentTab === 'archive' ? 'color: var(--theme-accent);' : ''} />
               <span>Archive Mods</span>
             </div>
           </button>
@@ -411,13 +496,13 @@
             oncontextmenu={(e) => openSidebarContextMenu(e, 'cet', 'CET Plugins')}
             title="Right-click for options"
             class="relative w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition cursor-pointer border"
-            style="{currentTab === 'cet' ? 'background-color: color-mix(in srgb, var(--theme-card) var(--theme-surface-opacity, 100%), transparent); border-color: var(--theme-border); color: var(--theme-text-primary);' : 'border-color: transparent; color: var(--theme-text-muted);'}"
+            style={currentTab === 'cet' ? 'background-color: color-mix(in srgb, var(--theme-card) var(--theme-surface-opacity, 100%), transparent); border-color: var(--theme-border); color: var(--theme-text-primary);' : 'border-color: transparent; color: var(--theme-text-muted);'}
           >
             {#if currentTab === 'cet'}
               <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md" style="background-color: var(--theme-accent); box-shadow: var(--theme-neon-shadow, none);"></div>
             {/if}
             <div class="flex items-center gap-3">
-              <Folder class="h-4 w-4" style="{currentTab === 'cet' ? 'color: var(--theme-accent);' : ''}" />
+              <Folder class="h-4 w-4" style={currentTab === 'cet' ? 'color: var(--theme-accent);' : ''} />
               <span>CET Plugins</span>
             </div>
           </button>
@@ -428,13 +513,13 @@
             oncontextmenu={(e) => openSidebarContextMenu(e, 'red4ext', 'RED4ext Plugins')}
             title="Right-click for options"
             class="relative w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition cursor-pointer border"
-            style="{currentTab === 'red4ext' ? 'background-color: color-mix(in srgb, var(--theme-card) var(--theme-surface-opacity, 100%), transparent); border-color: var(--theme-border); color: var(--theme-text-primary);' : 'border-color: transparent; color: var(--theme-text-muted);'}"
+            style={currentTab === 'red4ext' ? 'background-color: color-mix(in srgb, var(--theme-card) var(--theme-surface-opacity, 100%), transparent); border-color: var(--theme-border); color: var(--theme-text-primary);' : 'border-color: transparent; color: var(--theme-text-muted);'}
           >
             {#if currentTab === 'red4ext'}
               <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md" style="background-color: var(--theme-accent); box-shadow: var(--theme-neon-shadow, none);"></div>
             {/if}
             <div class="flex items-center gap-3">
-              <Folder class="h-4 w-4" style="{currentTab === 'red4ext' ? 'color: var(--theme-accent);' : ''}" />
+              <Folder class="h-4 w-4" style={currentTab === 'red4ext' ? 'color: var(--theme-accent);' : ''} />
               <span>RED4ext Plugins</span>
             </div>
           </button>
@@ -445,13 +530,13 @@
             oncontextmenu={(e) => openSidebarContextMenu(e, 'redscript', 'R6\\Scripts')}
             title="Right-click for options"
             class="relative w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition cursor-pointer border"
-            style="{currentTab === 'redscript' ? 'background-color: color-mix(in srgb, var(--theme-card) var(--theme-surface-opacity, 100%), transparent); border-color: var(--theme-border); color: var(--theme-text-primary);' : 'border-color: transparent; color: var(--theme-text-muted);'}"
+            style={currentTab === 'redscript' ? 'background-color: color-mix(in srgb, var(--theme-card) var(--theme-surface-opacity, 100%), transparent); border-color: var(--theme-border); color: var(--theme-text-primary);' : 'border-color: transparent; color: var(--theme-text-muted);'}
           >
             {#if currentTab === 'redscript'}
               <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md" style="background-color: var(--theme-accent); box-shadow: var(--theme-neon-shadow, none);"></div>
             {/if}
             <div class="flex items-center gap-3">
-              <Folder class="h-4 w-4" style="{currentTab === 'redscript' ? 'color: var(--theme-accent);' : ''}" />
+              <Folder class="h-4 w-4" style={currentTab === 'redscript' ? 'color: var(--theme-accent);' : ''} />
               <span>R6\Scripts</span>
             </div>
           </button>
@@ -462,13 +547,13 @@
             oncontextmenu={(e) => openSidebarContextMenu(e, 'r6tweaks', 'R6\\Tweaks')}
             title="Right-click for options"
             class="relative w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition cursor-pointer border"
-            style="{currentTab === 'r6tweaks' ? 'background-color: color-mix(in srgb, var(--theme-card) var(--theme-surface-opacity, 100%), transparent); border-color: var(--theme-border); color: var(--theme-text-primary);' : 'border-color: transparent; color: var(--theme-text-muted);'}"
+            style={currentTab === 'r6tweaks' ? 'background-color: color-mix(in srgb, var(--theme-card) var(--theme-surface-opacity, 100%), transparent); border-color: var(--theme-border); color: var(--theme-text-primary);' : 'border-color: transparent; color: var(--theme-text-muted);'}
           >
             {#if currentTab === 'r6tweaks'}
               <div class="absolute left-0 top-2 bottom-2 w-1 rounded-r-md" style="background-color: var(--theme-accent); box-shadow: var(--theme-neon-shadow, none);"></div>
             {/if}
             <div class="flex items-center gap-3">
-              <Folder class="h-4 w-4" style="{currentTab === 'r6tweaks' ? 'color: var(--theme-accent);' : ''}" />
+              <Folder class="h-4 w-4" style={currentTab === 'r6tweaks' ? 'color: var(--theme-accent);' : ''} />
               <span>R6\Tweaks</span>
             </div>
           </button>
@@ -482,7 +567,7 @@
           onclick={() => setTab('history')}
           title="Mod History & Ledger"
           class="p-2 rounded transition cursor-pointer hover:brightness-125"
-          style="{currentTab === 'history' ? 'color: var(--theme-accent); background-color: color-mix(in srgb, var(--theme-card) var(--theme-surface-opacity, 100%), transparent);' : 'color: var(--theme-text-muted);'}"
+          style={currentTab === 'history' ? 'color: var(--theme-accent); background-color: color-mix(in srgb, var(--theme-card) var(--theme-surface-opacity, 100%), transparent);' : 'color: var(--theme-text-muted);'}
         >
           <Clock class="h-4 w-4" />
         </button>
@@ -504,7 +589,7 @@
           onclick={() => setTab('help')}
           title="Help & Documentation"
           class="p-2 rounded transition cursor-pointer hover:brightness-125"
-          style="{currentTab === 'help' ? 'color: var(--theme-accent); background-color: color-mix(in srgb, var(--theme-card) var(--theme-surface-opacity, 100%), transparent);' : 'color: var(--theme-text-muted);'}"
+          style={currentTab === 'help' ? 'color: var(--theme-accent); background-color: color-mix(in srgb, var(--theme-card) var(--theme-surface-opacity, 100%), transparent);' : 'color: var(--theme-text-muted);'}
         >
           <HelpCircle class="h-4 w-4" />
         </button>
@@ -514,7 +599,7 @@
           onclick={() => setTab('settings')}
           title="Settings"
           class="p-2 rounded transition cursor-pointer hover:brightness-125"
-          style="{currentTab === 'settings' ? 'color: var(--theme-accent); background-color: color-mix(in srgb, var(--theme-card) var(--theme-surface-opacity, 100%), transparent);' : 'color: var(--theme-text-muted);'}"
+          style={currentTab === 'settings' ? 'color: var(--theme-accent); background-color: color-mix(in srgb, var(--theme-card) var(--theme-surface-opacity, 100%), transparent);' : 'color: var(--theme-text-muted);'}
         >
           <Settings class="h-4 w-4" />
         </button>
@@ -524,7 +609,7 @@
           onclick={() => setTab('about')}
           title="About R4"
           class="p-2 rounded transition cursor-pointer hover:brightness-125"
-          style="{currentTab === 'about' ? 'color: var(--theme-accent); background-color: color-mix(in srgb, var(--theme-card) var(--theme-surface-opacity, 100%), transparent);' : 'color: var(--theme-text-muted);'}"
+          style={currentTab === 'about' ? 'color: var(--theme-accent); background-color: color-mix(in srgb, var(--theme-card) var(--theme-surface-opacity, 100%), transparent);' : 'color: var(--theme-text-muted);'}
         >
           <Info class="h-4 w-4" />
         </button>
@@ -533,7 +618,7 @@
   </aside>
 
   <!-- Workspace Canvas -->
-  <div class="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+  <div class="flex-1 flex flex-col min-w-0 overflow-hidden relative" style="background-color: var(--theme-canvas-bg, transparent);">
     
     <!-- Full-Canvas Hero Background Layer (Enhanced Vibrancy Wash) -->
     {#if heroBannerUrl}
@@ -552,7 +637,7 @@
       </div>
     {/if}
 
-    <HeaderBar {gamePath} {currentTab} {customLaunchPath} />
+    <HeaderBar {gamePath} {currentTab} {customLaunchPath} {globalSelectedPath} />
 
     <main class="flex-1 overflow-y-auto relative z-10 {['settings', 'help', 'about', 'history'].includes(currentTab) ? 'p-0' : 'p-6'}">
       
@@ -580,6 +665,7 @@
           }}
           {currentTab}
           bind:globalSelectedPath
+          hideDisabled={hideDisabled['archive']}
         />
       </div>
 
@@ -592,6 +678,7 @@
           onRouteToHistory={handleNavigateToHistory}
           {currentTab}
           bind:globalSelectedPath
+          hideDisabled={hideDisabled['cet']}
         />
       </div>
 
@@ -604,6 +691,7 @@
           onRouteToHistory={handleNavigateToHistory}
           {currentTab}
           bind:globalSelectedPath
+          hideDisabled={hideDisabled['red4ext']}
         />
       </div>
 
@@ -616,6 +704,7 @@
           onRouteToHistory={handleNavigateToHistory}
           {currentTab}
           bind:globalSelectedPath
+          hideDisabled={hideDisabled['redscript']}
         />
       </div>
 
@@ -628,6 +717,7 @@
           onRouteToHistory={handleNavigateToHistory}
           {currentTab}
           bind:globalSelectedPath
+          hideDisabled={hideDisabled['r6tweaks']}
         />
       </div>
 
@@ -667,22 +757,56 @@
     </main>
 
     <!-- Bottom Status Bar (Advanced Theme Enabled) -->
-    <footer class="h-8 border-t flex items-center justify-between px-4 shrink-0 text-[11px] font-mono select-none relative z-10 overflow-hidden" style="border-color: var(--theme-border); border-top-width: var(--theme-border-macro, 1px); color: var(--theme-text-muted);">
+    <footer class="h-10 flex items-center justify-between px-4 shrink-0 text-[11px] font-mono select-none relative z-10 overflow-hidden" style="border-top: var(--theme-border-macro, 1px) solid var(--theme-footer-border, var(--theme-border)); box-shadow: var(--theme-footer-shadow, none); color: var(--theme-text-muted);">
       
       <!-- Glass Background -->
-      <div class="absolute inset-0 z-0 pointer-events-none" style="background-color: color-mix(in srgb, var(--theme-surface) var(--theme-surface-opacity, 100%), transparent); backdrop-filter: blur(var(--theme-backdrop-blur, 0px)); -webkit-backdrop-filter: blur(var(--theme-backdrop-blur, 0px));"></div>
+      <div class="absolute inset-0 z-0 pointer-events-none" style="background-color: color-mix(in srgb, var(--theme-footer-bg, var(--theme-surface)) var(--theme-footer-opacity, var(--theme-surface-opacity, 100%)), transparent); backdrop-filter: blur(var(--theme-footer-blur, var(--theme-backdrop-blur, 0px))); -webkit-backdrop-filter: blur(var(--theme-footer-blur, var(--theme-backdrop-blur, 0px)));"></div>
 
-      <!-- Left: Active Cursor Hover Path (Empty when idle) -->
-      <div class="relative z-10 flex-1 min-w-0 pr-4 truncate flex items-center h-full">
-        {#if globalSelectedPath && globalSelectedPath !== 'Ready'}
-          <span class="truncate opacity-80" style="color: var(--theme-text-muted);" title={globalSelectedPath}>
-            {globalSelectedPath}
-          </span>
+      <!-- Left: Action Buttons (Left Justified, No Outlines) -->
+      <div class="relative z-10 flex items-center gap-3 flex-1 h-full">
+        {#if ['archive', 'cet', 'red4ext', 'redscript', 'r6tweaks'].includes(currentTab)}
+          <button
+            type="button"
+            onclick={() => hideDisabled[currentTab] = !hideDisabled[currentTab]}
+            class="flex items-center gap-2 px-2.5 py-1.5 rounded transition cursor-pointer hover:brightness-125"
+            style={hideDisabled[currentTab] ? 'background-color: color-mix(in srgb, var(--theme-accent) 15%, transparent); color: var(--theme-accent);' : 'background-color: color-mix(in srgb, var(--theme-surface) 50%, transparent); color: var(--theme-text-muted);'}
+          >
+            {#if hideDisabled[currentTab]}
+              <EyeOff class="h-3.5 w-3.5" />
+              <span class="font-bold">{disabledCount} Disabled Hidden</span>
+            {:else}
+              <Eye class="h-3.5 w-3.5" />
+              <span>Hide Disabled</span>
+            {/if}
+          </button>
+
+          <!-- Vertical Divider -->
+          <div class="h-3 w-px" style="background-color: var(--theme-border);"></div>
+
+          <button
+            type="button"
+            onclick={() => confirmGlobalBulkAction(true)}
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded transition cursor-pointer hover:brightness-125"
+            style="background-color: color-mix(in srgb, var(--theme-surface) 50%, transparent); color: var(--theme-text-primary);"
+          >
+            <Check class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
+            <span class="font-bold uppercase tracking-wider">Enable All</span>
+          </button>
+          
+          <button
+            type="button"
+            onclick={() => confirmGlobalBulkAction(false)}
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded transition cursor-pointer hover:brightness-125"
+            style="background-color: color-mix(in srgb, var(--theme-surface) 50%, transparent); color: var(--color-danger);"
+          >
+            <Power class="h-3.5 w-3.5" style="color: var(--color-danger);" />
+            <span class="font-bold uppercase tracking-wider">Disable All</span>
+          </button>
         {/if}
       </div>
 
-      <!-- Right: Unified Telemetry Cluster (Right-Justified with Dividers) -->
-      <div class="relative z-10 flex items-center gap-3 shrink-0 h-full">
+      <!-- Right: Unified Telemetry Cluster -->
+      <div class="relative z-10 flex items-center justify-end gap-3 shrink-0 h-full">
         <!-- Sync / Rescan Button -->
         <div class="flex items-center gap-1.5">
           {#if isLoading}
@@ -710,7 +834,7 @@
           <div class="h-3 w-px" style="background-color: var(--theme-border);"></div>
         {/if}
 
-        <!-- Connection Integrity (Right-Justified) -->
+        <!-- Connection Integrity -->
         <div class="flex items-center gap-1.5">
           {#if !gamePath}
             <AlertTriangle class="h-3.5 w-3.5" style="color: var(--color-warning);" />

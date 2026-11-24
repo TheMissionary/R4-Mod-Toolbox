@@ -7,7 +7,6 @@
   import { tick } from 'svelte';
   import { loadConfigFromDisk } from '$lib/theme';
   import NoteModal from '$lib/components/NoteModal.svelte';
-  import DialogModal from '$lib/components/DialogModal.svelte';
 
   let {
     packages = $bindable([]),
@@ -16,7 +15,8 @@
     targetHighlightMod = null,
     onRouteToHistory,
     currentTab = 'redscript',
-    globalSelectedPath = $bindable('')
+    globalSelectedPath = $bindable(''),
+    hideDisabled = false
   }: {
     packages: RedScriptItem[];
     gamePath: string;
@@ -25,6 +25,7 @@
     onRouteToHistory?: (modName: string) => void;
     currentTab?: string;
     globalSelectedPath?: string;
+    hideDisabled?: boolean;
   } = $props();
 
   let searchQuery = $state('');
@@ -43,19 +44,6 @@
   let notesConfig = $state<Record<string, string>>({});
   let isNoteModalOpen = $state(false);
   let targetNoteModName = $state('');
-
-  let dialogState = $state<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    mode: 'prompt' | 'confirm';
-    initialValue: string;
-    confirmText: string;
-    isDanger: boolean;
-    onConfirm: (val: string) => void;
-  }>({
-    isOpen: false, title: '', message: '', mode: 'prompt', initialValue: '', confirmText: 'Confirm', isDanger: false, onConfirm: () => {}
-  });
 
   let contextMenu = $state<{
     visible: boolean;
@@ -209,30 +197,6 @@
     })();
   }
 
-  function confirmBulkAction(enable: boolean) {
-    dialogState = {
-      isOpen: true,
-      title: enable ? 'Enable All R6\\Scripts' : 'Disable All R6\\Scripts',
-      message: enable 
-        ? 'Are you sure you want to enable all R6\\Scripts? This will activate every mod in this list.' 
-        : 'Are you sure you want to disable all R6\\Scripts? This is a nuclear option that will deactivate every mod in this list.',
-      mode: 'confirm',
-      initialValue: '',
-      confirmText: enable ? 'Enable All' : 'Disable All',
-      isDanger: !enable,
-      onConfirm: async () => {
-        dialogState.isOpen = false;
-        try {
-          await invoke('bulk_toggle_mod_type', { gamePath, modType: 'redscript', enable });
-          packages = await invoke<RedScriptItem[]>('get_redscript_details', { gamePath });
-          if (onStateChanged) onStateChanged();
-        } catch (err) {
-          console.error(err);
-        }
-      }
-    };
-  }
-
   async function toggleFolder(path: string) {
     expandedFolders[path] = !expandedFolders[path];
     if (expandedFolders[path] && !folderContents[path]) {
@@ -365,9 +329,15 @@
   }
 
   let filteredPackages = $derived.by(() => {
-    if (!searchQuery.trim()) return packages;
-    const q = searchQuery.toLowerCase().trim();
-    return packages.filter(p => p.name.toLowerCase().includes(q));
+    let arr = packages;
+    if (hideDisabled) {
+      arr = arr.filter(p => p.enabled || p.is_dir);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      arr = arr.filter(p => p.name.toLowerCase().includes(q));
+    }
+    return arr;
   });
 </script>
 
@@ -607,28 +577,6 @@
           <span>Expand All</span>
         {/if}
       </button>
-
-      <div class="w-px h-5 mx-1" style="background-color: var(--theme-border);"></div>
-
-      <button
-        onclick={() => confirmBulkAction(true)}
-        class="h-8 flex items-center gap-1.5 px-3 rounded border text-xs font-medium transition cursor-pointer hover:brightness-125"
-        style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-primary);"
-        title="Enable All R6\Scripts"
-      >
-        <Check class="h-3.5 w-3.5" style="color: var(--theme-accent);" />
-        <span class="hidden xl:inline">Enable All</span>
-      </button>
-
-      <button
-        onclick={() => confirmBulkAction(false)}
-        class="h-8 flex items-center gap-1.5 px-3 rounded border text-xs font-medium transition cursor-pointer hover:brightness-125"
-        style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--color-danger);"
-        title="Disable All R6\Scripts"
-      >
-        <Power class="h-3.5 w-3.5" style="color: var(--color-danger);" />
-        <span class="hidden xl:inline">Disable All</span>
-      </button>
     </div>
   </div>
 
@@ -751,16 +699,4 @@
   initialNote={notesConfig[targetNoteModName] || ''}
   onConfirm={handleNoteConfirm}
   onCancel={() => isNoteModalOpen = false}
-/>
-
-<DialogModal
-  bind:isOpen={dialogState.isOpen}
-  title={dialogState.title}
-  message={dialogState.message}
-  mode={dialogState.mode}
-  initialValue={dialogState.initialValue}
-  confirmText={dialogState.confirmText}
-  isDanger={dialogState.isDanger}
-  onConfirm={dialogState.onConfirm}
-  onCancel={() => dialogState.isOpen = false}
 />

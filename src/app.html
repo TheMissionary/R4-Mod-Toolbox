@@ -4,18 +4,16 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%sveltekit.assets%/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>R4 Mod Toolbox</title>
+    <title>R4 Mod Manager</title>
     
     <script>
       // Synchronously load the user's accent color before the DOM renders to prevent color flashing
       try {
-        const settings = localStorage.getItem('cp2077_theme_settings_v2');
+        const settings = localStorage.getItem('cp2077_theme_settings_v3');
         if (settings) {
           const parsed = JSON.parse(settings);
-          const mode = parsed.mode || 'dark';
-          const colors = mode === 'light' ? parsed.lightColors : parsed.darkColors;
-          if (colors && colors.accent) {
-            document.documentElement.style.setProperty('--splash-accent', colors.accent);
+          if (parsed && parsed.accentHex) {
+            document.documentElement.style.setProperty('--splash-accent', parsed.accentHex);
           }
         }
       } catch (e) {}
@@ -46,7 +44,9 @@
         position: fixed;
         inset: 0;
         z-index: 999999;
-        background-color: #101418;
+        background-color: rgba(18, 21, 23, 0.6);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -119,7 +119,7 @@
         <div class="splash-badge">R4</div>
         <div class="splash-text">
           <span class="line-1">R4 MOD</span>
-          <span class="line-2">TOOLBOX</span>
+          <span class="line-2">MANAGER</span>
         </div>
       </div>
     </div>

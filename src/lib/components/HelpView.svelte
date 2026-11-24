@@ -4,7 +4,7 @@
   import { slide } from 'svelte/transition';
   import {
     HelpCircle, Link2, AlertTriangle, ExternalLink, FolderTree, Cpu,
-    ChevronDown, ChevronRight, Star, Code, FolderOpen, Trash2, Check, LayoutGrid
+    ChevronDown, ChevronRight, Star, Code, FolderOpen, Trash2, Check, LayoutGrid, Link
   } from 'lucide-svelte';
 
   let openSection = $state<string | null>('support');
@@ -88,7 +88,7 @@
               </div>
               <div>
                 <strong class="block mb-1" style="color: var(--theme-text-primary);">Virtual Groups:</strong>
-                R4 allows you to create virtual groups directly within your load order to organize related mods. These are purely organizational. Under the hood, R4 creates a safe, 0-byte <span class="font-mono" style="color: var(--theme-text-primary);">.txt</span> file (e.g., <span class="font-mono" style="color: var(--theme-text-primary);">[DIR] UI Mods.txt</span>) in your mod directory. The game engine completely ignores these files, ensuring your load order remains perfectly intact even if you launch the game without the toolbox.
+                R4 allows you to create virtual groups directly within your load order to organize related mods. These are purely organizational. Under the hood, R4 creates a safe, 0-byte <span class="font-mono" style="color: var(--theme-text-primary);">.txt</span> file (e.g., <span class="font-mono" style="color: var(--theme-text-primary);">[DIR] UI Mods.txt</span>) in your mod directory. The game engine completely ignores these files, ensuring your load order remains perfectly intact even if you launch the game without the manager.
               </div>
               <div>
                 <strong class="block mb-1" style="color: var(--theme-text-primary);">Multi-Select:</strong>
@@ -173,15 +173,62 @@
                   <span><strong style="color: var(--color-danger);">Red (Losing):</strong> This mod is placed lower in the load order, and its assets are being overwritten by a winning mod above it.</span>
                 </li>
               </ul>
+              
+              <div class="p-3 rounded border mt-2" style="background-color: color-mix(in srgb, var(--theme-surface) 30%, transparent); border-color: color-mix(in srgb, var(--theme-border) 50%, transparent);">
+                <strong class="block mb-1" style="color: var(--theme-text-primary);">Important Context:</strong>
+                The goal is not always zero conflicts. It is perfectly normal for mods to conflict, and a red indicator is not inherently bad.
+                <br/><br/>
+                <em style="color: var(--theme-text-primary);">Example:</em> A vehicle mod is installed with a base set of features and colors. You install another mod that changes the color or adds a spoiler. The spoiler mod must be placed <strong>above</strong> the base mod to work. When placed correctly, the base car mod will show as red, simply indicating it is safely giving up control of the color or spoiler to the mod above it.
+              </div>
+
               <p>
-                Click the chevron next to the conflict count to see exactly which mods are winning or losing against the selected file. Utilize the <strong style="color: var(--theme-text-primary);">Conflict Summary</strong> drawer to quickly narrow your view to only competing mods. The drawer updates conflicts in real-time as you adjust your load order to resolve contested assets.
+                Click the chevron next to the conflict count to see exactly which mods are winning or losing against the selected file. Utilize the <strong style="color: var(--theme-text-primary);">Conflict Summary</strong> drawer to quickly narrow your view to only competing mods.
               </p>
             </div>
           </div>
         {/if}
       </div>
 
-      <!-- Accordion 4: XL Linking -->
+      <!-- Accordion 4: Multi-Link System -->
+      <div class="rounded-xl border overflow-hidden flex flex-col" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
+        <button 
+          type="button"
+          onclick={() => toggleSection('multi_link')}
+          class="w-full px-4 py-3 flex items-center justify-between transition-colors cursor-pointer hover:bg-[color-mix(in_srgb,var(--theme-surface)_90%,transparent)]"
+          style="background-color: color-mix(in srgb, var(--theme-surface) 60%, transparent);"
+        >
+          <div class="flex items-center gap-2.5">
+            <Link class="h-4 w-4" style="color: var(--color-warning);" />
+            <h3 class="text-sm font-bold uppercase tracking-wider">Multi-Link System</h3>
+          </div>
+          {#if openSection === 'multi_link'}
+            <ChevronDown class="h-4 w-4" style="color: var(--theme-text-muted);" />
+          {:else}
+            <ChevronRight class="h-4 w-4" style="color: var(--theme-text-muted);" />
+          {/if}
+        </button>
+        
+        {#if openSection === 'multi_link'}
+          <div transition:slide={{ duration: 200 }} class="border-t" style="border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-bg) 30%, transparent);">
+            <div class="p-5 space-y-4 text-xs leading-relaxed" style="color: var(--theme-text-muted);">
+              <p>
+                <strong style="color: var(--theme-text-primary);">What is Multi-Link?</strong><br/>
+                Some complex mods require multiple files across different frameworks (e.g., an Archive file for models, and a CET plugin for scripts). The Multi-Link system allows you to bond these files together into a single "Cluster".
+              </p>
+              <p>
+                <strong style="color: var(--theme-text-primary);">Why is it beneficial?</strong><br/>
+                It ensures you never accidentally launch the game with only half a mod enabled, which can cause crashes or broken features. Toggling one member of a Multi-Link cluster automatically toggles all other members, regardless of which tab they are on.
+              </p>
+              <p>
+                <strong style="color: var(--theme-text-primary);">How to use:</strong><br/>
+                From the <strong>History</strong> tab, hold <kbd class="px-1.5 py-0.5 rounded border font-mono text-[10px]" style="background-color: var(--theme-card); border-color: var(--theme-border); color: var(--theme-text-primary);">Ctrl</kbd> or <kbd class="px-1.5 py-0.5 rounded border font-mono text-[10px]" style="background-color: var(--theme-card); border-color: var(--theme-border); color: var(--theme-text-primary);">Shift</kbd> to select multiple mods across different frameworks. Right-click the selection and choose <strong>"Create Multi-Link..."</strong>. Give the cluster a name, and they will be permanently bonded.
+              </p>
+            </div>
+          </div>
+        {/if}
+      </div>
+
+      <!-- Accordion 5: XL Linking -->
       <div class="rounded-xl border overflow-hidden flex flex-col" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
         <button 
           type="button"
@@ -217,7 +264,7 @@
         {/if}
       </div>
 
-      <!-- Accordion 5: Frameworks & Scripts -->
+      <!-- Accordion 6: Frameworks & Scripts -->
       <div class="rounded-xl border overflow-hidden flex flex-col" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
         <button 
           type="button"
@@ -240,7 +287,7 @@
           <div transition:slide={{ duration: 200 }} class="border-t" style="border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-bg) 30%, transparent);">
             <div class="p-5 space-y-4 text-xs leading-relaxed" style="color: var(--theme-text-muted);">
               <p>
-                R4 Mod Toolbox supports the following Cyberpunk 2077 modding frameworks: Archive, CET (Cyber Engine Tweaks), RED4ext, R6\Scripts (Redscript), and R6\Tweaks (TweakXL).
+                R4 Mod Manager supports the following Cyberpunk 2077 modding frameworks: Archive, CET (Cyber Engine Tweaks), RED4ext, R6\Scripts (Redscript), and R6\Tweaks (TweakXL).
               </p>
               
               <div>
@@ -262,7 +309,7 @@
         {/if}
       </div>
 
-      <!-- Accordion 6: Support & Feedback -->
+      <!-- Accordion 7: Support & Feedback -->
       <div class="rounded-xl border overflow-hidden flex flex-col" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
         <button 
           type="button"
