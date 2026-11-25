@@ -1,10 +1,13 @@
-﻿name: Tauri Build
+name: Tauri Build
 
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-tauri:
@@ -30,16 +33,57 @@ jobs:
       - name: Build Tauri application
         run: npm run tauri build
 
-      - name: Upload Executable Artifact
+      - name: Upload Executable Artifact (Internal Backup)
         uses: actions/upload-artifact@v4
         with:
-          name: r4-mod-toolbox-exe
-          path: src-tauri/target/release/r4-mod-toolbox.exe
+          name: r4-mod-manager-exe
+          path: src-tauri/target/release/r4-mod-manager.exe
           retention-days: 5
 
-      - name: Upload MSI Bundle Artifact
+      - name: Upload MSI Bundle Artifact (Internal Backup)
         uses: actions/upload-artifact@v4
         with:
-          name: r4-mod-toolbox-msi
+          name: r4-mod-manager-msi
           path: src-tauri/target/release/bundle/msi/*.msi
           retention-days: 5
+
+      - name: Publish Official GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: "R4 Mod Manager v0.46.0"
+          draft: false
+          prerelease: false
+          files: |
+            src-tauri/target/release/r4-mod-manager.exe
+            src-tauri/target/release/bundle/msi/*.msi
+          body: |
+            ## 🚀 R4 Mod Manager v0.46.0 Release
+
+            ### 🎉 Global Rebrand
+            * **R4 Mod Manager:** Officially rebranded from "R4 Mod Toolbox" across all UI components, configuration files, and documentation.
+
+            ### 🔗 The Multi-Link System
+            * **Universal UI Parity:** Integrated across all framework tabs (CET, RED4ext, R6\Scripts, R6\Tweaks) and the History tab. Multi-linked mods display a unified orange link icon, expandable cluster drawers, and right-click "Unlink from Cluster" options.
+            * **Transactional Toggling:** Powered by an atomic Rust rollback system to prevent load order corruption if a single file in a cluster fails to toggle.
+
+            ### 📜 Mod Inventory History Overhaul
+            * **Tab Redesign:** Renamed to "Mod Inventory History" with a native Windows-style clickable sorting header.
+            * **Consolidated Date Metrics:** Replaced the wall of dates with a single, unified Date column and a persistent calendar dropdown toggle (R4 First-Seen, OS Created, OS Modified).
+            * **Inline Interactions & .xl Injection:** Direct toggle checkboxes, Shift/Ctrl multi-select, context menus, and accurate OS-level timestamps for loose .xl files.
+
+            ### ✨ UI/UX & Visual Architecture
+            * **Strict Slot Architecture:** Fixed-width slots guarantee laser-straight vertical alignment across all tabs.
+            * **Typography Uniformity & Strikethrough Ban:** Natural rendering for user-selected monospace fonts and clean 50% opacity dimming for disabled mods.
+            * **Instant-On Splash Screen:** Synchronous theme hydration eliminates startup blur lag and gray flashes.
+            * **Modular Theme Engine:** Support for granular `.r4theme` segments (Sidebar, Header, Footer, Canvas, Drawer).
+
+            ### 🛠 Quality of Life & Ergonomics
+            * **Centralized Bulk Actions:** Global "Enable All" and "Disable All" buttons in the bottom footer with safety confirmation dialogs.
+            * **"Hide Disabled" Toggle:** Per-tab filter with live hidden count badges.
+            * **Archive Load Order Communication:** Dismissible banner explaining conflict priority rules to new users.
+            * **Virtual Group Ergonomics:** Explicit "Merge Up" vs "Move to Top" options when deleting groups.
+
+            ### 🐛 Bug Fixes & Stability
+            * **Disabled Folder Visibility:** Child files inside disabled directories properly dim to 50% opacity, and disabled directories hide cleanly.
+            * **Routing & Explorer Fixes:** Automatic folder expansion when locating mods from other views and accurate absolute path resolution in Windows Explorer.
