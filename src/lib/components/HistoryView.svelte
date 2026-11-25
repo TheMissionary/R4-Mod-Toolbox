@@ -6,7 +6,7 @@
   import {
     FolderSearch, ExternalLink, Copy, Check, Search, X,
     Archive, Cpu, Puzzle, FileCode2, Sliders, Power, ArrowDown, ArrowUp, Clock, ChevronDown,
-    Link, Unlink, MessageSquare, MoreVertical, ChevronRight
+    Link, Unlink, MessageSquare, MoreVertical, ChevronRight, Calendar
   } from 'lucide-svelte';
   import NoteModal from '$lib/components/NoteModal.svelte';
 
@@ -32,6 +32,7 @@
   let copiedFeedback = $state(false);
   let searchQuery = $state('');
   
+  let dateViewMode = $state<'first_seen' | 'os_created' | 'os_modified'>('first_seen');
   let sortBy = $state<'name' | 'mod_type' | 'first_seen' | 'os_created' | 'os_modified'>('first_seen');
   let sortDesc = $state(true);
 
@@ -182,6 +183,11 @@
 
   onMount(() => { 
     newModsHours = 999999;
+    const savedDateView = localStorage.getItem('cp2077_history_date_view');
+    if (savedDateView === 'first_seen' || savedDateView === 'os_created' || savedDateView === 'os_modified') {
+      dateViewMode = savedDateView;
+      sortBy = savedDateView;
+    }
     loadRecentMods(); 
     loadMultiLinks();
     loadNotes();
@@ -670,26 +676,32 @@
         {/if}
       </button>
 
-      <button type="button" onclick={() => handleSort('first_seen')} class="w-36 flex items-center gap-1 hover:text-[var(--theme-text-primary)] transition cursor-pointer shrink-0">
-        <span>R4 First-Seen</span>
-        {#if sortBy === 'first_seen'}
-          {#if sortDesc}<ArrowDown class="h-3 w-3" style="color: var(--theme-accent);" />{:else}<ArrowUp class="h-3 w-3" style="color: var(--theme-accent);" />{/if}
-        {/if}
-      </button>
-
-      <button type="button" onclick={() => handleSort('os_created')} class="w-36 flex items-center gap-1 hover:text-[var(--theme-text-primary)] transition cursor-pointer shrink-0 hidden xl:flex">
-        <span>OS Created</span>
-        {#if sortBy === 'os_created'}
-          {#if sortDesc}<ArrowDown class="h-3 w-3" style="color: var(--theme-accent);" />{:else}<ArrowUp class="h-3 w-3" style="color: var(--theme-accent);" />{/if}
-        {/if}
-      </button>
-
-      <button type="button" onclick={() => handleSort('os_modified')} class="w-36 flex items-center gap-1 hover:text-[var(--theme-text-primary)] transition cursor-pointer shrink-0 hidden 2xl:flex">
-        <span>OS Modified</span>
-        {#if sortBy === 'os_modified'}
-          {#if sortDesc}<ArrowDown class="h-3 w-3" style="color: var(--theme-accent);" />{:else}<ArrowUp class="h-3 w-3" style="color: var(--theme-accent);" />{/if}
-        {/if}
-      </button>
+      <!-- Unified Date Column Header -->
+      <div class="w-48 flex items-center gap-2 shrink-0">
+        <Calendar class="h-3.5 w-3.5" style="color: var(--theme-text-muted);" />
+        <select 
+          bind:value={dateViewMode} 
+          onchange={(e) => {
+            const val = e.currentTarget.value;
+            localStorage.setItem('cp2077_history_date_view', val);
+            if (['first_seen', 'os_created', 'os_modified'].includes(sortBy)) {
+              sortBy = val as any;
+            }
+          }}
+          class="bg-transparent focus:outline-none cursor-pointer hover:text-[var(--theme-text-primary)] transition-colors"
+        >
+          <option value="first_seen" style="background-color: var(--theme-surface);">R4 First-Seen</option>
+          <option value="os_created" style="background-color: var(--theme-surface);">OS Created</option>
+          <option value="os_modified" style="background-color: var(--theme-surface);">OS Modified</option>
+        </select>
+        <button type="button" onclick={() => handleSort(dateViewMode)} class="flex items-center hover:text-[var(--theme-text-primary)] transition cursor-pointer">
+          {#if ['first_seen', 'os_created', 'os_modified'].includes(sortBy)}
+            {#if sortDesc}<ArrowDown class="h-3 w-3" style="color: var(--theme-accent);" />{:else}<ArrowUp class="h-3 w-3" style="color: var(--theme-accent);" />{/if}
+          {:else}
+            <ArrowDown class="h-3 w-3 opacity-0" /> <!-- Spacer to prevent layout shift -->
+          {/if}
+        </button>
+      </div>
 
       <div class="w-6 shrink-0"></div> <!-- Note Spacer -->
       <div class="w-10 shrink-0"></div> <!-- Multi-Link Spacer -->
@@ -764,22 +776,12 @@
                 </span>
               </div>
 
-              <!-- Slot 2: R4 First-Seen (w-36) -->
-              <div class="w-36 shrink-0 text-[10px] font-mono" style="color: var(--theme-text-muted);">
-                {formatHistoryDate(new Date(item.first_seen || 0))}
+              <!-- Slot 2: Unified Date (w-48) -->
+              <div class="w-48 shrink-0 text-[10px] font-mono" style="color: var(--theme-text-muted);">
+                {formatHistoryDate(new Date(item[dateViewMode] || 0))}
               </div>
 
-              <!-- Slot 3: OS Created (w-36) -->
-              <div class="w-36 shrink-0 text-[10px] font-mono hidden xl:block" style="color: var(--theme-text-muted);">
-                {formatHistoryDate(new Date(item.os_created || 0))}
-              </div>
-
-              <!-- Slot 4: OS Modified (w-36) -->
-              <div class="w-36 shrink-0 text-[10px] font-mono hidden 2xl:block" style="color: var(--theme-text-muted);">
-                {formatHistoryDate(new Date(item.os_modified || 0))}
-              </div>
-
-              <!-- Slot 5: Note Icon (w-6) -->
+              <!-- Slot 3: Note Icon (w-6) -->
               <div class="w-6 flex justify-center shrink-0">
                 {#if notesConfig[item.name]}
                   <button 
@@ -793,7 +795,7 @@
                 {/if}
               </div>
 
-              <!-- Slot 6: Multi-Link Icon + Chevron (w-10) -->
+              <!-- Slot 4: Multi-Link Icon + Chevron (w-10) -->
               <div class="w-10 flex items-center justify-center gap-0.5 shrink-0">
                 {#if activeCluster}
                   <Link class="h-3.5 w-3.5" style="color: var(--color-warning);" title="Part of Multi-Link Cluster: {activeCluster.name}" />
@@ -813,7 +815,7 @@
                 {/if}
               </div>
 
-              <!-- Slot 7: Context Menu (w-6) -->
+              <!-- Slot 5: Context Menu (w-6) -->
               <div class="w-6 flex justify-end shrink-0">
                 <button
                   type="button"

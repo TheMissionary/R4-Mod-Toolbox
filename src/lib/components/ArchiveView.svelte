@@ -16,7 +16,7 @@
   } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
-  import { tick, untrack } from 'svelte';
+  import { tick, untrack, onMount } from 'svelte';
 
   let {
     archives = $bindable([]),
@@ -56,6 +56,7 @@
   let scrollContainer = $state<HTMLElement | null>(null);
   let showXlHelp = $state(false);
   let showUnassociatedXl = $state(false);
+  let showLoadOrderInfo = $state(true);
 
   let labelsConfig = $state<LabelsConfig>({ categories: [], assignments: {}, orders: {} });
   let notesConfig = $state<Record<string, string>>({});
@@ -102,6 +103,17 @@
   let totalFolders = $derived(localArchives.filter(a => a.is_delimiter).length);
   let collapsedCount = $derived(Object.keys(collapsedFolders).filter(k => collapsedFolders[k]).length);
   let isAllCollapsed = $derived(totalFolders > 0 && collapsedCount === totalFolders);
+
+  onMount(() => {
+    if (localStorage.getItem('cp2077_hide_load_order_info') === 'true') {
+      showLoadOrderInfo = false;
+    }
+  });
+
+  function dismissLoadOrderInfo() {
+    showLoadOrderInfo = false;
+    localStorage.setItem('cp2077_hide_load_order_info', 'true');
+  }
 
   function toggleAllFolders() {
     if (isAllCollapsed) {
@@ -706,6 +718,26 @@
     closeContextMenu();
   }
 
+  async function handleUnlinkMultiLink(clusterId: string, modName: string) {
+    const clusterIdx = multiLinks.findIndex(c => c.id === clusterId);
+    if (clusterIdx === -1) return;
+    
+    let cluster = multiLinks[clusterIdx];
+    cluster.members = cluster.members.filter(m => m.name !== modName);
+    
+    if (cluster.members.length < 2) {
+      multiLinks.splice(clusterIdx, 1);
+    } else {
+      multiLinks[clusterIdx] = cluster;
+    }
+    
+    multiLinks = [...multiLinks];
+    try {
+      await invoke('save_multilinks_config', { clusters: multiLinks });
+    } catch (e) { console.error(e); }
+    closeContextMenu();
+  }
+
   function openContextMenu(event: MouseEvent, target: ArchiveItem | XlItem, targetType: 'archive' | 'xl' | 'unassociated_xl' = 'archive') {
     event.preventDefault();
     event.stopPropagation();
@@ -953,6 +985,7 @@
       ? (contextMenu.archive.associated_xls.length === 1 ? contextMenu.archive.associated_xls[0].file_name : contextMenu.archive.associated_xls.length + ' Companion Files')
       : contextMenu.archive?.file_name}
   {@const isActive = contextMenu.targetType === 'unassociated_xl' ? contextMenu.unassociatedXl?.enabled : contextMenu.archive?.enabled}
+  {@const activeCluster = contextMenu.targetType === 'archive' && contextMenu.archive ? getClusterForMod(contextMenu.archive.file_name) : null}
   
   <div
     class="fixed z-50 w-56 rounded-md border py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
@@ -1104,6 +1137,19 @@
         >
           <Unlink class="h-3.5 w-3.5" style="color: var(--color-warning);" />
           <span>Unlink .xl</span>
+        </button>
+      {/if}
+
+      {#if activeCluster}
+        <div class="h-px my-1 mx-1" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
+        <button
+          type="button"
+          onclick={() => handleUnlinkMultiLink(activeCluster.id, contextMenu.archive!.file_name)}
+          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+          style="color: var(--theme-text-primary);"
+        >
+          <Unlink class="h-3.5 w-3.5" style="color: var(--color-warning);" />
+          <span class="truncate">Unlink from {activeCluster.name}</span>
         </button>
       {/if}
 
@@ -1315,6 +1361,18 @@
         bind:this={scrollContainer}
         class="space-y-0 overflow-y-auto pr-1 flex-1 max-h-[calc(100vh-120px)]"
       >
+        {#if activeViewMode === 'load_order' && showLoadOrderInfo}
+          <div class="mb-3 mx-1 p-3 rounded-lg border flex items-start gap-3 relative shadow-sm" style="background-color: color-mix(in srgb, var(--color-info) 10%, transparent); border-color: color-mix(in srgb, var(--color-info) 30%, transparent);">
+            <Info class="h-5 w-5 shrink-0 mt-0.5" style="color: var(--color-info);" />
+            <div class="text-xs leading-relaxed pr-6" style="color: var(--theme-text-primary);">
+              <strong style="color: var(--color-info);">This is your Archive load order view.</strong> This page shows the order in which your mods are loaded into Cyberpunk 2077. Mods placed higher in the list are prioritized over mods placed lower. All mods are drag-and-drop. More information can be found in the Knowledge Base.
+            </div>
+            <button type="button" onclick={dismissLoadOrderInfo} class="absolute top-2 right-2 p-1 rounded transition cursor-pointer hover:bg-[var(--theme-surface)]" style="color: var(--theme-text-muted);">
+              <X class="h-4 w-4 hover:text-[var(--theme-text-primary)]" />
+            </button>
+          </div>
+        {/if}
+
         {#if visibleItems.length === 0}
           <div class="p-6 text-center text-xs border rounded" style="background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-muted);">
             No matches found.

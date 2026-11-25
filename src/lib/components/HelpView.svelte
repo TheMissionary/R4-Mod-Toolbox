@@ -8,7 +8,7 @@
     MessageSquare, FileCode
   } from 'lucide-svelte';
 
-  let openSection = $state<string | null>('support');
+  let openSection = $state<string | null>(null);
   let clearedFeedback = $state(false);
 
   function toggleSection(section: string) {
@@ -100,7 +100,52 @@
         {/if}
       </div>
 
-      <!-- Accordion 2: Organizer View -->
+      <!-- Accordion 2: Frameworks & Scripts -->
+      <div class="rounded-xl border overflow-hidden flex flex-col" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
+        <button 
+          type="button"
+          onclick={() => toggleSection('frameworks')}
+          class="w-full px-4 py-3 flex items-center justify-between transition-colors cursor-pointer hover:bg-[color-mix(in_srgb,var(--theme-surface)_90%,transparent)]"
+          style="background-color: color-mix(in srgb, var(--theme-surface) 60%, transparent);"
+        >
+          <div class="flex items-center gap-2.5">
+            <Cpu class="h-4 w-4" style="color: var(--theme-accent);" />
+            <h3 class="text-sm font-bold uppercase tracking-wider">Frameworks & Scripts</h3>
+          </div>
+          {#if openSection === 'frameworks'}
+            <ChevronDown class="h-4 w-4" style="color: var(--theme-text-muted);" />
+          {:else}
+            <ChevronRight class="h-4 w-4" style="color: var(--theme-text-muted);" />
+          {/if}
+        </button>
+        
+        {#if openSection === 'frameworks'}
+          <div transition:slide={{ duration: 200 }} class="border-t" style="border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-bg) 30%, transparent);">
+            <div class="p-5 space-y-4 text-xs leading-relaxed" style="color: var(--theme-text-muted);">
+              <p>
+                R4 Mod Manager supports the following Cyberpunk 2077 modding frameworks: Archive, CET (Cyber Engine Tweaks), RED4ext, R6\Scripts (Redscript), and R6\Tweaks (TweakXL).
+              </p>
+              
+              <div>
+                <strong class="block mb-1" style="color: var(--theme-text-primary);">Disabling & Enabling Mods:</strong>
+                R4 uses two highly optimized methods depending on the mod type to ensure safety:
+                <ul class="list-disc pl-5 mt-1.5 space-y-1.5">
+                  <li><strong style="color: var(--theme-text-primary);">Archive Mods:</strong> Toggling an archive renames it in-place (appending <span class="font-mono" style="color: var(--theme-text-primary);">.disabled</span>). It never leaves your mod folder and retains its exact alphabetical position.</li>
+                  <li><strong style="color: var(--theme-text-primary);">Framework & Script Mods:</strong> Toggling these physically moves the files to a <span class="font-mono" style="color: var(--theme-text-primary);">Disabled_Mods</span> folder in the game's root directory to prevent engine compilation errors.</li>
+                </ul>
+                <p class="mt-2">Both methods execute in milliseconds, ensuring the game engine completely ignores the disabled files without permanently deleting your data.</p>
+              </div>
+
+              <div>
+                <strong class="block mb-1" style="color: var(--theme-text-primary);">Viewing & Editing Files:</strong>
+                R4 displays associated mod files directly in the interface. You can right-click mod files (like <span class="font-mono" style="color: var(--theme-text-primary);">.log</span>, <span class="font-mono" style="color: var(--theme-text-primary);">.yaml</span>, <span class="font-mono" style="color: var(--theme-text-primary);">.ini</span>, <span class="font-mono" style="color: var(--theme-text-primary);">.lua</span>, etc.) and select 'Open in Editor'. You can select your preferred text editor in the Settings tab.
+              </div>
+            </div>
+          </div>
+        {/if}
+      </div>
+
+      <!-- Accordion 3: Organizer View -->
       <div class="rounded-xl border overflow-hidden flex flex-col" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
         <button 
           type="button"
@@ -126,7 +171,7 @@
                 <strong style="color: var(--color-info);">Note:</strong> The Organizer View is a completely decoupled visual tool. It allows you to view and organize your mods in a way that works best for you, <strong>without impacting your physical load order or game performance in any way</strong>.
               </div>
               <p>
-                The Organizer View is a purely visual layer that allows you to group your mods into custom-named, color-coded categories (like "Vehicles", "Weapons", or "Clothing") without altering their physical load order.
+                <strong>Enable this feature in Settings > Advanced Integrations.</strong> The Organizer View is a purely visual layer that allows you to group your mods into custom-named, color-coded categories (like "Vehicles", "Weapons", or "Clothing") without altering their physical load order.
               </p>
               <p>
                 <strong>How it works:</strong><br/>
@@ -139,7 +184,7 @@
         {/if}
       </div>
 
-      <!-- Accordion 3: Conflict Resolution -->
+      <!-- Accordion 4: Conflict Resolution -->
       <div class="rounded-xl border overflow-hidden flex flex-col" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
         <button 
           type="button"
@@ -190,7 +235,7 @@
         {/if}
       </div>
 
-      <!-- Accordion 4: Multi-Link System -->
+      <!-- Accordion 5: Multi-Link System -->
       <div class="rounded-xl border overflow-hidden flex flex-col" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
         <button 
           type="button"
@@ -200,7 +245,7 @@
         >
           <div class="flex items-center gap-2.5">
             <Link class="h-4 w-4" style="color: var(--color-warning);" />
-            <h3 class="text-sm font-bold uppercase tracking-wider">Multi-Link System</h3>
+            <h3 class="text-sm font-bold uppercase tracking-wider">Multi-Link Function</h3>
           </div>
           {#if openSection === 'multi_link'}
             <ChevronDown class="h-4 w-4" style="color: var(--theme-text-muted);" />
@@ -214,22 +259,22 @@
             <div class="p-5 space-y-4 text-xs leading-relaxed" style="color: var(--theme-text-muted);">
               <p>
                 <strong style="color: var(--theme-text-primary);">What is Multi-Link?</strong><br/>
-                Some complex mods require multiple files across different frameworks (e.g., an Archive file for models, and a CET plugin for scripts). The Multi-Link system allows you to bond these files together into a single "Cluster".
+                Some mods are made up of multiple files across different frameworks (e.g., an Archive file for models, and a CET plugin for scripts). The Multi-Link system allows you to bond these files together into a single "Cluster".
               </p>
               <p>
                 <strong style="color: var(--theme-text-primary);">Why is it beneficial?</strong><br/>
-                It ensures you never accidentally launch the game with only half a mod enabled, which can cause crashes or broken features. Toggling one member of a Multi-Link cluster automatically toggles all other members, regardless of which tab they are on.
+                It ensures you never accidentally launch the game with only half a mod enabled, which can cause crashes or broken features. Toggling one member of a Multi-Link cluster on or off, automatically toggles all other members, regardless of which tab they are on.
               </p>
               <p>
                 <strong style="color: var(--theme-text-primary);">How to use:</strong><br/>
-                From the <strong>History</strong> tab, hold <kbd class="px-1.5 py-0.5 rounded border font-mono text-[10px]" style="background-color: var(--theme-card); border-color: var(--theme-border); color: var(--theme-text-primary);">Ctrl</kbd> or <kbd class="px-1.5 py-0.5 rounded border font-mono text-[10px]" style="background-color: var(--theme-card); border-color: var(--theme-border); color: var(--theme-text-primary);">Shift</kbd> to select multiple mods across different frameworks. Right-click the selection and choose <strong>"Create Multi-Link..."</strong>. Give the cluster a name, and they will be permanently bonded.
+                From the <strong>History</strong> tab, hold <kbd class="px-1.5 py-0.5 rounded border font-mono text-[10px]" style="background-color: var(--theme-card); border-color: var(--theme-border); color: var(--theme-text-primary);">Ctrl</kbd> or <kbd class="px-1.5 py-0.5 rounded border font-mono text-[10px]" style="background-color: var(--theme-card); border-color: var(--theme-border); color: var(--theme-text-primary);">Shift</kbd> to select multiple mods across different frameworks. Right-click the selection and choose <strong>"Create Multi-Link..."</strong>. Give the cluster a name, and they will always toggle on or off, together.
               </p>
             </div>
           </div>
         {/if}
       </div>
 
-      <!-- Accordion 5: Notes -->
+      <!-- Accordion 6: Notes -->
       <div class="rounded-xl border overflow-hidden flex flex-col" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
         <button 
           type="button"
@@ -258,7 +303,7 @@
                 <strong style="color: var(--theme-text-primary);">Use Cases:</strong><br/>
                 • Store <span class="font-mono" style="color: var(--theme-text-primary);">Game.AddToInventory</span> CET codes for quick access.<br/>
                 • Save specific installation instructions or load order requirements from the mod author.<br/>
-                • Keep track of which in-game items a mod replaces.
+                • Any other note or reminder you wish to keep.
               </p>
               <p>
                 <strong style="color: var(--color-warning);">How to use:</strong> Right-click any mod and select "Add Note..." (or "Edit Note..."). Once a note is saved, a yellow Note icon will appear next to the mod. Hover over the icon to read the note, or click it to edit.
@@ -268,7 +313,7 @@
         {/if}
       </div>
 
-      <!-- Accordion 6: XL Linking -->
+      <!-- Accordion 7: XL Linking -->
       <div class="rounded-xl border overflow-hidden flex flex-col" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
         <button 
           type="button"
@@ -277,7 +322,9 @@
           style="background-color: color-mix(in srgb, var(--theme-surface) 60%, transparent);"
         >
           <div class="flex items-center gap-2.5">
-            <FileCode class="h-4 w-4" style="color: var(--color-info);" />
+            <div class="flex items-center justify-center h-4 w-4 shrink-0">
+              <span class="text-[11px] font-black leading-none" style="color: var(--color-warning);">XL</span>
+            </div>
             <h3 class="text-sm font-bold uppercase tracking-wider">Linking XL Files</h3>
           </div>
           {#if openSection === 'xl_linking'}
@@ -297,53 +344,8 @@
                 If a mod author named them differently, the <span class="font-mono" style="color: var(--theme-text-primary);">.xl</span> file will appear at the bottom of the Archive tab under "Unassociated .xl Files".
               </p>
               <p>
-                <strong style="color: var(--color-info);">How to Link:</strong> Click "Active / Click to Link" on the loose file, search for the parent archive, and confirm. The parent will now display a blue <strong style="color: var(--color-info);">[XL]</strong> badge. Toggling the parent mod will now automatically toggle the linked <span class="font-mono" style="color: var(--theme-text-primary);">.xl</span> file.
+                <strong style="color: var(--color-info);">How to Link:</strong> Click "Active / Click to Link" on the loose file, search for the parent archive, and confirm. The parent will now display an orange <strong style="color: var(--color-warning);">XL</strong> icon. Toggling the parent mod will now automatically toggle the linked <span class="font-mono" style="color: var(--theme-text-primary);">.xl</span> file.
               </p>
-            </div>
-          </div>
-        {/if}
-      </div>
-
-      <!-- Accordion 7: Frameworks & Scripts -->
-      <div class="rounded-xl border overflow-hidden flex flex-col" style="background-color: color-mix(in srgb, var(--theme-surface) 40%, transparent); border-color: var(--theme-border);">
-        <button 
-          type="button"
-          onclick={() => toggleSection('frameworks')}
-          class="w-full px-4 py-3 flex items-center justify-between transition-colors cursor-pointer hover:bg-[color-mix(in_srgb,var(--theme-surface)_90%,transparent)]"
-          style="background-color: color-mix(in srgb, var(--theme-surface) 60%, transparent);"
-        >
-          <div class="flex items-center gap-2.5">
-            <Cpu class="h-4 w-4" style="color: var(--theme-accent);" />
-            <h3 class="text-sm font-bold uppercase tracking-wider">Frameworks & Scripts</h3>
-          </div>
-          {#if openSection === 'frameworks'}
-            <ChevronDown class="h-4 w-4" style="color: var(--theme-text-muted);" />
-          {:else}
-            <ChevronRight class="h-4 w-4" style="color: var(--theme-text-muted);" />
-          {/if}
-        </button>
-        
-        {#if openSection === 'frameworks'}
-          <div transition:slide={{ duration: 200 }} class="border-t" style="border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-bg) 30%, transparent);">
-            <div class="p-5 space-y-4 text-xs leading-relaxed" style="color: var(--theme-text-muted);">
-              <p>
-                R4 Mod Manager supports the following Cyberpunk 2077 modding frameworks: Archive, CET (Cyber Engine Tweaks), RED4ext, R6\Scripts (Redscript), and R6\Tweaks (TweakXL).
-              </p>
-              
-              <div>
-                <strong class="block mb-1" style="color: var(--theme-text-primary);">Disabling & Enabling Mods:</strong>
-                R4 uses two highly optimized methods depending on the mod type to ensure safety:
-                <ul class="list-disc pl-5 mt-1.5 space-y-1.5">
-                  <li><strong style="color: var(--theme-text-primary);">Archive Mods:</strong> Toggling an archive renames it in-place (appending <span class="font-mono" style="color: var(--theme-text-primary);">.disabled</span>). It never leaves your mod folder and retains its exact alphabetical position.</li>
-                  <li><strong style="color: var(--theme-text-primary);">Framework & Script Mods:</strong> Toggling these physically moves the files to a <span class="font-mono" style="color: var(--theme-text-primary);">Disabled_Mods</span> folder in the game's root directory to prevent engine compilation errors.</li>
-                </ul>
-                <p class="mt-2">Both methods execute in milliseconds, ensuring the game engine completely ignores the disabled files without permanently deleting your data.</p>
-              </div>
-
-              <div>
-                <strong class="block mb-1" style="color: var(--theme-text-primary);">Viewing & Editing Files:</strong>
-                R4 displays associated mod files directly in the interface. You can right-click mod files (like <span class="font-mono" style="color: var(--theme-text-primary);">.log</span>, <span class="font-mono" style="color: var(--theme-text-primary);">.yaml</span>, <span class="font-mono" style="color: var(--theme-text-primary);">.ini</span>, <span class="font-mono" style="color: var(--theme-text-primary);">.lua</span>, etc.) and select 'Open in Editor'. You can select your preferred text editor in the Settings tab.
-              </div>
             </div>
           </div>
         {/if}

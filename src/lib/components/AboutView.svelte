@@ -12,6 +12,23 @@
 
   const changelog = [
     {
+      version: "0.46.0",
+      date: "November 2026",
+      changes: [
+        "Global Rebrand: Officially rebranded the application from \"R4 Mod Toolbox\" to \"R4 Mod Manager\" across all UI components, configuration files, and documentation.",
+        "The Multi-Link System: Brought full cross-framework parity to CET, RED4ext, R6\\Scripts, and R6\\Tweaks. Multi-linked mods display a clean orange link icon, expandable cluster drawers, and right-click Unlink actions.",
+        "Transactional Toggling: Built an atomic Rust rollback system ensuring that if any file in a Multi-Link cluster fails to toggle, the entire cluster reverts automatically to prevent engine corruption.",
+        "Mod Inventory History Overhaul: Redesigned the History tab with a Windows-native clickable sorting header, inline toggle interactions, .xl ledger injection, and a consolidated Date column with a calendar toggle (R4 First-Seen, OS Created, OS Modified).",
+        "Strict Slot Architecture: Standardized fixed-width containers across all mod lists, guaranteeing laser-straight vertical alignment of checkboxes, chevrons, and metadata across all tabs.",
+        "Typography Uniformity & Strikethrough Ban: Removed forced bold/medium weights from mod data rows, honoring your chosen monospace font. Disabled mods now communicate status strictly through a clean 50% opacity dimming effect.",
+        "Instant-On Splash Screen: Rewrote the startup screen to use synchronous theme hydration and solid-state rendering, eliminating blur performance penalties and the startup gray flash.",
+        "Centralized Bulk Actions: Relocated Enable All and Disable All buttons to the global status bar, protected by nuclear-option confirmation dialogs.",
+        "Hide Disabled Toggle: Implemented a per-tab status bar toggle to instantly filter out disabled mods with a live counter badge.",
+        "Archive Load Order Communication: Added a dismissible educational banner explaining top-to-bottom conflict priorities to new users.",
+        "Virtual Group Ergonomics: Added explicit 'Merge Up' vs 'Move to Top' handling when deleting virtual groups, and enhanced folder icon visual distinction."
+      ]
+    },
+    {
       version: "0.45.1",
       date: "November 2026",
       changes: [
@@ -156,7 +173,7 @@
             </div>
             <div>
               <div class="text-lg font-bold" style="color: var(--theme-text-primary);">R4 Mod Manager</div>
-              <div class="text-xs font-mono mt-0.5" style="color: var(--theme-text-muted);">Version 0.45.1</div>
+              <div class="text-xs font-mono mt-0.5" style="color: var(--theme-text-muted);">Version 0.46.0</div>
             </div>
           </div>
         </div>

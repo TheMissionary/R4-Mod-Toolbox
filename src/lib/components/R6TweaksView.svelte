@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
   import type { R6TweaksItem, FileNode, MultiLinkCluster } from '$lib/types';
-  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen, EyeOff, Clock, MessageSquare, Link } from 'lucide-svelte';
+  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen, EyeOff, Clock, MessageSquare, Link, Unlink } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { tick } from 'svelte';
@@ -348,10 +348,30 @@
     }
   }
 
+  async function handleUnlinkMultiLink(clusterId: string, modName: string) {
+    const clusterIdx = multiLinks.findIndex(c => c.id === clusterId);
+    if (clusterIdx === -1) return;
+    
+    let cluster = multiLinks[clusterIdx];
+    cluster.members = cluster.members.filter(m => m.name !== modName);
+    
+    if (cluster.members.length < 2) {
+      multiLinks.splice(clusterIdx, 1);
+    } else {
+      multiLinks[clusterIdx] = cluster;
+    }
+    
+    multiLinks = [...multiLinks];
+    try {
+      await invoke('save_multilinks_config', { clusters: multiLinks });
+    } catch (e) { console.error(e); }
+    closeContextMenu();
+  }
+
   let filteredTweaks = $derived.by(() => {
     let arr = tweaks;
     if (hideDisabled) {
-      arr = arr.filter(p => p.enabled || p.is_dir);
+      arr = arr.filter(p => p.enabled);
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
@@ -365,6 +385,7 @@
 
 <!-- Custom Context Menu -->
 {#if contextMenu.visible && (contextMenu.tweak || contextMenu.fileNode)}
+  {@const activeCluster = contextMenu.targetType === 'tweak' && contextMenu.tweak ? getClusterForMod(contextMenu.tweak.name) : null}
   <div
     class="fixed z-50 w-56 rounded-md border py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
     style="left: {contextMenu.x}px; top: {contextMenu.y}px; background-color: var(--theme-card); border-color: var(--theme-border);"
@@ -465,6 +486,19 @@
         <span>{notesConfig[(contextMenu.targetType === 'tweak' ? contextMenu.tweak?.name : contextMenu.fileNode?.name) || ''] ? 'Edit Note...' : 'Add Note...'}</span>
       </button>
 
+      {#if activeCluster}
+        <div class="h-px my-1 mx-1" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
+        <button
+          type="button"
+          onclick={() => handleUnlinkMultiLink(activeCluster.id, contextMenu.tweak!.name)}
+          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+          style="color: var(--theme-text-primary);"
+        >
+          <Unlink class="h-3.5 w-3.5" style="color: var(--color-warning);" />
+          <span class="truncate">Unlink from {activeCluster.name}</span>
+        </button>
+      {/if}
+
       <div class="h-px my-1 mx-1" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
 
       <button
@@ -488,9 +522,9 @@
 {/if}
 
 <!-- Recursive Folder Snippet -->
-{#snippet folderTree(parentPath: string, depth: number)}
+{#snippet folderTree(parentPath: string, depth: number, parentEnabled: boolean)}
   {#if loadingFolders[parentPath]}
-    <div class="flex items-center pr-3 py-1 text-[10px] font-mono" style="padding-left: {4.5 + (depth - 1) * 1.375}rem; color: var(--theme-text-muted);">
+    <div class="flex items-center pr-3 py-1 text-[10px] font-mono {parentEnabled ? 'opacity-100' : 'opacity-50'}" style="padding-left: {4.5 + (depth - 1) * 1.375}rem; color: var(--theme-text-muted);">
       <div class="h-3 w-3 rounded-full border-2 animate-spin mr-2" style="border-color: var(--theme-surface); border-top-color: var(--theme-accent);"></div>
       Loading contents...
     </div>
@@ -500,7 +534,7 @@
         oncontextmenu={(e) => openContextMenu(e, node, 'file')}
         onpointerenter={() => globalSelectedPath = node.path}
         onpointerleave={() => globalSelectedPath = ''}
-        class="group flex items-center justify-between px-2 border-b transition density-row cursor-context-menu hover:bg-[var(--theme-surface)]"
+        class="group flex items-center justify-between px-2 border-b transition density-row cursor-context-menu hover:bg-[var(--theme-surface)] {parentEnabled ? 'opacity-100' : 'opacity-50'}"
         style="padding-left: {4.5 + (depth - 1) * 1.375}rem; border-color: var(--theme-border);"
       >
         <div class="flex items-center gap-1 min-w-0 flex-1">
@@ -565,7 +599,7 @@
         </div>
       </div>
       {#if node.is_dir && expandedFolders[node.path]}
-        {@render folderTree(node.path, depth + 1)}
+        {@render folderTree(node.path, depth + 1, parentEnabled)}
       {/if}
     {/each}
   {/if}
@@ -814,7 +848,7 @@
           {/if}
 
           {#if tweak.is_dir && expandedFolders[tweak.path]}
-            {@render folderTree(tweak.path, 1)}
+            {@render folderTree(tweak.path, 1, tweak.enabled)}
           {/if}
         </div>
       {/each}

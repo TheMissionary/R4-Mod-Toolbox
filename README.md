@@ -1,32 +1,35 @@
-# R4 Mod Toolbox
+# R4 Mod Manager
 
 **Advanced Mod Manager and Conflict Resolver for Cyberpunk 2077**
 
-![Release](https://img.shields.io/badge/Release-v0.45.1-blue.svg)
+![Release](https://img.shields.io/badge/Release-v0.46.0-blue.svg)
 ![Platform](https://img.shields.io/badge/Platform-Windows_10_%7C_11-blue.svg)
-![R4 Mod Toolbox Header](https://raw.githubusercontent.com/TheMissionary/R4-Mod-Toolbox/main/assets/headertemplate4.png)
+![R4 Mod Manager Header](https://raw.githubusercontent.com/TheMissionary/R4-Mod-Toolbox/main/assets/headertemplate4.png)
 
-R4 Mod Toolbox is a high-performance, standalone desktop application built specifically for **manual modders**. If you prefer to download and extract your own mods but require a powerful, visualized dashboard to manage load orders, resolve conflicts, and organize your workspace, R4 is built for you. 
+R4 Mod Manager is a high-performance, standalone desktop application built specifically for **manual modders**. If you prefer to download and extract your own mods but require a powerful, visualized dashboard to manage load orders, resolve conflicts, and organize your workspace, R4 is built for you. 
 
 It does not hijack your downloads or obfuscate your files inside virtual file systems. It simply provides absolute, deterministic control over your existing Cyberpunk 2077 modding ecosystem.
 
 ---
 
-## ✅ Latest Release (v0.45.1)
-R4 Mod Toolbox has officially reached v0.45.1. This hotfix addresses UI lockups caused by runtime log file noise and introduces a Custom Game Launcher option. We are currently gathering community feedback and edge-case reports from users managing massive or highly complex modlists to ensure absolute stability before the 1.0 launch. Please report any bugs or UX friction in the [Issues tab](https://github.com/TheMissionary/R4-Mod-Toolbox/issues). 
+## ✅ Latest Release (v0.46.0)
+R4 Mod Manager has officially reached **v0.46.0**. This major release introduces the **Multi-Link System** with transactional rollback protection across all framework tabs, a complete overhaul of the **Mod Inventory History** view featuring Windows-native sorting and consolidated date metrics, and our new **Strict Slot Architecture** guaranteeing laser-straight vertical alignment. It also features our new **Instant-On Splash Screen** with synchronous theme hydration.
+
+Please report any feedback or edge cases in the [Issues tab](https://github.com/TheMissionary/R4-Mod-Toolbox/issues).
 
 ---
 
 ## 🚀 Key Features
 
+* **The Multi-Link System:** Bond complex mods spanning multiple frameworks (e.g., an Archive file and a CET plugin) into atomic clusters. Toggling any member automatically toggles the entire cluster, backed by a Rust-powered transactional rollback engine that prevents load order corruption.
 * **Organizer View & The Stash:** Group your mods into custom-named, color-coded categories. This purely visual layer allows for deep organization—including a 'Stash' drawer for shelving inactive categories—without altering your physical load order.
 * **Real-Time Conflict Resolution:** R4 scans the internal hashes of every `.archive` file in milliseconds. Instantly see exactly which mods are winning (green) and losing (red) asset conflicts before you even launch the game.
 * **Custom Drag-and-Drop Engine:** Effortlessly reorder your mods or categories with a custom-built, 60fps pointer-based drag-and-drop engine. The UI updates conflict states in real-time as you drag.
-* **Visual Sorting & Multi-Select:** Full OS-level multi-select (Ctrl-click, Shift-click) is supported for moving, disabling, tagging, or organizing multiple mods simultaneously.
-* **Universal Framework Support:** Complete visibility with Windows Explorer-style file trees and safe toggle control over **Archive**, **CET**, **RED4ext**, **R6\Scripts**, and **R6\Tweaks**.
-* **Mod History & Ledger:** Track every mod by its "First Seen" date. Use the universal search or the "Show in History" context menu to instantly locate any file across your entire modding history.
+* **Strict Slot Architecture:** Re-engineered layout across all framework lists. Checkboxes, folder chevrons, icons, and metadata occupy fixed-width slots, guaranteeing pixel-perfect vertical alignment.
+* **Mod Inventory History:** Track your entire modding ledger with a Windows-native clickable sorting header. Easily toggle between *R4 First-Seen*, *OS Created*, and *OS Modified* timestamps with our new consolidated calendar view.
+* **Universal Framework Support:** Complete visibility with Explorer-style file trees and safe toggle control over **Archive**, **CET**, **RED4ext**, **R6\Scripts**, and **R6\Tweaks**.
 * **Smart XL Linking:** ArchiveXL requires `.xl` files to load custom entities. R4 automatically pairs these sidecar files with their parent `.archive`, allowing you to toggle both with a single click.
-* **Advanced Theme Engine:** Personalize your experience with dynamic accent colors, curated typography engines, and full support for custom `.r4theme` zip packs featuring glassmorphism and custom hero banners.
+* **Advanced Theme Engine:** Personalize your experience with dynamic accent colors, curated typography engines, and full support for custom `.r4theme` zip packs featuring modular glassmorphism segments.
 
 ---
 

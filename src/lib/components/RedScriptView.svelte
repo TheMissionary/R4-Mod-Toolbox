@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
-  import type { RedScriptItem, FileNode } from '$lib/types';
-  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen, Clock, MessageSquare } from 'lucide-svelte';
+  import type { RedScriptItem, FileNode, MultiLinkCluster } from '$lib/types';
+  import { Search, X, FolderSearch, Power, Copy, Check, Folder, FileCode, ChevronDown, ChevronRight, FileEdit, MoreVertical, FolderOpen, Clock, MessageSquare, Link, Unlink } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { tick } from 'svelte';
@@ -42,6 +42,9 @@
   let loadingFolders = $state<Record<string, boolean>>({});
 
   let notesConfig = $state<Record<string, string>>({});
+  let multiLinks = $state<MultiLinkCluster[]>([]);
+  let expandedMultiLinks = $state<Record<string, boolean>>({});
+
   let isNoteModalOpen = $state(false);
   let targetNoteModName = $state('');
 
@@ -85,6 +88,9 @@
       invoke<Record<string, string>>('load_notes_config').then(res => {
         notesConfig = res;
       }).catch(err => console.error('Failed to load notes config:', err));
+      invoke<MultiLinkCluster[]>('load_multilinks_config').then(res => {
+        multiLinks = res;
+      }).catch(err => console.error('Failed to load multilinks config:', err));
     }
   });
 
@@ -165,6 +171,14 @@
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  function getClusterForMod(modName: string): MultiLinkCluster | undefined {
+    return multiLinks.find(c => c.members.some(m => m.name === modName));
+  }
+
+  function toggleMultiLink(fileName: string) {
+    expandedMultiLinks[fileName] = !expandedMultiLinks[fileName];
   }
 
   let toggleDebounceTimer: number | null = null;
@@ -328,10 +342,30 @@
     }
   }
 
+  async function handleUnlinkMultiLink(clusterId: string, modName: string) {
+    const clusterIdx = multiLinks.findIndex(c => c.id === clusterId);
+    if (clusterIdx === -1) return;
+    
+    let cluster = multiLinks[clusterIdx];
+    cluster.members = cluster.members.filter(m => m.name !== modName);
+    
+    if (cluster.members.length < 2) {
+      multiLinks.splice(clusterIdx, 1);
+    } else {
+      multiLinks[clusterIdx] = cluster;
+    }
+    
+    multiLinks = [...multiLinks];
+    try {
+      await invoke('save_multilinks_config', { clusters: multiLinks });
+    } catch (e) { console.error(e); }
+    closeContextMenu();
+  }
+
   let filteredPackages = $derived.by(() => {
     let arr = packages;
     if (hideDisabled) {
-      arr = arr.filter(p => p.enabled || p.is_dir);
+      arr = arr.filter(p => p.enabled);
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
@@ -345,6 +379,7 @@
 
 <!-- Custom Context Menu -->
 {#if contextMenu.visible && (contextMenu.pkg || contextMenu.fileNode)}
+  {@const activeCluster = contextMenu.targetType === 'pkg' && contextMenu.pkg ? getClusterForMod(contextMenu.pkg.name) : null}
   <div
     class="fixed z-50 w-56 rounded-md border py-1 shadow-2xl shadow-black/90 text-xs select-none backdrop-blur-md"
     style="left: {contextMenu.x}px; top: {contextMenu.y}px; background-color: var(--theme-card); border-color: var(--theme-border);"
@@ -445,6 +480,19 @@
         <span>{notesConfig[(contextMenu.targetType === 'pkg' ? contextMenu.pkg?.name : contextMenu.fileNode?.name) || ''] ? 'Edit Note...' : 'Add Note...'}</span>
       </button>
 
+      {#if activeCluster}
+        <div class="h-px my-1 mx-1" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
+        <button
+          type="button"
+          onclick={() => handleUnlinkMultiLink(activeCluster.id, contextMenu.pkg!.name)}
+          class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded transition text-left cursor-pointer group hover:brightness-110"
+          style="color: var(--theme-text-primary);"
+        >
+          <Unlink class="h-3.5 w-3.5" style="color: var(--color-warning);" />
+          <span class="truncate">Unlink from {activeCluster.name}</span>
+        </button>
+      {/if}
+
       <div class="h-px my-1 mx-1" style="background-color: color-mix(in srgb, var(--theme-border) 50%, transparent);"></div>
 
       <button
@@ -468,9 +516,9 @@
 {/if}
 
 <!-- Recursive Folder Snippet -->
-{#snippet folderTree(parentPath: string, depth: number)}
+{#snippet folderTree(parentPath: string, depth: number, parentEnabled: boolean)}
   {#if loadingFolders[parentPath]}
-    <div class="flex items-center pr-3 py-1 text-[10px] font-mono" style="padding-left: {4.5 + (depth - 1) * 1.375}rem; color: var(--theme-text-muted);">
+    <div class="flex items-center pr-3 py-1 text-[10px] font-mono {parentEnabled ? 'opacity-100' : 'opacity-50'}" style="padding-left: {4.5 + (depth - 1) * 1.375}rem; color: var(--theme-text-muted);">
       <div class="h-3 w-3 rounded-full border-2 animate-spin mr-2" style="border-color: var(--theme-surface); border-top-color: var(--theme-accent);"></div>
       Loading contents...
     </div>
@@ -480,7 +528,7 @@
         oncontextmenu={(e) => openContextMenu(e, node, 'file')}
         onpointerenter={() => globalSelectedPath = node.path}
         onpointerleave={() => globalSelectedPath = ''}
-        class="group flex items-center justify-between px-2 border-b transition density-row cursor-context-menu hover:bg-[var(--theme-surface)]"
+        class="group flex items-center justify-between px-2 border-b transition density-row cursor-context-menu hover:bg-[var(--theme-surface)] {parentEnabled ? 'opacity-100' : 'opacity-50'}"
         style="padding-left: {4.5 + (depth - 1) * 1.375}rem; border-color: var(--theme-border);"
       >
         <div class="flex items-center gap-1 min-w-0 flex-1">
@@ -545,7 +593,7 @@
         </div>
       </div>
       {#if node.is_dir && expandedFolders[node.path]}
-        {@render folderTree(node.path, depth + 1)}
+        {@render folderTree(node.path, depth + 1, parentEnabled)}
       {/if}
     {/each}
   {/if}
@@ -606,6 +654,8 @@
       {#each filteredPackages as pkg (pkg.name)}
         {@const isHighlighted = highlightedModName === pkg.name}
         {@const isSelected = selectedMod === pkg.name}
+        {@const activeCluster = getClusterForMod(pkg.name)}
+        {@const isMultiLinkExpanded = !!expandedMultiLinks[pkg.name]}
         <div class="flex flex-col">
           <div
             use:registerModNode={pkg.name}
@@ -700,7 +750,22 @@
 
               <!-- Slot 2: Multi-Link Icon + Chevron (w-10) -->
               <div class="w-10 flex items-center justify-center gap-0.5 shrink-0">
-                <!-- Redscript doesn't currently support Multi-Link in the UI, but we keep the slot for alignment -->
+                {#if activeCluster}
+                  <Link class="h-3.5 w-3.5" style="color: var(--color-warning);" title="Part of Multi-Link Cluster: {activeCluster.name}" />
+                  <button
+                    type="button"
+                    onclick={(e) => { e.stopPropagation(); toggleMultiLink(pkg.name); }}
+                    class="p-0.5 rounded transition cursor-pointer hover:bg-[var(--theme-card)]"
+                    style="color: var(--color-warning);"
+                    title="Toggle Multi-Link details"
+                  >
+                    {#if isMultiLinkExpanded}
+                      <ChevronDown class="h-3.5 w-3.5" />
+                    {:else}
+                      <ChevronRight class="h-3.5 w-3.5" />
+                    {/if}
+                  </button>
+                {/if}
               </div>
 
               <!-- Slot 3: File Count (w-20) -->
@@ -732,8 +797,24 @@
             </div>
           </div>
 
+          <!-- Inline Drawer: Multi-Link -->
+          {#if isMultiLinkExpanded && activeCluster}
+            <div class="px-4 py-2 border-t space-y-2 text-xs" style="border-color: color-mix(in srgb, var(--theme-border) 60%, transparent); background-color: color-mix(in srgb, var(--theme-card) 30%, transparent);">
+              <div>
+                <span class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--color-warning);">Multi-Link Cluster: {activeCluster.name}</span>
+                <div class="mt-1 flex flex-wrap gap-1">
+                  {#each activeCluster.members as member}
+                    <button type="button" onclick={(e) => { e.stopPropagation(); if(onRouteToHistory) onRouteToHistory(member.name); }} class="px-1.5 py-0.2 rounded border text-[10px] font-mono cursor-pointer hover:brightness-125 transition-all" style="background-color: color-mix(in srgb, var(--color-warning) 15%, transparent); border-color: color-mix(in srgb, var(--color-warning) 40%, transparent); color: var(--color-warning);" title="Jump to mod">
+                      {member.name}
+                    </button>
+                  {/each}
+                </div>
+              </div>
+            </div>
+          {/if}
+
           {#if pkg.is_dir && expandedFolders[pkg.path]}
-            {@render folderTree(pkg.path, 1)}
+            {@render folderTree(pkg.path, 1, pkg.enabled)}
           {/if}
         </div>
       {/each}
