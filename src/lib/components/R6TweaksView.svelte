@@ -571,7 +571,7 @@
 
           <!-- Slot 3: File Name -->
           <div class="flex items-center min-w-0">
-            <span class="font-mono truncate text-[11px]" style="color: {tweak.enabled ? 'var(--theme-text-primary)' : 'var(--theme-text-muted)'};">
+            <span class="font-mono truncate text-[11px]" style="color: var(--theme-text-primary);">
               {node.name}
             </span>
           </div>
