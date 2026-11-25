@@ -234,10 +234,8 @@
     const cluster = getClusterForMod(entry.name);
 
     if (cluster) {
-      // Transactional Multi-Link Toggle
       try {
         await invoke('toggle_multilink_cluster', { gamePath, cluster, enable: nextState });
-        // Update local state for all members
         const memberNames = new Set(cluster.members.map(m => m.name));
         recentMods = recentMods.map(m => {
           if (memberNames.has(m.name)) {
@@ -249,7 +247,6 @@
         console.error(err);
       }
     } else {
-      // Standard Single Toggle
       entry.enabled = nextState;
       recentMods = [...recentMods];
       try {
@@ -362,14 +359,11 @@
     }
   }
 
-  // Multi-Link Logic
   function openLinkModalFromSelection() {
     const selected = displayMods.filter(m => selectedMods.has(m.path));
-    // Filter out mods that are already in a cluster
     linkDraftMembers = selected.filter(m => !getClusterForMod(m.name));
     
     if (linkDraftMembers.length < 2) {
-      // If they selected mods that are already linked, we can't create a new link with them.
       closeContextMenu();
       return;
     }
@@ -698,7 +692,7 @@
           {#if ['first_seen', 'os_created', 'os_modified'].includes(sortBy)}
             {#if sortDesc}<ArrowDown class="h-3 w-3" style="color: var(--theme-accent);" />{:else}<ArrowUp class="h-3 w-3" style="color: var(--theme-accent);" />{/if}
           {:else}
-            <ArrowDown class="h-3 w-3 opacity-0" /> <!-- Spacer to prevent layout shift -->
+            <ArrowDown class="h-3 w-3 opacity-0" />
           {/if}
         </button>
       </div>
@@ -798,7 +792,9 @@
               <!-- Slot 4: Multi-Link Icon + Chevron (w-10) -->
               <div class="w-10 flex items-center justify-center gap-0.5 shrink-0">
                 {#if activeCluster}
-                  <Link class="h-3.5 w-3.5" style="color: var(--color-warning);" title="Part of Multi-Link Cluster: {activeCluster.name}" />
+                  <span title="Part of Multi-Link Cluster: {activeCluster.name}" class="flex items-center">
+                    <Link class="h-3.5 w-3.5" style="color: var(--color-warning);" />
+                  </span>
                   <button
                     type="button"
                     onclick={(e) => { e.stopPropagation(); toggleMultiLink(item.name); }}

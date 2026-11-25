@@ -228,7 +228,6 @@
     }
   });
 
-  // Tab Exit Effect: Clears Search, Selections, and Highlights
   $effect(() => {
     if (currentTab !== 'archive') {
       untrack(() => {
@@ -248,7 +247,6 @@
     try {
       const report = await invoke<ArchiveScanReport>('save_load_order', { gamePath, loadOrder: archiveNames });
       if (report && Array.isArray(report.archives)) {
-        // Smart Merge: Update conflict data without overwriting optimistic UI state (enabled)
         const payloadMap = new Map(report.archives.map(a => [a.file_name, a]));
         const updatedLocal = localArchives.map(local => {
           const remote = payloadMap.get(local.file_name);
@@ -378,12 +376,10 @@
     isDeleteGroupModalOpen = false;
     
     try {
-      // 1. Delete physical folder
       const report = await invoke<ArchiveScanReport>('delete_physical_folder', { gamePath, folderFileName: archive.file_name });
       delete collapsedFolders[archive.file_name];
 
       if (deleteGroupOption === 'top') {
-        // Find the mods that were under this group in the original localArchives
         const groupIdx = localArchives.findIndex(a => a.file_name === archive.file_name);
         const extractedNames = new Set<string>();
         if (groupIdx !== -1) {
@@ -395,14 +391,13 @@
         }
 
         if (extractedNames.size > 0) {
-          // Reorder the newly returned archives array
           let updated = [...report.archives];
           const extractedItems = updated.filter(a => extractedNames.has(a.file_name));
           updated = updated.filter(a => !extractedNames.has(a.file_name));
           updated.unshift(...extractedItems);
           
           localArchives = updated;
-          await persistState(); // Saves new order and updates scanReport
+          await persistState();
         } else {
           archives = report.archives;
           localArchives = [...archives];
@@ -466,7 +461,7 @@
         if (item.is_delimiter) {
           if (collapsedFolders[item.file_name]) { 
             collapsedFolders[item.file_name] = false; 
-            collapsedFolders = { ...collapsedFolders }; // Trigger Svelte 5 reactivity
+            collapsedFolders = { ...collapsedFolders };
           }
           break;
         }
@@ -1553,7 +1548,9 @@
                       <!-- Slot 4: Multi-Link Icon + Chevron (w-10) -->
                       <div class="w-10 flex items-center justify-center gap-0.5 shrink-0">
                         {#if activeCluster}
-                          <Link class="h-3.5 w-3.5" style="color: var(--color-warning);" title="Part of Multi-Link Cluster: {activeCluster.name}" />
+                          <span title="Part of Multi-Link Cluster: {activeCluster.name}" class="flex items-center">
+                            <Link class="h-3.5 w-3.5" style="color: var(--color-warning);" />
+                          </span>
                           <button
                             type="button"
                             onclick={(e) => { e.stopPropagation(); toggleMultiLink(archive.file_name); }}

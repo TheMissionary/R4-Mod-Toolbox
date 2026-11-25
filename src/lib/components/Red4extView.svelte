@@ -751,7 +751,9 @@
               <!-- Slot 2: Multi-Link Icon + Chevron (w-10) -->
               <div class="w-10 flex items-center justify-center gap-0.5 shrink-0">
                 {#if activeCluster}
-                  <Link class="h-3.5 w-3.5" style="color: var(--color-warning);" title="Part of Multi-Link Cluster: {activeCluster.name}" />
+                  <span title="Part of Multi-Link Cluster: {activeCluster.name}" class="flex items-center">
+                    <Link class="h-3.5 w-3.5" style="color: var(--color-warning);" />
+                  </span>
                   <button
                     type="button"
                     onclick={(e) => { e.stopPropagation(); toggleMultiLink(plugin.name); }}
